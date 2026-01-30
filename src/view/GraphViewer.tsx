@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { GraphData } from "@/types/GraphData";
 import { PhysicsSimulator } from "@/physics/PhysicsSimulator";
 import { GraphVisualizer, ViewTransform } from "@/view/GraphVisualizer";
@@ -9,6 +9,7 @@ import { CommandPalette } from "./CommandPalette";
 import { addCursorStyle } from "@/common/addCursorStyle";
 import { addStateStyles } from "./addNodeStateStyles";
 import { NodeInfoOverlay } from "./NodeInfoOverlay";
+import { KeyboardGraphNavigator } from "./KeyboardGraphNavigator";
 import { getModuleNode, hasModuleNode } from "@/common/dict_graph/api/functional_dict_graph_module_api";
 
 interface GraphViewerProps {
@@ -302,14 +303,24 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ graphData }) => {
         return 'Unknown command. Type "help" for available commands.';
     };
 
+    // Getter callback for KeyboardGraphNavigator
+    const getPhysicsState = useCallback(() =>
+        physicsSimulatorRef.current?.getState() ?? null, []);
+
     return (
         <div style={{ position: "absolute", width: "100%", height: "100%" }}>
             <div style={{ width: "100%", height: "100%", backgroundColor: "black", position: "absolute" }} ref={rootContainerRef}>
                 <div ref={viewportRef} style={{ width: "100%", height: "100%", backgroundColor: "black", position: "absolute" }} />
                 <CommandPalette onCommandRun={handleCommandRun} />
-                <NodeInfoOverlay 
+                <NodeInfoOverlay
                     node={cursorNode ? graphData.nodes.find(n => n.id === cursorNode) || null : null}
                     onClose={() => setCursorNode(null)}
+                />
+                <KeyboardGraphNavigator
+                    graphData={graphData}
+                    cursorNode={cursorNode}
+                    setCursorNode={setCursorNode}
+                    getPhysicsState={getPhysicsState}
                 />
                 {/* Navigator Mode Selector */}
                 <div style={{

@@ -1,9 +1,24 @@
-- [ ] "S" curves instead of lines for edges
-- [ ] Support for a root node in the graph that always needs to be present, if its not, create it
-- [ ] Migrate from regular graphs to directed graphs
-- [ ] Allow for storing information in edges
-- [ ] Migrate over TodoDigraph library
-    - [ ] Don't use separate tree data structure to expand graphs into trees - trees are just a special case of graphs! Use a unified graph data structure.
-        - Instead of expanding to a tree, separate into two functionalities
-            - [ ] solve(), which given some node, solves for its state given its child nodes. This is recursive, and outputs a new augmented graphs with new solved details.
-            - [ ] Then a separate traverse() function, that should be tied to the view instead of the controller, which traverses   through said graph to expand into the final rendered nodes and edges. Note that in this expansion, we could make the traversal treat different paths to the same original node as different nodes - which means we can do the tree expansion within this step too.
+- this tool is nice-ish for now
+- features
+    - refactoring
+        - needs to follow simple data flow, draw it out! manual scaffolding! full understanding of flow before involvement of ai.
+        - no more old shit and compatibility stuff.
+    - features
+        - syntax highlighting
+            - irrelevant nodes given current selected ndoe (50% bright)
+            - remaining nodes that are currently not actionable (75% bright)
+            - actionable nodes (shimmer)
+        - write functionality!
+            - edit tasks using UI (inspector like UI?)
+        - plan feature
+            - in graph: plan node, links up different tasks and execute on it
+        - commands
+            - goto command (specialized)
+            - cli passthrough with tab completion
+            - perhaps expose this as a virtual environment of a REAL shell (very insecure.. better alternatives to unify UI and commands? OH! actually just importing the cli lib..)
+        - structural
+            - better way to model nested UI keyboard shortcuts etc, reconfigurable like vscode would be amazing
+        - backend mcp
+        - better view interpolation
+        - better graph plotting:
+            - right now relationships arent super clear, and the radial nature is a bit disorienting. 

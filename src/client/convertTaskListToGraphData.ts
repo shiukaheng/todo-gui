@@ -66,16 +66,25 @@ export function convertTaskListToGraphData(taskList: TaskListOut): GraphData {
         .filter(node => node.data.parentIds.length === 0)
         .map(node => node.id);
 
-    // Add virtual root node
+    // Add virtual root node with childIds pointing to all top-level nodes
     const rootNode: GraphNode = {
         id: ROOT_NODE_ID,
         data: {
             id: ROOT_NODE_ID,
             text: 'Root',
             isVirtualRoot: true,
+            parentIds: [],
+            childIds: topLevelNodeIds,
         }
     };
     nodes.push(rootNode);
+
+    // Update top-level nodes to have root as their parent
+    for (const node of nodes) {
+        if (topLevelNodeIds.includes(node.id)) {
+            node.data.parentIds = [ROOT_NODE_ID];
+        }
+    }
 
     // Add edges from root to all top-level nodes
     topLevelNodeIds.forEach(nodeId => {
