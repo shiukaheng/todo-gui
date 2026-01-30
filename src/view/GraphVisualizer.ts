@@ -1,4 +1,5 @@
 import { GraphData, GraphNode, GraphEdge } from "@/types/GraphData";
+import { ROOT_NODE_ID } from "@/client/convertTaskListToGraphData";
 import { SpatialNode } from "@/common/app_types/nodeTypes";
 import { DictGraphModule } from "@/common/dict_graph/DictGraphModule";
 import { getModuleNode, hasModuleNode } from "@/common/dict_graph/api/functional_dict_graph_module_api";
@@ -231,14 +232,12 @@ export class GraphVisualizer {
     private render(): void {
         this.svg.innerHTML = '';
 
-        console.log('[GraphVisualizer] Rendering:', {
-            graphDataNodeCount: this.graphData.nodes.length,
-            graphDataNodeIds: this.graphData.nodes.map(n => n.id),
-            spatialModuleNodeIds: Object.keys(this.spatialModule),
-        });
-
-        // Render edges
+        // Render edges (skip virtual root edges)
         for (const edge of this.graphData.edges) {
+            // Skip edges connected to the virtual root node
+            if (edge.source === ROOT_NODE_ID || edge.target === ROOT_NODE_ID) {
+                continue;
+            }
             if (!hasModuleNode(this.spatialModule, edge.source) ||
                 !hasModuleNode(this.spatialModule, edge.target)) {
                 continue;
@@ -246,8 +245,12 @@ export class GraphVisualizer {
             this.renderEdge(edge);
         }
 
-        // Render nodes
+        // Render nodes (skip virtual root node)
         for (const node of this.graphData.nodes) {
+            // Skip the virtual root node
+            if (node.id === ROOT_NODE_ID) {
+                continue;
+            }
             if (!hasModuleNode(this.spatialModule, node.id)) continue;
             this.renderNode(node);
         }
