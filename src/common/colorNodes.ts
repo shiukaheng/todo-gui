@@ -9,16 +9,63 @@ export interface ColoredGraphData extends Omit<GraphData, 'nodes'> {
 }
 
 /**
- * Better hash function using FNV-1a algorithm for more uniform distribution
+ * cyrb128 - a fast, high-quality 128-bit hash designed for seeding PRNGs.
+ * Produces 4 independent 32-bit values with good avalanche properties.
+ * Source: https://github.com/bryc/code/blob/master/jshash/PRNGs.md
+ */
+function cyrb128(str: string): [number, number, number, number] {
+    let h1 = 1779033703, h2 = 3144134277,
+        h3 = 1013904242, h4 = 2773480762;
+    for (let i = 0; i < str.length; i++) {
+        const k = str.charCodeAt(i);
+        h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+        h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+        h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+        h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+    }
+    h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+    h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+    h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+    h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+    h1 ^= h2 ^ h3 ^ h4; h2 ^= h1; h3 ^= h1; h4 ^= h1;
+    return [h1 >>> 0, h2 >>> 0, h3 >>> 0, h4 >>> 0];
+}
+
+/**
+ * sfc32 - a fast, high-quality 32-bit PRNG with 128-bit state.
+ * Better quality than mulberry32, passes PractRand and BigCrush.
+ * Source: https://github.com/bryc/code/blob/master/jshash/PRNGs.md
+ */
+function sfc32(a: number, b: number, c: number, d: number): () => number {
+    return function() {
+        a |= 0; b |= 0; c |= 0; d |= 0;
+        const t = (a + b | 0) + d | 0;
+        d = d + 1 | 0;
+        a = b ^ b >>> 9;
+        b = c + (c << 3) | 0;
+        c = (c << 21 | c >>> 11);
+        c = c + t | 0;
+        return (t >>> 0) / 4294967296;
+    };
+}
+
+/**
+ * Create a seeded PRNG from a string using cyrb128 + sfc32.
+ */
+function seededRandom(str: string): () => number {
+    const seed = cyrb128(str);
+    const rng = sfc32(seed[0], seed[1], seed[2], seed[3]);
+    // Warm up the generator - first ~15 values can be correlated
+    for (let i = 0; i < 15; i++) rng();
+    return rng;
+}
+
+/**
+ * Hash string to [0, 1) using seeded PRNG.
  */
 function hashString(str: string): number {
-    let hash = 2166136261; // FNV offset basis
-    for (let i = 0; i < str.length; i++) {
-        hash ^= str.charCodeAt(i);
-        hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
-    }
-    // Use modulo with a prime number for better distribution
-    return Math.abs(hash % 10007) / 10007;
+    const rng = seededRandom(str);
+    return rng();
 }
 
 /**
@@ -146,54 +193,60 @@ function clampSV(value: number): number {
  * deltaSV: how much saturation/value can change (0-1 scale)
  */
 function randomWalkColorHSV(
-    avgParentColor: [number, number, number], 
-    nodeId: string, 
+    avgParentColor: [number, number, number],
+    nodeId: string,
     deltaHue: number = 0.1,
     deltaSV: number = 0.1
 ): [number, number, number] {
     // Convert RGB to HSV
     const [h, s, v] = rgbToHsv(avgParentColor[0], avgParentColor[1], avgParentColor[2]);
-    
-    // Generate pseudo-random deltas for each channel
-    const hDelta = (hashString(nodeId + "_h") - 0.5) * 2; // Range [-1, 1]
-    const sDelta = (hashString(nodeId + "_s") - 0.5) * 2;
-    const vDelta = (hashString(nodeId + "_v") - 0.5) * 2;
-    
+
+    // Create seeded PRNG and generate deltas
+    const rng = seededRandom(nodeId + "_walk");
+    const hDelta = (rng() - 0.5) * 2; // Range [-1, 1]
+    const sDelta = (rng() - 0.5) * 2;
+    const vDelta = (rng() - 0.5) * 2;
+
     // Apply random walk in HSV space
     const newH = clampHue(h + hDelta * deltaHue);
     const newS = clampSV(s + sDelta * deltaSV);
     const newV = clampSV(v + vDelta * deltaSV);
-    
+
     // Convert back to RGB
     return hsvToRgb(newH, newS, newV);
 }
 
 /**
- * Assign initial colors to nodes based on their ID hash
+ * Assign initial colors to nodes based on their ID using seeded PRNG.
+ * Uses multiple draws from the same RNG for H, S, L.
  */
 function colorNodesInitial(graph: GraphData): ColoredGraphData {
     const coloredNodes: ColoredGraphNode[] = graph.nodes.map(node => {
-        if (node.data.id === "root") {
+        if (node.data.id === "__root__" || node.data.isVirtualRoot) {
             return {
                 ...node,
                 color: [0.5, 0.5, 0.5]
             }
         }
-        // Hash the node ID to get a hue value (0-1)
-        const hue = hashString(node.id);
-        
-        // Use high saturation and medium lightness for vibrant colors
-        const saturation = 0.7;
-        const lightness = 0.6;
-        
+
+        // Create a seeded PRNG from the node ID
+        const rng = seededRandom(node.id);
+
+        // Draw H, S, L from the same RNG instance
+        const hue = rng();
+        // Saturation: 0.55 - 0.85 (vibrant but varied)
+        const saturation = 0.55 + rng() * 0.30;
+        // Lightness: 0.45 - 0.65 (readable range)
+        const lightness = 0.45 + rng() * 0.20;
+
         const color = hslToRgb(hue, saturation, lightness);
-        
+
         return {
             ...node,
             color
         };
     });
-    
+
     return {
         ...graph,
         nodes: coloredNodes
@@ -218,8 +271,8 @@ function propagateColors(
         
         const parents = parentsMap.get(nodeId) || [];
         
-        if (parents.length === 0 || (parents.length === 1 && parents[0] === "root")) {
-            // No parents, keep initial color
+        if (parents.length === 0 || (parents.length === 1 && parents[0] === "__root__")) {
+            // No parents (or only virtual root), keep initial color
             finalColors.set(nodeId, node.color);
         } else {
             // Get parent colors
