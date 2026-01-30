@@ -21,7 +21,7 @@ export const NodeInfoOverlay: React.FC<NodeInfoOverlayProps> = ({ node, onClose 
     };
 
     return (
-        <div className="absolute top-4 left-4 w-80">
+        <div>
             {/* Content */}
             <div className="px-4 space-y-4">
                 {/* ID */}

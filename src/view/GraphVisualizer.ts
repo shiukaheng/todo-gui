@@ -69,6 +69,7 @@ export interface GraphVisualizerCallbacks {
     onNodeDrag?: NodeDragCallback;
     onNodeDrop?: NodeDropCallback;
     onNodeClick?: NodeClickCallback;
+    onViewportDragStart?: () => void;  // Called when user starts dragging the viewport (not a node)
     onMouseDown?: MouseDownCallback;
     onMouseMove?: MouseMoveCallback;
     onMouseUp?: MouseUpCallback;
@@ -400,6 +401,10 @@ export class GraphVisualizer {
     }
 
     private handleMouseDown(event: MouseEvent): void {
+        // Notify that user started dragging the viewport (not a node)
+        if (this.callbacks.onViewportDragStart) {
+            this.callbacks.onViewportDragStart();
+        }
         if (this.callbacks.onMouseDown) {
             this.callbacks.onMouseDown(event);
         }

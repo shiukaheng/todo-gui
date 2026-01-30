@@ -160,12 +160,20 @@ export class GraphNavigator implements INavigator {
     }
 
     public handleMouseMove(event: MouseEvent): void {
+        // Handle case where we switched to this navigator mid-drag
+        // (e.g., auto-switch from auto mode when user starts dragging)
+        if (!this.isDragging && (event.buttons & 1) !== 0) {
+            this.isDragging = true;
+            this.lastPosition = { x: event.clientX, y: event.clientY };
+            return;
+        }
+
         if (!this.isDragging || !this.lastPosition) return;
-        
+
         const dx = event.clientX - this.lastPosition.x;
         const dy = event.clientY - this.lastPosition.y;
         this.lastPosition = { x: event.clientX, y: event.clientY };
-        
+
         // Pan by updating translation
         this.transform.tx += dx;
         this.transform.ty += dy;

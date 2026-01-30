@@ -10,6 +10,7 @@ import { addCursorStyle } from "@/common/addCursorStyle";
 import { addStateStyles } from "./addNodeStateStyles";
 import { NodeInfoOverlay } from "./NodeInfoOverlay";
 import { KeyboardGraphNavigator } from "./KeyboardGraphNavigator";
+import { AppControlPanel } from "./AppControlPanel";
 import { getModuleNode, hasModuleNode } from "@/common/dict_graph/api/functional_dict_graph_module_api";
 
 interface GraphViewerProps {
@@ -29,6 +30,8 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ graphData }) => {
     const [navigatorMode, setNavigatorMode] = useState<'manual' | 'auto'>('manual');
     const navigatorModeRef = useRef<'manual' | 'auto'>('manual');
     const draggedNodeRef = useRef<string | null>(null);
+    const [autoPanEnabled, setAutoPanEnabled] = useState<boolean>(true);
+    const autoPanEnabledRef = useRef<boolean>(true);
     
     // Keep refs in sync with state
     useEffect(() => {
@@ -42,6 +45,10 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ graphData }) => {
     useEffect(() => {
         navigatorModeRef.current = navigatorMode;
     }, [navigatorMode]);
+
+    useEffect(() => {
+        autoPanEnabledRef.current = autoPanEnabled;
+    }, [autoPanEnabled]);
 
     useEffect(() => {
         if (!viewportRef.current) return;
@@ -75,10 +82,10 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ graphData }) => {
                 onNodeDrag: (nodeId, newPosition) => {
                     // Prevent dragging in auto mode
                     if (navigatorModeRef.current === 'auto') return;
-                    
+
                     // Track that this node is being dragged
                     draggedNodeRef.current = nodeId;
-                    
+
                     // On node drag - stop simulation for this node
                     physicsSimulator.nodesToSkipSimulation.add(nodeId);
                     physicsSimulator.setSpatialData(nodeId, { position: [newPosition.x, newPosition.y] });
@@ -87,10 +94,10 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ graphData }) => {
                 onNodeDrop: (nodeId) => {
                     // Prevent drop handling in auto mode
                     if (navigatorModeRef.current === 'auto') return;
-                    
+
                     // Clear drag tracking
                     draggedNodeRef.current = null;
-                    
+
                     // On node drop - resume simulation
                     physicsSimulator.nodesToSkipSimulation.delete(nodeId);
                     physicsSimulator.registerInteraction();
@@ -98,6 +105,10 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ graphData }) => {
                 onNodeClick: (nodeId) => {
                     // On node click
                     setCursorNode(nodeId);
+                },
+                onViewportDragStart: () => {
+                    // Switch to manual mode when user drags the viewport
+                    setNavigatorMode('manual');
                 }
             }
         );
@@ -192,6 +203,13 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ graphData }) => {
             (window as any).graphNavigator = autoNav;
         }
     }, [navigatorMode]);
+
+    // Auto-switch to auto mode when cursor changes to a node (if auto-pan is enabled)
+    useEffect(() => {
+        if (cursorNode !== null && autoPanEnabled) {
+            setNavigatorMode('auto');
+        }
+    }, [cursorNode, autoPanEnabled]);
 
     // Continuously track node position in auto mode
     useEffect(() => {
@@ -312,41 +330,23 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ graphData }) => {
             <div style={{ width: "100%", height: "100%", backgroundColor: "black", position: "absolute" }} ref={rootContainerRef}>
                 <div ref={viewportRef} style={{ width: "100%", height: "100%", backgroundColor: "black", position: "absolute" }} />
                 <CommandPalette onCommandRun={handleCommandRun} />
-                <NodeInfoOverlay
-                    node={cursorNode ? graphData.nodes.find(n => n.id === cursorNode) || null : null}
-                    onClose={() => setCursorNode(null)}
-                />
+                {/* Left Panel */}
+                <div className="absolute top-4 left-4 w-80 flex flex-col gap-2">
+                    <AppControlPanel
+                        autoPanEnabled={autoPanEnabled}
+                        onAutoPanChange={setAutoPanEnabled}
+                    />
+                    <NodeInfoOverlay
+                        node={cursorNode ? graphData.nodes.find(n => n.id === cursorNode) || null : null}
+                        onClose={() => setCursorNode(null)}
+                    />
+                </div>
                 <KeyboardGraphNavigator
                     graphData={graphData}
                     cursorNode={cursorNode}
                     setCursorNode={setCursorNode}
                     getPhysicsState={getPhysicsState}
                 />
-                {/* Navigator Mode Selector */}
-                <div style={{
-                    position: "absolute",
-                    top: "16px",
-                    right: "16px",
-                    zIndex: 1000
-                }}>
-                    <select
-                        value={navigatorMode}
-                        onChange={(e) => setNavigatorMode(e.target.value as 'manual' | 'auto')}
-                        style={{
-                            padding: "8px 12px",
-                            fontSize: "14px",
-                            backgroundColor: "rgba(0, 0, 0, 0.7)",
-                            color: "white",
-                            border: "1px solid rgba(255, 255, 255, 0.2)",
-                            borderRadius: "4px",
-                            cursor: "pointer",
-                            outline: "none"
-                        }}
-                    >
-                        <option value="manual">Manual Navigation</option>
-                        <option value="auto">Auto Focus</option>
-                    </select>
-                </div>
             </div>
         </div>
     );

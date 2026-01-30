@@ -145,7 +145,7 @@ export const KeyboardGraphNavigator: React.FC<KeyboardGraphNavigatorProps> = ({
     }, [cursorNode, nodeMap, filterValidNodes, getNodeLabel]);
 
     // Find and navigate to peer in the given direction relative to selected parent
-    // Uses edge angles from parent: A = counter-clockwise, D = clockwise
+    // Uses edge angles from parent: A = clockwise, D = counter-clockwise
     const findAndNavigateToPeer = useCallback((parentId: string, direction: 'left' | 'right') => {
         if (!cursorNode) return;
 
@@ -177,10 +177,10 @@ export const KeyboardGraphNavigator: React.FC<KeyboardGraphNavigatorProps> = ({
             while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
             while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
 
-            // For 'right' (D), we want clockwise (positive angle diff)
-            // For 'left' (A), we want counter-clockwise (negative angle diff)
-            if (direction === 'right' && angleDiff <= 0) continue;
-            if (direction === 'left' && angleDiff >= 0) continue;
+            // For 'left' (A), we want clockwise (positive angle diff)
+            // For 'right' (D), we want counter-clockwise (negative angle diff)
+            if (direction === 'left' && angleDiff <= 0) continue;
+            if (direction === 'right' && angleDiff >= 0) continue;
 
             const absAngleDiff = Math.abs(angleDiff);
             if (absAngleDiff < bestAngleDiff) {

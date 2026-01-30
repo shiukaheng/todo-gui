@@ -22,3 +22,4 @@
         - better view interpolation
         - better graph plotting:
             - right now relationships arent super clear, and the radial nature is a bit disorienting. 
+            - webcola plotting.
