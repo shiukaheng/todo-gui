@@ -24,6 +24,7 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ graphData }) => {
     
     const [cursorNode, setCursorNode] = useState<string | null>(null);
     const cursorNodeRef = useRef<string | null>(null);
+    const graphDataRef = useRef<GraphData>(graphData);
     const [navigatorMode, setNavigatorMode] = useState<'manual' | 'auto'>('manual');
     const navigatorModeRef = useRef<'manual' | 'auto'>('manual');
     const draggedNodeRef = useRef<string | null>(null);
@@ -32,6 +33,10 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ graphData }) => {
     useEffect(() => {
         cursorNodeRef.current = cursorNode;
     }, [cursorNode]);
+
+    useEffect(() => {
+        graphDataRef.current = graphData;
+    }, [graphData]);
     
     useEffect(() => {
         navigatorModeRef.current = navigatorMode;
@@ -44,7 +49,7 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ graphData }) => {
         const physicsSimulator = new PhysicsSimulator((state) => {
             // Update visualizer when physics state changes
             if (visualizerRef.current) {
-                let styledGraph = addStateStyles(graphData);
+                let styledGraph = addStateStyles(graphDataRef.current);
                 styledGraph = addCursorStyle(styledGraph, cursorNodeRef.current ? [cursorNodeRef.current] : []);
                 visualizerRef.current.updateState(styledGraph, state);
             }

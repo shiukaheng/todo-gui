@@ -79,12 +79,13 @@ export class PhysicsSimulator {
 
     private rectifySpatialModule(): void {
         const nodeIds = new Set(this.graphData.nodes.map(n => n.id));
-        
+
         // Add missing nodes with random positions
         for (const node of this.graphData.nodes) {
             if (!hasModuleNode(this.spatialModule, node.id)) {
                 const sigma = this.simulationParameters.spawnSigma;
                 const position: Vector = [sigma * unitGaussianRandom(), sigma * unitGaussianRandom()];
+                console.log('[PhysicsSimulator] Adding new node:', node.id, 'at position:', position);
                 setModuleNode(this.spatialModule, node.id, { position });
             }
         }

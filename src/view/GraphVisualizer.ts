@@ -231,9 +231,15 @@ export class GraphVisualizer {
     private render(): void {
         this.svg.innerHTML = '';
 
+        console.log('[GraphVisualizer] Rendering:', {
+            graphDataNodeCount: this.graphData.nodes.length,
+            graphDataNodeIds: this.graphData.nodes.map(n => n.id),
+            spatialModuleNodeIds: Object.keys(this.spatialModule),
+        });
+
         // Render edges
         for (const edge of this.graphData.edges) {
-            if (!hasModuleNode(this.spatialModule, edge.source) || 
+            if (!hasModuleNode(this.spatialModule, edge.source) ||
                 !hasModuleNode(this.spatialModule, edge.target)) {
                 continue;
             }
