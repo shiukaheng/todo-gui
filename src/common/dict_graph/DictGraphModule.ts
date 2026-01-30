@@ -1,0 +1,1 @@
+export type DictGraphModule<T> = {[nodeId: string]: T};

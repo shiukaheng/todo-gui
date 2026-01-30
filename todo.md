@@ -1,0 +1,9 @@
+- [ ] "S" curves instead of lines for edges
+- [ ] Support for a root node in the graph that always needs to be present, if its not, create it
+- [ ] Migrate from regular graphs to directed graphs
+- [ ] Allow for storing information in edges
+- [ ] Migrate over TodoDigraph library
+    - [ ] Don't use separate tree data structure to expand graphs into trees - trees are just a special case of graphs! Use a unified graph data structure.
+        - Instead of expanding to a tree, separate into two functionalities
+            - [ ] solve(), which given some node, solves for its state given its child nodes. This is recursive, and outputs a new augmented graphs with new solved details.
+            - [ ] Then a separate traverse() function, that should be tied to the view instead of the controller, which traverses   through said graph to expand into the final rendered nodes and edges. Note that in this expansion, we could make the traversal treat different paths to the same original node as different nodes - which means we can do the tree expansion within this step too.
