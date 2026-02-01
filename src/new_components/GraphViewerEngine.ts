@@ -1,11 +1,17 @@
 import { TaskListOut } from "todo-client";
 import { DataSource } from "./DataSource";
 import { GraphViewerEngineState } from "./GraphViewerEngineState";
+import { nestGraphData } from "../new_utils/nestGraphData";
+import { styleGraphData } from "./styleGraphData";
 
 /**
  * Callback type for pushing state updates back to React.
  */
 export type EngineStateCallback = (state: GraphViewerEngineState) => void;
+
+export type PhysicsState = {
+    [key: string]: [number, number, number, number]; // x, y, vx, vy
+}
 
 /**
  * GraphViewerEngine - Imperative class that owns the animation loop.
@@ -146,39 +152,9 @@ export class GraphViewerEngine {
             // ─────────────────────────────────────────────────────────────
             const { data, isNew, version } = this.dataSource.read();
 
-            if (isNew) {
-                console.log(`[GraphViewerEngine] Frame ${this.frameCount}: NEW DATA (version ${version})`, {
-                    taskCount: data.tasks?.length ?? 0,
-                });
+            const nestedData = nestGraphData(data); // Pre-process to a format thats friendly to add metadata
+            const styledNestedData = styleGraphData(nestedData); // Infer visual style from node data
 
-                // TODO: Rebuild graph structure from new data
-                // this.rebuildGraph(data);
-            }
-
-            // ─────────────────────────────────────────────────────────────
-            // STEP 2: Physics simulation step
-            // ─────────────────────────────────────────────────────────────
-            // TODO: Apply forces and update positions
-            // this.simulatePhysicsStep();
-
-            // ─────────────────────────────────────────────────────────────
-            // STEP 3: Render
-            // ─────────────────────────────────────────────────────────────
-            // TODO: Clear and redraw
-            // this.render();
-
-            // ─────────────────────────────────────────────────────────────
-            // STEP 4: Emit state to React (throttled)
-            // ─────────────────────────────────────────────────────────────
-            // Only emit when something changes, or periodically
-            if (this.frameCount % 10 === 0 || isNew) {
-                this.emitState();
-            }
-
-            // Log periodically for debugging
-            if (this.frameCount % 60 === 0) {
-                console.log(`[GraphViewerEngine] Frame ${this.frameCount}: ticking`);
-            }
 
             this.animationFrameId = requestAnimationFrame(tick);
         };
