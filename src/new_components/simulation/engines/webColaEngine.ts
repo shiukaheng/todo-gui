@@ -88,6 +88,8 @@ export interface WebColaConfig {
     convergenceThreshold?: number;
     /** High-level constraints using string IDs. Default: [] */
     constraints?: Constraint[];
+    /** Padding between disconnected component groups. Set to 0 to disable. Default: 50 */
+    componentPadding?: number;
 }
 
 const DEFAULT_CONFIG: Required<WebColaConfig> = {
@@ -96,9 +98,9 @@ const DEFAULT_CONFIG: Required<WebColaConfig> = {
     flowDirection: undefined as unknown as "x" | "y",
     flowSeparation: 50,
     symmetricDiffLinkLengths: false,
-    // convergenceThreshold: 1e-9, // Very low - keeps running until truly stable
-    convergenceThreshold: 0.01, // Reasonable default for interactive use
+    convergenceThreshold: 0.01,
     constraints: [],
+    componentPadding: 50,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -110,6 +112,7 @@ interface ColaNode extends ColaInputNode {
     id: string; // Our string ID, kept for reverse mapping
     x: number;
     y: number;
+    componentId?: number; // Connected component ID (if available)
 }
 
 /** Internal link representation for WebCola */
@@ -178,14 +181,7 @@ export class WebColaEngine implements SimulationEngine {
 
         // Always tick - this animates smoothly from current positions toward optimal
         if (this.layout) {
-            const converged = this.layout.doTick();
-
-            // WebCola stops when converged. For continuous animation (like force-directed),
-
-            // // we restart it so it keeps responding to external position changes.
-            // if (converged) {
-            //     this.layout.resume();
-            // }
+            this.layout.doTick();
         }
 
         return this.extractState();
@@ -236,7 +232,7 @@ export class WebColaEngine implements SimulationEngine {
         const newNodes: ColaNode[] = [];
         const newNodeIdToIndex = new Map<string, number>();
 
-        for (const taskId of Object.keys(tasks)) {
+        for (const [taskId, taskWrapper] of Object.entries(tasks)) {
             const index = newNodes.length;
             const prevPos = prevState.positions[taskId];
 
@@ -257,6 +253,9 @@ export class WebColaEngine implements SimulationEngine {
                 }
             }
 
+            // Extract componentId if present (from computeConnectedComponents)
+            const componentId = (taskWrapper as { componentId?: number }).componentId;
+
             const node: ColaNode = {
                 id: taskId,
                 index,
@@ -264,6 +263,7 @@ export class WebColaEngine implements SimulationEngine {
                 y,
                 width: 60,  // Default size for avoidOverlaps
                 height: 40,
+                componentId,
             };
 
             newNodes.push(node);
@@ -319,9 +319,19 @@ export class WebColaEngine implements SimulationEngine {
             .nodes(this.colaNodes)
             .links(this.colaLinks)
             .linkDistance(linkDistance)
-            .avoidOverlaps(avoidOverlaps)
             .convergenceThreshold(convergenceThreshold)
             .handleDisconnected(true);
+
+        // Auto-create groups from connected components (if componentId present)
+        const componentGroups = this.buildComponentGroups();
+        if (componentGroups) {
+            // WebCola accepts indices in leaves[], converts to nodes internally
+            // Type assertion needed because @types/webcola expects Node[]
+            this.layout.groups(componentGroups as any);
+            this.layout.avoidOverlaps(true); // Required for group separation
+        } else {
+            this.layout.avoidOverlaps(avoidOverlaps);
+        }
 
         // Optional: flow direction for directed graphs
         if (flowDirection) {
@@ -354,6 +364,41 @@ export class WebColaEngine implements SimulationEngine {
         // IMPORTANT: resume() sets alpha to 0.1, which allows tick() to run
         // Without this, alpha is 0 and tick() immediately returns "converged"
         this.layout.resume();
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // COMPONENT GROUPS
+    // ───────────────────────────────────────────────────────────────────────
+
+    /**
+     * Build WebCola groups from connected components.
+     * Returns null if nodes don't have componentId or only one component exists.
+     */
+    private buildComponentGroups(): Array<{ leaves: number[]; padding: number }> | null {
+        if (this.config.componentPadding === 0) return null;
+        if (this.colaNodes.length === 0) return null;
+
+        // Check if any node has componentId
+        if (this.colaNodes[0].componentId === undefined) return null;
+
+        // Group node indices by componentId
+        const componentMap = new Map<number, number[]>();
+        for (const node of this.colaNodes) {
+            const cid = node.componentId!;
+            if (!componentMap.has(cid)) {
+                componentMap.set(cid, []);
+            }
+            componentMap.get(cid)!.push(node.index!);
+        }
+
+        // Only create groups if multiple components exist
+        if (componentMap.size <= 1) return null;
+
+        // Create a group for each component
+        return Array.from(componentMap.values()).map(indices => ({
+            leaves: indices,
+            padding: this.config.componentPadding,
+        }));
     }
 
     // ───────────────────────────────────────────────────────────────────────

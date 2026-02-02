@@ -83,7 +83,7 @@ export function computeConnectedComponents<G extends NestedGraphData>(
 
     // Union nodes connected by edges
     for (const dep of Object.values(graphData.dependencies)) {
-        uf.union(dep.data.prerequisite_task_id, dep.data.dependent_task_id);
+        uf.union(dep.data.fromId, dep.data.toId);
     }
 
     // Map root IDs to sequential component IDs
