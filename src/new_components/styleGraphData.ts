@@ -156,8 +156,12 @@ export type StyledGraphData<G extends NestedGraphData> = ExtendNestedGraphData<
         text: string;
         color: Color;
         borderColor: Color;
+        outlineWidth: number;
+        glowIntensity: number;
+        glowRadius: number;
         opacity: number;
         specialEffect: SpecialEffect;
+        brightnessMultiplier: number;
     },
     // Edge extra properties
     {
@@ -176,21 +180,16 @@ export function baseStyleGraphData<G extends NestedGraphData>(graphData: G): Sty
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, taskWrapper]) => [
                 taskId,
-                { ...taskWrapper, text: taskId, color: nodeColors.get(taskId) || [1, 1, 1] as Color, borderColor: [0.5, 0.5, 0.5] as Color, opacity: 1.0, specialEffect: "none" as SpecialEffect },
+                { ...taskWrapper, text: taskId, color: nodeColors.get(taskId) || [1, 1, 1] as Color, borderColor: [0.5, 0.5, 0.5] as Color, outlineWidth: 0, glowIntensity: 0, glowRadius: 0, opacity: 1.0, specialEffect: "none" as SpecialEffect, brightnessMultiplier: 1.0 },
             ])
         ),
         dependencies: Object.fromEntries(
             Object.entries(graphData.dependencies).map(([depId, depWrapper]) => [
                 depId,
-                { ...depWrapper, text: "", color: [0.75, 0.75, 0.75] as Color, opacity: 0.8, dotted: false },
+                { ...depWrapper, text: "", color: [0.4, 0.4, 0.4] as Color, opacity: 0.8, dotted: false },
             ])
         ),
     } as StyledGraphData<G>;
-}
-
-/** Darken a color by a factor (0-1). */
-function darkenColor(color: Color, factor: number): Color {
-    return [color[0] * factor, color[1] * factor, color[2] * factor];
 }
 
 /** Apply conditional styling based on node state (e.g., completed, actionable). */
@@ -204,12 +203,13 @@ export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphD
                 const isActionable = data.depsClear && !isCompleted;
 
                 if (isCompleted) {
-                    return [taskId, { ...task, color: darkenColor(task.color, 0.5), borderColor: [0, 0.8, 0] as Color }];
+                    return [taskId, { ...task, brightnessMultiplier: 0.25, borderColor: [0, 0.8, 0] as Color, outlineWidth: 4, glowIntensity: 0.5, glowRadius: 8 }];
                 }
                 if (isActionable) {
-                    return [taskId, { ...task, borderColor: [1, 0.8, 0] as Color }];
+                    return [taskId, { ...task, borderColor: [1, 0.8, 0] as Color, outlineWidth: 4, glowIntensity: 0.5, glowRadius: 8 }];
                 }
-                return [taskId, task];
+                // Blocked: not completed and not actionable
+                return [taskId, { ...task, brightnessMultiplier: 0.25 }];
             })
         ),
     } as G;

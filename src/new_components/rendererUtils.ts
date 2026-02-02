@@ -24,7 +24,11 @@ export interface RenderNode {
     text: string;
     color: Color;
     borderColor: Color;
+    outlineWidth: number;
+    glowIntensity: number;
+    glowRadius: number;
     opacity: number;
+    brightnessMultiplier: number;
     position: Vec2;
 }
 
@@ -47,6 +51,26 @@ export const PADDING = 8;
 
 export function colorToCSS(color: Color): string {
     return `rgb(${Math.round(color[0] * 255)}, ${Math.round(color[1] * 255)}, ${Math.round(color[2] * 255)})`;
+}
+
+/** Convert sRGB component to linear. */
+function srgbToLinear(c: number): number {
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+/** Convert linear component to sRGB. */
+function linearToSrgb(c: number): number {
+    return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+}
+
+/** Apply brightness multiplier to a color in linear space, return CSS string. */
+export function colorToCSSWithBrightness(color: Color, multiplier: number): string {
+    // Convert to linear, multiply, convert back, abs for negative multipliers
+    const r = Math.abs(linearToSrgb(srgbToLinear(color[0]) * multiplier));
+    const g = Math.abs(linearToSrgb(srgbToLinear(color[1]) * multiplier));
+    const b = Math.abs(linearToSrgb(srgbToLinear(color[2]) * multiplier));
+    // Clamp to [0, 1]
+    return `rgb(${Math.round(Math.min(1, r) * 255)}, ${Math.round(Math.min(1, g) * 255)}, ${Math.round(Math.min(1, b) * 255)})`;
 }
 
 export function getTextColor(bg: Color): string {

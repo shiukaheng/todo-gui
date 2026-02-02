@@ -8,6 +8,7 @@ import {
     STROKE_WIDTH,
     PADDING,
     colorToCSS,
+    colorToCSSWithBrightness,
     getTextColor,
     worldToScreen,
 } from "./rendererUtils";
@@ -26,11 +27,60 @@ interface EdgeElements {
 
 export class SVGRenderer {
     private svg: SVGSVGElement;
+    private defs: SVGDefsElement;
     private nodeElements: Map<string, NodeElements> = new Map();
     private edgeElements: Map<string, EdgeElements> = new Map();
 
     constructor(svg: SVGSVGElement) {
         this.svg = svg;
+        this.defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        this.svg.appendChild(this.defs);
+    }
+
+    /** Get or create a glow filter for the given radius and intensity. */
+    private getGlowFilter(radius: number, intensity: number): string {
+        const filterId = `glow-${radius}-${Math.round(intensity * 100)}`;
+        if (!document.getElementById(filterId)) {
+            const filter = document.createElementNS("http://www.w3.org/2000/svg", "filter");
+            filter.setAttribute("id", filterId);
+            filter.setAttribute("x", "-100%");
+            filter.setAttribute("y", "-100%");
+            filter.setAttribute("width", "300%");
+            filter.setAttribute("height", "300%");
+
+            // Blur the source graphic
+            const blur = document.createElementNS("http://www.w3.org/2000/svg", "feGaussianBlur");
+            blur.setAttribute("in", "SourceGraphic");
+            blur.setAttribute("stdDeviation", radius.toString());
+            blur.setAttribute("result", "blur");
+
+            // Adjust opacity of blurred version
+            const colorMatrix = document.createElementNS("http://www.w3.org/2000/svg", "feColorMatrix");
+            colorMatrix.setAttribute("in", "blur");
+            colorMatrix.setAttribute("type", "matrix");
+            colorMatrix.setAttribute("values", `1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 ${intensity} 0`);
+            colorMatrix.setAttribute("result", "glowAlpha");
+
+            // Blend blurred glow with original using screen mode
+            const blend = document.createElementNS("http://www.w3.org/2000/svg", "feBlend");
+            blend.setAttribute("in", "glowAlpha");
+            blend.setAttribute("in2", "SourceGraphic");
+            blend.setAttribute("mode", "screen");
+            blend.setAttribute("result", "glow");
+
+            // Composite original on top
+            const composite = document.createElementNS("http://www.w3.org/2000/svg", "feComposite");
+            composite.setAttribute("in", "SourceGraphic");
+            composite.setAttribute("in2", "glow");
+            composite.setAttribute("operator", "over");
+
+            filter.appendChild(blur);
+            filter.appendChild(colorMatrix);
+            filter.appendChild(blend);
+            filter.appendChild(composite);
+            this.defs.appendChild(filter);
+        }
+        return filterId;
     }
 
     render(data: RenderGraphData, transform: ViewTransform): void {
@@ -79,11 +129,12 @@ export class SVGRenderer {
         }
 
         const { group, rect, text } = elements;
+        const brightness = node.brightnessMultiplier;
 
         // Update text
         text.setAttribute("x", x.toString());
         text.setAttribute("y", y.toString());
-        text.setAttribute("fill", getTextColor(node.color));
+        text.setAttribute("fill", colorToCSSWithBrightness(getTextColor(node.color) === "white" ? [1, 1, 1] : [0, 0, 0], brightness));
         text.textContent = node.text;
 
         // Measure and update rect
@@ -96,8 +147,17 @@ export class SVGRenderer {
         rect.setAttribute("width", rectWidth.toString());
         rect.setAttribute("height", rectHeight.toString());
         rect.setAttribute("rx", (rectHeight / 2).toString());
-        rect.setAttribute("fill", colorToCSS(node.color));
+        rect.setAttribute("fill", colorToCSSWithBrightness(node.color, brightness));
         rect.setAttribute("stroke", colorToCSS(node.borderColor));
+        rect.setAttribute("stroke-width", node.outlineWidth.toString());
+
+        // Apply glow filter if intensity > 0
+        if (node.glowIntensity > 0 && node.glowRadius > 0) {
+            const filterId = this.getGlowFilter(node.glowRadius, node.glowIntensity);
+            group.setAttribute("filter", `url(#${filterId})`);
+        } else {
+            group.removeAttribute("filter");
+        }
 
         group.setAttribute("opacity", node.opacity.toString());
     }
@@ -108,7 +168,6 @@ export class SVGRenderer {
         group.style.pointerEvents = "all";
 
         const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        rect.setAttribute("stroke-width", STROKE_WIDTH.toString());
         rect.style.pointerEvents = "all";
 
         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
