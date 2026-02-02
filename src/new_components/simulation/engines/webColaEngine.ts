@@ -105,8 +105,8 @@ const DEFAULT_CONFIG: Required<WebColaConfig> = {
     convergenceThreshold: 0.01,
     constraints: [],
     virtualRoot: true,
-    componentGrouping: false,
-    componentPadding: 100,
+    componentGrouping: true,
+    componentPadding: 20,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
