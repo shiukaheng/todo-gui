@@ -95,6 +95,7 @@ export class SVGRenderer {
         rect.setAttribute("y", (y - rectHeight / 2).toString());
         rect.setAttribute("width", rectWidth.toString());
         rect.setAttribute("height", rectHeight.toString());
+        rect.setAttribute("rx", (rectHeight / 2).toString());
         rect.setAttribute("fill", colorToCSS(node.color));
         rect.setAttribute("stroke", colorToCSS(node.borderColor));
 
