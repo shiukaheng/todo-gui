@@ -88,7 +88,11 @@ export interface WebColaConfig {
     convergenceThreshold?: number;
     /** High-level constraints using string IDs. Default: [] */
     constraints?: Constraint[];
-    /** Padding between disconnected component groups. Set to 0 to disable. Default: 50 */
+    /** Add virtual root node connecting all parentless nodes (layout-only). Default: true */
+    virtualRoot?: boolean;
+    /** Group disconnected components with bounding box separation. Default: false */
+    componentGrouping?: boolean;
+    /** Padding between component groups (when componentGrouping is true). Default: 100 */
     componentPadding?: number;
 }
 
@@ -100,7 +104,9 @@ const DEFAULT_CONFIG: Required<WebColaConfig> = {
     symmetricDiffLinkLengths: false,
     convergenceThreshold: 0.01,
     constraints: [],
-    componentPadding: 50,
+    virtualRoot: true,
+    componentGrouping: false,
+    componentPadding: 100,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -125,6 +131,9 @@ interface TopologySnapshot {
     nodeIds: string;  // Sorted, joined node IDs
     edgeIds: string;  // Sorted, joined edge IDs
 }
+
+/** ID for the virtual root node (layout-only, not rendered) */
+const VIRTUAL_ROOT_ID = "__virtual_root__";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ENGINE
@@ -288,6 +297,38 @@ export class WebColaEngine implements SimulationEngine {
             });
         }
 
+        // Find nodes with no parents (no incoming edges) - these are "root" nodes
+        const nodesWithParents = new Set<string>();
+        for (const dep of Object.values(dependencies)) {
+            nodesWithParents.add(dep.data.toId);
+        }
+        const rootNodeIds = Object.keys(tasks).filter(id => !nodesWithParents.has(id));
+
+        // Add virtual root node if enabled and multiple root nodes exist
+        if (this.config.virtualRoot && rootNodeIds.length > 1) {
+            const virtualIndex = newNodes.length;
+            const virtualRoot: ColaNode = {
+                id: VIRTUAL_ROOT_ID,
+                index: virtualIndex,
+                x: 0,
+                y: -200, // Position above the tree
+                width: 1,
+                height: 1,
+            };
+            newNodes.push(virtualRoot);
+            newNodeIdToIndex.set(VIRTUAL_ROOT_ID, virtualIndex);
+
+            // Connect virtual root to all parentless nodes
+            for (const rootId of rootNodeIds) {
+                const targetIndex = newNodeIdToIndex.get(rootId)!;
+                newLinks.push({
+                    id: `__virtual_link_${rootId}__`,
+                    source: virtualRoot,
+                    target: newNodes[targetIndex],
+                });
+            }
+        }
+
         // Update internal state
         this.colaNodes = newNodes;
         this.colaLinks = newLinks;
@@ -372,18 +413,19 @@ export class WebColaEngine implements SimulationEngine {
 
     /**
      * Build WebCola groups from connected components.
-     * Returns null if nodes don't have componentId or only one component exists.
+     * Returns null if disabled, nodes don't have componentId, or only one component exists.
      */
     private buildComponentGroups(): Array<{ leaves: number[]; padding: number }> | null {
-        if (this.config.componentPadding === 0) return null;
+        if (!this.config.componentGrouping) return null;
         if (this.colaNodes.length === 0) return null;
 
-        // Check if any node has componentId
-        if (this.colaNodes[0].componentId === undefined) return null;
+        // Check if any real node has componentId
+        const realNodes = this.colaNodes.filter(n => n.id !== VIRTUAL_ROOT_ID);
+        if (realNodes.length === 0 || realNodes[0].componentId === undefined) return null;
 
-        // Group node indices by componentId
+        // Group node indices by componentId (exclude virtual root)
         const componentMap = new Map<number, number[]>();
-        for (const node of this.colaNodes) {
+        for (const node of realNodes) {
             const cid = node.componentId!;
             if (!componentMap.has(cid)) {
                 componentMap.set(cid, []);
@@ -477,11 +519,15 @@ export class WebColaEngine implements SimulationEngine {
 
     /**
      * Extract current positions from cola nodes into SimulationState.
+     * Excludes virtual nodes (layout-only, not for rendering).
      */
     private extractState(): SimulationState {
         const positions: Record<string, Position> = {};
 
         for (const node of this.colaNodes) {
+            // Skip virtual root - it's only for layout
+            if (node.id === VIRTUAL_ROOT_ID) continue;
+
             positions[node.id] = {
                 x: node.x,
                 y: node.y,
