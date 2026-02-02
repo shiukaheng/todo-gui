@@ -87,11 +87,14 @@ export class SVGRenderer {
         text.textContent = node.text;
 
         // Measure and update rect
+        // Note: getBBox() on empty text returns x=0,y=0, so we calculate position manually
         const bbox = text.getBBox();
-        rect.setAttribute("x", (bbox.x - PADDING).toString());
-        rect.setAttribute("y", (bbox.y - PADDING).toString());
-        rect.setAttribute("width", (bbox.width + 2 * PADDING).toString());
-        rect.setAttribute("height", (bbox.height + 2 * PADDING).toString());
+        const rectWidth = Math.max(bbox.width, FONT_SIZE) + 2 * PADDING;
+        const rectHeight = Math.max(bbox.height, FONT_SIZE) + 2 * PADDING;
+        rect.setAttribute("x", (x - rectWidth / 2).toString());
+        rect.setAttribute("y", (y - rectHeight / 2).toString());
+        rect.setAttribute("width", rectWidth.toString());
+        rect.setAttribute("height", rectHeight.toString());
         rect.setAttribute("fill", colorToCSS(node.color));
         rect.setAttribute("stroke", colorToCSS(node.borderColor));
 

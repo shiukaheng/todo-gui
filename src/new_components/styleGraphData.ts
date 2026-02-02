@@ -26,7 +26,7 @@ export function styleGraphData<G extends NestedGraphData>(graphData: G): StyledG
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, taskWrapper]) => [
                 taskId,
-                { ...taskWrapper, text: taskWrapper.data.text ?? taskId, color: [1, 1, 1] as Color, borderColor: [0.5, 0.5, 0.5] as Color, opacity: 1.0, specialEffect: "none" as SpecialEffect },
+                { ...taskWrapper, text: taskWrapper.data.text || taskId, color: [1, 1, 1] as Color, borderColor: [0.5, 0.5, 0.5] as Color, opacity: 1.0, specialEffect: "none" as SpecialEffect },
             ])
         ),
         dependencies: Object.fromEntries(
