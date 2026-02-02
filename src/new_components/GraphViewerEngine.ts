@@ -1,7 +1,7 @@
 import { TaskListOut } from "todo-client";
 import { DataSource } from "./DataSource";
 import { GraphViewerEngineState } from "./GraphViewerEngineState";
-import { nestGraphData } from "../new_utils/nestGraphData";
+import { ExtendNestedGraphData, NestedGraphData, nestGraphData } from "../new_utils/nestGraphData";
 import { styleGraphData } from "./styleGraphData";
 
 /**
@@ -9,9 +9,46 @@ import { styleGraphData } from "./styleGraphData";
  */
 export type EngineStateCallback = (state: GraphViewerEngineState) => void;
 
-export type PhysicsState = {
-    [key: string]: [number, number, number, number]; // x, y, vx, vy
+type MinimalGraph = {
+    nodes: string[]; // Array of node IDs
+    edges: [string, string][]; // Array of [sourceId, targetId]
+};
+
+type GraphSpatialState = {
+    positions: Record<string, { x: number; y: number }>; // Node ID to position mapping
+};
+
+interface SimulationModule {
+    calculate(data: MinimalGraph): GraphSpatialState;
+    saveState(): GraphSpatialState;
+    loadState(state: GraphSpatialState): void;
 }
+
+class DummySimulationModule implements SimulationModule {
+    calculate(data: MinimalGraph): GraphSpatialState {
+        const positions: Record<string, { x: number; y: number }> = {};
+        data.nodes.forEach((nodeId, index) => {
+            positions[nodeId] = { x: Math.cos(index) * 100, y: Math.sin(index) * 100 };
+        });
+        return { positions };
+    }
+    saveState(): GraphSpatialState {
+        return { positions: {} };
+    }
+    loadState(state: GraphSpatialState): void {
+        // No-op for dummy
+    }
+}
+
+export type PositionedGraphData<G extends NestedGraphData> = ExtendNestedGraphData<
+    // Node extra properties
+    {
+        x: number;
+        y: number;
+    },
+    // Edge extra properties
+    {}, G
+>;
 
 /**
  * GraphViewerEngine - Imperative class that owns the animation loop.
@@ -100,6 +137,7 @@ export class GraphViewerEngine {
     private frameCount = 0;
     private isSimulating = true;
     private svg: SVGSVGElement;
+    private simulationModule: SimulationModule | null = null;
 
     // TODO: Add your internal state here
     // private nodes: GraphNode[] = [];
@@ -118,11 +156,21 @@ export class GraphViewerEngine {
         this.svg.style.height = "100%";
         this.container.appendChild(this.svg);
 
-        // TODO: Attach event listeners
-        // this.handleMouseMove = this.handleMouseMove.bind(this);
-        // this.container.addEventListener('mousemove', this.handleMouseMove);
+        // For now, we default to starting with a DummySimulationModule
+        const dummyModule = new DummySimulationModule();
+        this.setSimulationModule(dummyModule);
 
         this.startLoop();
+    }
+
+    setSimulationModule(module: SimulationModule) {
+        // If there's an existing module, save its state
+        let oldState: GraphSpatialState | null = null
+        if (this.simulationModule !== null) {
+            oldState = this.simulationModule.saveState();
+        }
+        this.simulationModule = module;
+        module.loadState(oldState ?? { positions: {} });
     }
 
     /**
@@ -137,6 +185,13 @@ export class GraphViewerEngine {
             // selectedNodeId: this.selectedNodeId,
             // hoveredNodeId: this.hoveredNodeId,
         });
+    }
+
+    private addSpatialData<G extends NestedGraphData>(graphData: G): PositionedGraphData<G> {
+        // Adds x,y positions to each node based on simulation results
+        // If there is no simulationModule, return default positions of (0,0)
+        // Otherwise, get positions from simulationModule
+        throw new Error("Method not implemented.");
     }
 
     /**
@@ -154,7 +209,8 @@ export class GraphViewerEngine {
 
             const nestedData = nestGraphData(data); // Pre-process to a format thats friendly to add metadata
             const styledNestedData = styleGraphData(nestedData); // Infer visual style from node data
-
+            const positionedData = this.addSpatialData(styledNestedData); // Add x,y positions from simulation
+            // TODO: Navigation module (not settable externally)
 
             this.animationFrameId = requestAnimationFrame(tick);
         };
