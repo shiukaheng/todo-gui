@@ -96,7 +96,8 @@ const DEFAULT_CONFIG: Required<WebColaConfig> = {
     flowDirection: undefined as unknown as "x" | "y",
     flowSeparation: 50,
     symmetricDiffLinkLengths: false,
-    convergenceThreshold: 0.01,
+    // convergenceThreshold: 1e-9, // Very low - keeps running until truly stable
+    convergenceThreshold: 0.01, // Reasonable default for interactive use
     constraints: [],
 };
 
@@ -167,7 +168,14 @@ export class WebColaEngine implements SimulationEngine {
 
         // Always tick - this animates smoothly from current positions toward optimal
         if (this.layout) {
-            this.layout.doTick();
+            const converged = this.layout.doTick();
+
+            // WebCola stops when converged. For continuous animation (like force-directed),
+
+            // // we restart it so it keeps responding to external position changes.
+            // if (converged) {
+            //     this.layout.resume();
+            // }
         }
 
         return this.extractState();
@@ -319,6 +327,10 @@ export class WebColaEngine implements SimulationEngine {
             false, // keepRunning = false
             false  // centerGraph = false (preserve positions from prevState)
         );
+
+        // IMPORTANT: resume() sets alpha to 0.1, which allows tick() to run
+        // Without this, alpha is 0 and tick() immediately returns "converged"
+        this.layout.resume();
     }
 
     // ───────────────────────────────────────────────────────────────────────

@@ -75,7 +75,11 @@ export class GraphViewerEngine {
 
         // Default simulation: force-directed layout
         // this.simulationEngine = new ForceDirectedEngine();
-        this.simulationEngine = new WebColaEngine();
+        this.simulationEngine = new WebColaEngine({
+            flowDirection: "y",
+            flowSeparation: 50,
+            symmetricDiffLinkLengths: true,
+        });
 
         // Default navigation: auto-fit content in viewport
         this.navigator = new FitNavigator({ padding: 40, animationDuration: 300 });
