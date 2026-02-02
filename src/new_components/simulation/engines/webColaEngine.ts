@@ -1,0 +1,421 @@
+/**
+ * WebCola Simulation Engine
+ *
+ * Adapts WebCola's constraint-based layout to the SimulationEngine interface.
+ *
+ * Key differences from ForceDirectedEngine:
+ * - Stress minimization (not physics simulation) - converges to optimal layout
+ * - Supports constraints (alignment, separation, groups)
+ * - No deltaTime concept - each tick moves toward optimal regardless of timing
+ */
+
+import { LayoutAdaptor, Node as ColaInputNode, Link } from "webcola";
+import {
+    SimulationEngine,
+    SimulatorInput,
+    SimulationState,
+    Position,
+} from "../types";
+import { NestedGraphData } from "../../../new_utils/nestGraphData";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CUSTOM LAYOUT WITH EXPOSED TICK
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Extends LayoutAdaptor to expose the protected tick() method.
+ * This allows us to step the simulation manually each frame.
+ */
+class ManualTickLayout extends LayoutAdaptor {
+    constructor() {
+        super({
+            // Empty kick - we'll tick manually
+            kick: () => {},
+            // Empty trigger - we don't need events
+            trigger: () => {},
+        });
+    }
+
+    /**
+     * Expose tick() for manual stepping.
+     * Returns true when converged.
+     */
+    public doTick(): boolean {
+        return this.tick();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSTRAINT TYPES (high-level, using string IDs)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Separation constraint: leftId must be left/above rightId by at least gap */
+export interface SeparationConstraint {
+    type: "separation";
+    axis: "x" | "y";
+    leftId: string;
+    rightId: string;
+    gap: number;
+    equality?: boolean; // exact distance vs minimum
+}
+
+/** Alignment constraint: all nodes share same x or y coordinate */
+export interface AlignmentConstraint {
+    type: "alignment";
+    axis: "x" | "y";
+    nodeIds: string[];
+    offsets?: number[]; // optional offset for each node
+}
+
+export type Constraint = SeparationConstraint | AlignmentConstraint;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface WebColaConfig {
+    /** Ideal edge length. Default: 150 */
+    linkDistance?: number;
+    /** Prevent node overlap (requires width/height on nodes). Default: false */
+    avoidOverlaps?: boolean;
+    /** Flow direction for directed graphs. Default: undefined (no flow) */
+    flowDirection?: "x" | "y";
+    /** Minimum separation for flow constraints. Default: 50 */
+    flowSeparation?: number;
+    /** Use symmetric diff for adaptive link lengths. Default: false */
+    symmetricDiffLinkLengths?: boolean;
+    /** Convergence threshold. Default: 0.01 */
+    convergenceThreshold?: number;
+    /** High-level constraints using string IDs. Default: [] */
+    constraints?: Constraint[];
+}
+
+const DEFAULT_CONFIG: Required<WebColaConfig> = {
+    linkDistance: 150,
+    avoidOverlaps: false,
+    flowDirection: undefined as unknown as "x" | "y",
+    flowSeparation: 50,
+    symmetricDiffLinkLengths: false,
+    convergenceThreshold: 0.01,
+    constraints: [],
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INTERNAL TYPES
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Internal node representation for WebCola */
+interface ColaNode extends ColaInputNode {
+    id: string; // Our string ID, kept for reverse mapping
+    x: number;
+    y: number;
+}
+
+/** Internal link representation for WebCola */
+interface ColaLink extends Link<ColaNode> {
+    id: string; // Edge ID for change detection
+}
+
+/** Snapshot of graph topology for change detection */
+interface TopologySnapshot {
+    nodeIds: string;  // Sorted, joined node IDs
+    edgeIds: string;  // Sorted, joined edge IDs
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENGINE
+// ═══════════════════════════════════════════════════════════════════════════
+
+export class WebColaEngine implements SimulationEngine {
+    private config: Required<WebColaConfig>;
+    private layout: ManualTickLayout | null = null;
+
+    // Internal graph representation
+    private colaNodes: ColaNode[] = [];
+    private colaLinks: ColaLink[] = [];
+
+    // Mappings for O(1) lookup
+    private nodeIdToIndex: Map<string, number> = new Map();
+
+    // Topology snapshot for change detection
+    private lastTopology: TopologySnapshot = { nodeIds: "", edgeIds: "" };
+
+    // Track if we've done initial layout
+    private initialized = false;
+
+    constructor(config: WebColaConfig = {}) {
+        this.config = { ...DEFAULT_CONFIG, ...config };
+    }
+
+    step(input: SimulatorInput, prevState: SimulationState): SimulationState {
+        const { graph } = input;
+        // Note: deltaTime is intentionally ignored - WebCola uses stress minimization
+
+        // Compute current topology snapshot
+        const currentTopology = this.computeTopologySnapshot(graph);
+        const topologyChanged = !this.topologyEquals(currentTopology, this.lastTopology);
+
+        if (topologyChanged || !this.initialized) {
+            // Topology changed - full reconciliation
+            this.reconcileGraph(graph, prevState);
+            this.lastTopology = currentTopology;
+            this.initialized = true;
+        } else {
+            // Topology unchanged - just sync any external position changes
+            this.syncPositionsFromState(prevState);
+        }
+
+        // Always tick - this animates smoothly from current positions toward optimal
+        if (this.layout) {
+            this.layout.doTick();
+        }
+
+        return this.extractState();
+    }
+
+    destroy(): void {
+        if (this.layout) {
+            this.layout.stop();
+        }
+        this.layout = null;
+        this.colaNodes = [];
+        this.colaLinks = [];
+        this.nodeIdToIndex.clear();
+        this.lastTopology = { nodeIds: "", edgeIds: "" };
+        this.initialized = false;
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // TOPOLOGY CHANGE DETECTION
+    // ───────────────────────────────────────────────────────────────────────
+
+    private computeTopologySnapshot(graph: NestedGraphData): TopologySnapshot {
+        const nodeIds = Object.keys(graph.tasks).sort().join(",");
+        const edgeIds = Object.keys(graph.dependencies).sort().join(",");
+        return { nodeIds, edgeIds };
+    }
+
+    private topologyEquals(a: TopologySnapshot, b: TopologySnapshot): boolean {
+        return a.nodeIds === b.nodeIds && a.edgeIds === b.edgeIds;
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // GRAPH RECONCILIATION
+    // ───────────────────────────────────────────────────────────────────────
+
+    private reconcileGraph(graph: NestedGraphData, prevState: SimulationState): void {
+        const { tasks, dependencies } = graph;
+
+        // Build new node array
+        const newNodes: ColaNode[] = [];
+        const newNodeIdToIndex = new Map<string, number>();
+
+        for (const taskId of Object.keys(tasks)) {
+            const index = newNodes.length;
+            const prevPos = prevState.positions[taskId];
+
+            // Try to get position from: prevState > existing cola node > random
+            let x: number, y: number;
+            if (prevPos) {
+                x = prevPos.x;
+                y = prevPos.y;
+            } else {
+                const existingIndex = this.nodeIdToIndex.get(taskId);
+                if (existingIndex !== undefined && this.colaNodes[existingIndex]) {
+                    x = this.colaNodes[existingIndex].x;
+                    y = this.colaNodes[existingIndex].y;
+                } else {
+                    // Random initialization (Gaussian around origin)
+                    x = this.gaussianRandom() * 100;
+                    y = this.gaussianRandom() * 100;
+                }
+            }
+
+            const node: ColaNode = {
+                id: taskId,
+                index,
+                x,
+                y,
+                width: 60,  // Default size for avoidOverlaps
+                height: 40,
+            };
+
+            newNodes.push(node);
+            newNodeIdToIndex.set(taskId, index);
+        }
+
+        // Build new link array
+        const newLinks: ColaLink[] = [];
+        for (const [depId, dep] of Object.entries(dependencies)) {
+            const sourceIndex = newNodeIdToIndex.get(dep.data.fromId);
+            const targetIndex = newNodeIdToIndex.get(dep.data.toId);
+
+            // Skip links with missing endpoints
+            if (sourceIndex === undefined || targetIndex === undefined) {
+                continue;
+            }
+
+            newLinks.push({
+                id: depId,
+                source: newNodes[sourceIndex],
+                target: newNodes[targetIndex],
+            });
+        }
+
+        // Update internal state
+        this.colaNodes = newNodes;
+        this.colaLinks = newLinks;
+        this.nodeIdToIndex = newNodeIdToIndex;
+
+        // Recreate layout
+        this.rebuildLayout();
+    }
+
+    private rebuildLayout(): void {
+        const {
+            linkDistance,
+            avoidOverlaps,
+            flowDirection,
+            flowSeparation,
+            symmetricDiffLinkLengths,
+            convergenceThreshold,
+            constraints,
+        } = this.config;
+
+        // Create new layout
+        this.layout = new ManualTickLayout();
+        this.layout
+            .nodes(this.colaNodes)
+            .links(this.colaLinks)
+            .linkDistance(linkDistance)
+            .avoidOverlaps(avoidOverlaps)
+            .convergenceThreshold(convergenceThreshold)
+            .handleDisconnected(true);
+
+        // Optional: flow direction for directed graphs
+        if (flowDirection) {
+            this.layout.flowLayout(flowDirection, flowSeparation);
+        }
+
+        // Optional: adaptive link lengths based on graph structure
+        if (symmetricDiffLinkLengths) {
+            this.layout.symmetricDiffLinkLengths(linkDistance / 10);
+        }
+
+        // Translate high-level constraints to WebCola format
+        if (constraints.length > 0) {
+            const colaConstraints = this.translateConstraints(constraints);
+            this.layout.constraints(colaConstraints);
+        }
+
+        // Initialize layout WITHOUT running iterations
+        // This sets up distance matrix and Descent, but doesn't move nodes
+        // Animation happens naturally through doTick() calls
+        this.layout.start(
+            0,     // No unconstrained iterations
+            0,     // No user constraint iterations
+            0,     // No all-constraint iterations
+            0,     // No grid snap iterations
+            false, // keepRunning = false
+            false  // centerGraph = false (preserve positions from prevState)
+        );
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // CONSTRAINT TRANSLATION
+    // ───────────────────────────────────────────────────────────────────────
+
+    private translateConstraints(constraints: Constraint[]): any[] {
+        const colaConstraints: any[] = [];
+
+        for (const c of constraints) {
+            if (c.type === "separation") {
+                const leftIndex = this.nodeIdToIndex.get(c.leftId);
+                const rightIndex = this.nodeIdToIndex.get(c.rightId);
+
+                if (leftIndex !== undefined && rightIndex !== undefined) {
+                    colaConstraints.push({
+                        axis: c.axis,
+                        left: leftIndex,
+                        right: rightIndex,
+                        gap: c.gap,
+                        equality: c.equality ?? false,
+                    });
+                }
+            } else if (c.type === "alignment") {
+                const offsets: { node: number; offset: number }[] = [];
+
+                for (let i = 0; i < c.nodeIds.length; i++) {
+                    const nodeIndex = this.nodeIdToIndex.get(c.nodeIds[i]);
+                    if (nodeIndex !== undefined) {
+                        offsets.push({
+                            node: nodeIndex,
+                            offset: c.offsets?.[i] ?? 0,
+                        });
+                    }
+                }
+
+                if (offsets.length >= 2) {
+                    colaConstraints.push({
+                        type: "alignment",
+                        axis: c.axis,
+                        offsets,
+                    });
+                }
+            }
+        }
+
+        return colaConstraints;
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // POSITION SYNC
+    // ───────────────────────────────────────────────────────────────────────
+
+    /**
+     * Sync positions from external state into cola nodes.
+     * This handles the case where positions were modified externally
+     * (e.g., user dragging a node).
+     */
+    private syncPositionsFromState(prevState: SimulationState): void {
+        for (const [taskId, pos] of Object.entries(prevState.positions)) {
+            const index = this.nodeIdToIndex.get(taskId);
+            if (index !== undefined && this.colaNodes[index]) {
+                const node = this.colaNodes[index];
+                // Only update if position actually changed (avoid unnecessary perturbation)
+                if (Math.abs(node.x - pos.x) > 0.01 || Math.abs(node.y - pos.y) > 0.01) {
+                    node.x = pos.x;
+                    node.y = pos.y;
+                }
+            }
+        }
+    }
+
+    /**
+     * Extract current positions from cola nodes into SimulationState.
+     */
+    private extractState(): SimulationState {
+        const positions: Record<string, Position> = {};
+
+        for (const node of this.colaNodes) {
+            positions[node.id] = {
+                x: node.x,
+                y: node.y,
+            };
+        }
+
+        return { positions };
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // UTILITIES
+    // ───────────────────────────────────────────────────────────────────────
+
+    /** Box-Muller transform for Gaussian random */
+    private gaussianRandom(): number {
+        let u = 0, v = 0;
+        while (u === 0) u = Math.random();
+        while (v === 0) v = Math.random();
+        return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    }
+}

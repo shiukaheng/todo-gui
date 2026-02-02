@@ -8,6 +8,7 @@ import {
     SimulationState,
     EMPTY_SIMULATION_STATE,
     mergePositions,
+    WebColaEngine,
 } from "./simulation";
 import { ForceDirectedEngine } from "./simulation/engines/forceDirectedEngine";
 import {
@@ -73,7 +74,8 @@ export class GraphViewerEngine {
         this.renderer = new SVGRenderer(this.svg);
 
         // Default simulation: force-directed layout
-        this.simulationEngine = new ForceDirectedEngine();
+        // this.simulationEngine = new ForceDirectedEngine();
+        this.simulationEngine = new WebColaEngine();
 
         // Default navigation: auto-fit content in viewport
         this.navigator = new FitNavigator({ padding: 40, animationDuration: 300 });
