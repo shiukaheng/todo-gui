@@ -16,7 +16,7 @@ export { ViewTransform, RenderGraphData, RenderNode, RenderEdge };
 
 // Simpler / naive implementation of the graph renderer that clears and redraws everything on each render call.
 
-export class SVGRenderer {
+export class SVGRendererRedraw {
     private svg: SVGSVGElement;
 
     constructor(svg: SVGSVGElement) {

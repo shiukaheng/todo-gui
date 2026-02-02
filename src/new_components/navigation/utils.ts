@@ -4,8 +4,17 @@
  * Pure functions for coordinate transformations and bounds calculations.
  */
 
-import { SimulationState, Position } from "../simulation";
-import { ViewTransform, WorldBounds, ViewportInfo, NavigationState, createPanZoomTransform } from "./types";
+import { ViewTransform, ViewportInfo, NavigationState, Position, createPanZoomTransform } from "./types";
+
+/**
+ * Axis-aligned bounding box in world space.
+ */
+export interface WorldBounds {
+    readonly minX: number;
+    readonly minY: number;
+    readonly maxX: number;
+    readonly maxY: number;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // COORDINATE TRANSFORMS
@@ -52,14 +61,14 @@ export function screenToWorld(screen: Position, t: ViewTransform): Position {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Calculate the bounding box of all node positions.
+ * Calculate the bounding box of all task positions from a positioned graph.
  *
- * @param state - Simulation state containing positions
- * @returns World-space bounds, or null if no positions
+ * @param tasks - Object map of tasks with position: [x, y]
+ * @returns World-space bounds, or null if no tasks
  */
-export function calculateWorldBounds(state: SimulationState): WorldBounds | null {
-    const positions = Object.values(state.positions);
-    if (positions.length === 0) {
+export function calculateWorldBounds(tasks: Record<string, { position: [number, number] }>): WorldBounds | null {
+    const taskList = Object.values(tasks);
+    if (taskList.length === 0) {
         return null;
     }
 
@@ -68,11 +77,12 @@ export function calculateWorldBounds(state: SimulationState): WorldBounds | null
     let maxX = -Infinity;
     let maxY = -Infinity;
 
-    for (const pos of positions) {
-        if (pos.x < minX) minX = pos.x;
-        if (pos.y < minY) minY = pos.y;
-        if (pos.x > maxX) maxX = pos.x;
-        if (pos.y > maxY) maxY = pos.y;
+    for (const task of taskList) {
+        const [x, y] = task.position;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
     }
 
     return { minX, minY, maxX, maxY };

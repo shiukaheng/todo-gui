@@ -24,7 +24,7 @@ interface EdgeElements {
     line: SVGLineElement;
 }
 
-export class SVGRendererB {
+export class SVGRenderer {
     private svg: SVGSVGElement;
     private nodeElements: Map<string, NodeElements> = new Map();
     private edgeElements: Map<string, EdgeElements> = new Map();

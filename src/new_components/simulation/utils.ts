@@ -6,72 +6,54 @@
  */
 
 import { NestedGraphData } from "../../new_utils/nestGraphData";
-import { GraphTopology, Position, SimulationState } from "./types";
-
-// ═══════════════════════════════════════════════════════════════════════════
-// EXTRACT TOPOLOGY
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Extract minimal topology from any nested graph data.
- * Discards all properties except structural information.
- *
- * Pure function.
- *
- * @param graph - Graph with nodes and edges (may have extra properties)
- * @returns Topology containing only node IDs and edge pairs
- */
-export function extractTopology<G extends NestedGraphData>(graph: G): GraphTopology {
-    return {
-        nodeIds: graph.nodes.map((n) => n.id),
-        edges: graph.edges.map((e) => [e.source, e.target] as [string, string]),
-    };
-}
+import { Position, SimulationState } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MERGE POSITIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Node with position added.
+ * Task with position added.
  */
-export type WithPosition<T> = T & { x: number; y: number };
+export type WithPosition<T> = T & { position: [number, number] };
 
 /**
- * Graph data with positions merged into nodes.
+ * Graph data with positions merged into tasks.
  */
 export type PositionedGraphData<G extends NestedGraphData> = {
-    nodes: WithPosition<G["nodes"][number]>[];
-    edges: G["edges"];
+    tasks: {
+        [K in keyof G["tasks"]]: WithPosition<G["tasks"][K]>;
+    };
+    dependencies: G["dependencies"];
 };
 
 /**
- * Merge positions from simulation state into graph nodes.
+ * Merge positions from simulation state into graph tasks.
  *
  * Pure function.
  *
- * @param graph - Graph data (nodes without positions)
+ * @param graph - Graph data (tasks without positions)
  * @param state - Simulation state with positions
- * @returns New graph with x,y added to each node
- *
- * @throws If a node has no position in state (simulation should always provide all)
+ * @returns New graph with position: [x, y] added to each task
  */
 export function mergePositions<G extends NestedGraphData>(
     graph: G,
     state: SimulationState
 ): PositionedGraphData<G> {
-    const positionedNodes = graph.nodes.map((node) => {
-        const pos = state.positions[node.id];
+    const positionedTasks: Record<string, WithPosition<G["tasks"][string]>> = {};
+
+    for (const [taskId, task] of Object.entries(graph.tasks)) {
+        const pos = state.positions[taskId];
         if (!pos) {
-            // Fallback to origin if missing (shouldn't happen if engine is correct)
-            console.warn(`[mergePositions] Missing position for node: ${node.id}`);
-            return { ...node, x: 0, y: 0 };
+            console.warn(`[mergePositions] Missing position for task: ${taskId}`);
+            positionedTasks[taskId] = { ...task, position: [0, 0] } as WithPosition<G["tasks"][string]>;
+        } else {
+            positionedTasks[taskId] = { ...task, position: [pos.x, pos.y] } as WithPosition<G["tasks"][string]>;
         }
-        return { ...node, x: pos.x, y: pos.y };
-    });
+    }
 
     return {
-        nodes: positionedNodes,
-        edges: graph.edges,
-    };
+        tasks: positionedTasks,
+        dependencies: graph.dependencies,
+    } as PositionedGraphData<G>;
 }

@@ -7,18 +7,17 @@ import {
     SimulationEngine,
     SimulationState,
     EMPTY_SIMULATION_STATE,
-    extractTopology,
     mergePositions,
 } from "./simulation";
-import { createRandomInitEngine } from "./simulation/engines/nullEngine";
+import { RandomInitEngine } from "./simulation/engines/nullEngine";
 import {
     Navigator,
     NavigationState,
     INITIAL_NAVIGATION_STATE,
     ViewportInfo,
 } from "./navigation";
-import { calculateWorldBounds, fitBoundsToViewport } from "./navigation/utils";
-import { createFitNavigator } from "./navigation/navigators/fitNavigator";
+import { FitNavigator } from "./navigation/navigators/fitNavigator";
+import { SVGRenderer } from "./SVGRenderer";
 
 /**
  * Callback type for pushing state updates back to React.
@@ -50,6 +49,9 @@ export class GraphViewerEngine {
     private navigator: Navigator;
     private navigationState: NavigationState = INITIAL_NAVIGATION_STATE;
 
+    // Rendering: draws to SVG with reconciliation
+    private renderer: SVGRenderer;
+
     constructor(
         private container: HTMLDivElement,
         private dataSource: DataSource<TaskListOut>,
@@ -63,11 +65,14 @@ export class GraphViewerEngine {
         this.svg.style.height = "100%";
         this.container.appendChild(this.svg);
 
+        // Create renderer (reconciliation-based for performance)
+        this.renderer = new SVGRenderer(this.svg);
+
         // Default simulation: random positions (no actual layout)
-        this.simulationEngine = createRandomInitEngine(100);
+        this.simulationEngine = new RandomInitEngine(100);
 
         // Default navigation: auto-fit content in viewport
-        this.navigator = createFitNavigator({ padding: 40, animationDuration: 300 });
+        this.navigator = new FitNavigator({ padding: 40, animationDuration: 300 });
 
         this.lastFrameTime = performance.now();
         this.startLoop();
@@ -76,23 +81,21 @@ export class GraphViewerEngine {
     /**
      * Replace the simulation engine.
      * Current positions are preserved and passed to the new engine.
+     * The old engine is destroyed if it has a destroy method.
      */
     setSimulationEngine(engine: SimulationEngine): void {
-        this.simulationEngine.reset();
+        this.simulationEngine.destroy?.();
         this.simulationEngine = engine;
-        // simulationState (positions) is preserved automatically -
-        // new engine will receive it on next step() call
     }
 
     /**
      * Replace the navigator.
      * Current view transform is preserved and passed to the new navigator.
+     * The old navigator is destroyed if it has a destroy method.
      */
     setNavigator(navigator: Navigator): void {
-        this.navigator.reset();
+        this.navigator.destroy?.();
         this.navigator = navigator;
-        // navigationState (transform) is preserved automatically -
-        // new navigator will receive it on next step() call
     }
 
     /**
@@ -155,17 +158,17 @@ export class GraphViewerEngine {
             // The simulation engine determines WHERE nodes should be laid
             // out in an abstract "world space" coordinate system.
             //
-            // Pipeline:
-            //   a) extractTopology: graph -> { nodeIds, edges }
-            //   b) engine.step: (topology, prevPositions) -> newPositions
-            //   c) mergePositions: (styledData, positions) -> positionedData
+            // Receives full graph so it can access any node/edge properties
+            // (e.g., weight nodes by priority). Extracts what it needs internally.
             //
             // The engine is stateful (may track velocities internally) but
             // has a functional interface. Positions are portable across
             // different engine implementations.
             // ─────────────────────────────────────────────────────────────
-            const topology = extractTopology(styledData);
-            this.simulationState = this.simulationEngine.step(topology, this.simulationState);
+            this.simulationState = this.simulationEngine.step(
+                { graph: styledData, deltaTime },
+                this.simulationState
+            );
             const positionedData = mergePositions(styledData, this.simulationState);
 
             // ─────────────────────────────────────────────────────────────
@@ -176,36 +179,37 @@ export class GraphViewerEngine {
             // - At what scale (zoom)
             // - Optionally animated transitions
             //
+            // Receives full positioned graph so it can access any node
+            // properties (e.g., focus on selected/highlighted nodes).
+            //
             // This produces a ViewTransform (2D affine matrix) that maps
             // world coordinates to screen pixels. Different navigators
             // enable different behaviors:
             // - FitNavigator: auto-fit all content
-            // - StaticNavigator: manual pan/zoom (Google Maps style)
-            // - FocusNavigator: track a specific node
+            // - StaticNavigator: preserve current view
             //
             // The navigator is stateful (may track animation progress) but
             // has a functional interface. The transform is portable.
             // ─────────────────────────────────────────────────────────────
-            const worldBounds = calculateWorldBounds(this.simulationState);
-            if (worldBounds) {
-                this.navigationState = this.navigator.step(
-                    {
-                        worldBounds,
-                        viewport: this.getViewport(),
-                        deltaTime,
-                    },
-                    this.navigationState
-                );
-            }
+            this.navigationState = this.navigator.step(
+                {
+                    graph: positionedData,
+                    viewport: this.getViewport(),
+                    deltaTime,
+                },
+                this.navigationState
+            );
 
             // ─────────────────────────────────────────────────────────────
-            // STEP 6: Render (TODO)
+            // STEP 6: Render - draw to SVG
             //
-            // Apply the navigation transform to node positions and render
-            // to SVG. The renderer receives:
-            // - positionedData: nodes with world-space x,y
-            // - navigationState.transform: world → screen matrix
+            // The renderer takes positioned graph data and the view transform,
+            // then draws/updates SVG elements. Uses reconciliation to minimize
+            // DOM operations (only updates changed elements).
+            //
+            // This is a terminal side effect - no state produced.
             // ─────────────────────────────────────────────────────────────
+            this.renderer.render(positionedData, this.navigationState.transform);
 
             this.animationFrameId = requestAnimationFrame(tick);
         };
@@ -228,6 +232,12 @@ export class GraphViewerEngine {
             this.animationFrameId = null;
         }
 
+        // Clean up compositional objects
+        this.simulationEngine.destroy?.();
+        this.navigator.destroy?.();
+        this.renderer.clear();
+
+        // Remove SVG from DOM
         this.svg.remove();
     }
 }

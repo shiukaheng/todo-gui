@@ -14,6 +14,13 @@
  * - Fit-to-content
  */
 
+import { NestedGraphData } from "../../new_utils/nestGraphData";
+import { Position } from "../simulation/types";
+import { PositionedGraphData } from "../simulation/utils";
+
+// Re-export for convenience
+export { Position };
+
 // ═══════════════════════════════════════════════════════════════════════════
 // VIEW TRANSFORM
 // ═══════════════════════════════════════════════════════════════════════════
@@ -106,43 +113,27 @@ export interface ViewportInfo {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// WORLD BOUNDS
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Axis-aligned bounding box in world space.
- * Useful for fit-to-content calculations.
- */
-export interface WorldBounds {
-    readonly minX: number;
-    readonly minY: number;
-    readonly maxX: number;
-    readonly maxY: number;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // NAVIGATOR
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
  * Input to the navigator's step function.
- * Contains everything the navigator might need to decide the next view.
+ *
+ * Receives the full positioned graph data so navigators can access any
+ * task properties they need (e.g., focus on selected/highlighted tasks).
+ *
+ * Tasks exist on an infinite 2D plane. The navigator decides which
+ * part of that plane is visible on screen.
  */
-export interface NavigatorInput {
-    /** Current world-space bounds of all nodes. */
-    readonly worldBounds: WorldBounds;
+export interface NavigatorInput<G extends NestedGraphData = NestedGraphData> {
+    /** Full graph data with positions (tasks have .position: [x, y]). */
+    readonly graph: PositionedGraphData<G>;
 
     /** Screen viewport dimensions. */
     readonly viewport: ViewportInfo;
 
     /** Time since last frame in milliseconds (for animations). */
     readonly deltaTime: number;
-
-    /** Optional: ID of node to focus on (for auto-focus navigators). */
-    readonly focusNodeId?: string;
-
-    /** Optional: World position of focus node. */
-    readonly focusPosition?: { x: number; y: number };
 }
 
 /**
@@ -154,77 +145,21 @@ export interface NavigatorInput {
  * Contract:
  * - MUST return a valid ViewTransform
  * - SHOULD smoothly interpolate when animating
- * - MAY ignore focusNodeId if not an auto-focus navigator
  */
 export interface Navigator {
     /**
      * Compute the next navigation state.
      *
-     * @param input - World bounds, viewport size, delta time, focus info
+     * @param input - Positions, viewport size, delta time
      * @param prevState - Previous navigation state
      * @returns New navigation state
      */
     step(input: NavigatorInput, prevState: NavigationState): NavigationState;
 
     /**
-     * Reset internal state (animation progress, momentum, etc.)
+     * Clean up any resources held by the navigator (timers, listeners, etc.)
+     * Called when the navigator is replaced or the parent is destroyed.
      */
-    reset(): void;
-
-    /**
-     * Handle user input events (pan, zoom gestures).
-     * Returns true if the event was handled.
-     *
-     * This is called outside the animation loop when user interacts.
-     */
-    handleInput?(event: NavigatorEvent): boolean;
+    destroy?(): void;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// NAVIGATOR EVENTS
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Pan event (user dragging the viewport).
- */
-export interface PanEvent {
-    readonly type: "pan";
-    /** Delta in screen pixels. */
-    readonly deltaX: number;
-    readonly deltaY: number;
-}
-
-/**
- * Zoom event (user scrolling or pinching).
- */
-export interface ZoomEvent {
-    readonly type: "zoom";
-    /** Zoom factor (> 1 = zoom in, < 1 = zoom out). */
-    readonly factor: number;
-    /** Zoom center in screen coordinates. */
-    readonly centerX: number;
-    readonly centerY: number;
-}
-
-/**
- * Fit-to-content request.
- */
-export interface FitEvent {
-    readonly type: "fit";
-    /** Optional padding in pixels. */
-    readonly padding?: number;
-}
-
-/**
- * Union of all navigator input events.
- */
-export type NavigatorEvent = PanEvent | ZoomEvent | FitEvent;
-
-// ═══════════════════════════════════════════════════════════════════════════
-// FACTORY TYPE
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Factory function that creates a navigator.
- */
-export type CreateNavigator<TConfig = void> = (config: TConfig) => Navigator;

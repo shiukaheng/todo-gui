@@ -6,21 +6,7 @@
  * different layout strategies (force-directed, constraint-based, etc.)
  */
 
-// ═══════════════════════════════════════════════════════════════════════════
-// GRAPH TOPOLOGY
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Minimal graph structure that affects layout computation.
- * Distilled from the full graph data - only what the simulation needs.
- */
-export interface GraphTopology {
-    /** Node identifiers. Order is not significant. */
-    nodeIds: readonly string[];
-
-    /** Directed edges as [source, target] pairs. */
-    edges: readonly [source: string, target: string][];
-}
+import { NestedGraphData } from "../../new_utils/nestGraphData";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SIMULATION STATE
@@ -59,50 +45,46 @@ export const EMPTY_SIMULATION_STATE: SimulationState = {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * A simulation engine computes node positions from graph topology.
+ * Input to the simulation engine's step function.
+ *
+ * Receives the full graph data so engines can access any node/edge
+ * properties they need (e.g., weight nodes by priority).
+ */
+export interface SimulatorInput<G extends NestedGraphData = NestedGraphData> {
+    /** Full graph data (nodes with .data properties, edges). */
+    readonly graph: G;
+
+    /** Time since last frame in milliseconds (for framerate-independent physics). */
+    readonly deltaTime: number;
+}
+
+/**
+ * A simulation engine computes node positions from graph data.
  *
  * The `step` function has a functional signature but the engine itself
  * may maintain internal state (velocities, convergence tracking, etc.)
  *
  * Contract:
- * - MUST handle nodes in topology that have no position in prevState
+ * - MUST handle nodes in graph that have no position in prevState
  *   (initialize them - random, center, inherited from neighbors, etc.)
- * - MUST include positions for ALL nodes in topology in returned state
- * - MAY ignore positions in prevState for nodes not in topology
+ * - MUST include positions for ALL nodes in graph in returned state
+ * - MAY ignore positions in prevState for nodes not in graph
  * - SHOULD converge to stable positions over repeated calls
  */
 export interface SimulationEngine {
     /**
      * Advance simulation by one step.
      *
-     * @param topology - Current graph structure (may change between calls)
+     * @param input - Full graph data and delta time
      * @param prevState - Previous positions (may be partial or empty)
-     * @returns New positions for all nodes in topology
+     * @returns New positions for all nodes in graph
      */
-    step(topology: GraphTopology, prevState: SimulationState): SimulationState;
+    step(input: SimulatorInput, prevState: SimulationState): SimulationState;
 
     /**
-     * Reset internal state (velocities, iteration count, etc.)
-     * Positions are passed in via `step`, so this doesn't affect them.
+     * Clean up any resources held by the engine (timers, workers, etc.)
+     * Called when the engine is replaced or the parent is destroyed.
      */
-    reset(): void;
+    destroy?(): void;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// FACTORY TYPE
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Factory function that creates a simulation engine.
- * Use this pattern to allow configuration at creation time.
- *
- * @example
- * const createForceEngine: CreateSimulationEngine = (config) => {
- *     let velocities: Record<string, Vec2> = {};
- *     return {
- *         step(topology, prevState) { ... },
- *         reset() { velocities = {}; }
- *     };
- * };
- */
-export type CreateSimulationEngine<TConfig = void> = (config: TConfig) => SimulationEngine;

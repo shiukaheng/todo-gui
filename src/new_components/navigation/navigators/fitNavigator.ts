@@ -10,7 +10,7 @@ import {
     NavigatorInput,
     NavigationState,
 } from "../types";
-import { fitBoundsToViewport, lerpTransform } from "../utils";
+import { calculateWorldBounds, fitBoundsToViewport, lerpTransform } from "../utils";
 
 export interface FitNavigatorConfig {
     /** Padding around content in pixels. Default: 40 */
@@ -20,53 +20,55 @@ export interface FitNavigatorConfig {
 }
 
 /**
- * Creates a navigator that keeps all content fitted in the viewport.
- *
- * Will smoothly animate when bounds change.
+ * Navigator that keeps all content fitted in the viewport.
+ * Smoothly animates when bounds change.
  */
-export function createFitNavigator(config: FitNavigatorConfig = {}): Navigator {
-    const padding = config.padding ?? 40;
-    const animationDuration = config.animationDuration ?? 300;
+export class FitNavigator implements Navigator {
+    private padding: number;
+    private animationDuration: number;
+    private targetState: NavigationState | null = null;
+    private animationProgress = 1; // 0 = start, 1 = done
 
-    let targetState: NavigationState | null = null;
-    let animationProgress = 1; // 0 = start, 1 = done
+    constructor(config: FitNavigatorConfig = {}) {
+        this.padding = config.padding ?? 40;
+        this.animationDuration = config.animationDuration ?? 300;
+    }
 
-    return {
-        step(input: NavigatorInput, prevState: NavigationState): NavigationState {
-            // Calculate ideal fit for current bounds
-            const idealState = fitBoundsToViewport(input.worldBounds, input.viewport, padding);
+    step(input: NavigatorInput, prevState: NavigationState): NavigationState {
+        // Calculate bounds from graph tasks
+        const worldBounds = calculateWorldBounds(input.graph.tasks);
+        if (!worldBounds) {
+            return prevState;
+        }
 
-            // If bounds changed significantly, start new animation
-            const targetChanged = !targetState ||
-                Math.abs(idealState.transform.a - targetState.transform.a) > 0.001 ||
-                Math.abs(idealState.transform.tx - targetState.transform.tx) > 1 ||
-                Math.abs(idealState.transform.ty - targetState.transform.ty) > 1;
+        // Calculate ideal fit for current bounds
+        const idealState = fitBoundsToViewport(worldBounds, input.viewport, this.padding);
 
-            if (targetChanged) {
-                targetState = idealState;
-                if (animationDuration > 0) {
-                    animationProgress = 0;
-                }
+        // If bounds changed significantly, start new animation
+        const targetChanged = !this.targetState ||
+            Math.abs(idealState.transform.a - this.targetState.transform.a) > 0.001 ||
+            Math.abs(idealState.transform.tx - this.targetState.transform.tx) > 1 ||
+            Math.abs(idealState.transform.ty - this.targetState.transform.ty) > 1;
+
+        if (targetChanged) {
+            this.targetState = idealState;
+            if (this.animationDuration > 0) {
+                this.animationProgress = 0;
             }
+        }
 
-            // Animate towards target
-            if (animationProgress < 1 && animationDuration > 0) {
-                animationProgress += input.deltaTime / animationDuration;
-                if (animationProgress > 1) animationProgress = 1;
+        // Animate towards target
+        if (this.animationProgress < 1 && this.animationDuration > 0) {
+            this.animationProgress += input.deltaTime / this.animationDuration;
+            if (this.animationProgress > 1) this.animationProgress = 1;
 
-                // Ease-out cubic
-                const t = 1 - Math.pow(1 - animationProgress, 3);
-                return {
-                    transform: lerpTransform(prevState.transform, targetState!.transform, t),
-                };
-            }
+            // Ease-out cubic
+            const t = 1 - Math.pow(1 - this.animationProgress, 3);
+            return {
+                transform: lerpTransform(prevState.transform, this.targetState!.transform, t),
+            };
+        }
 
-            return targetState!;
-        },
-
-        reset(): void {
-            targetState = null;
-            animationProgress = 1;
-        },
-    };
+        return this.targetState!;
+    }
 }
