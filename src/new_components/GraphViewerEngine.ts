@@ -9,7 +9,7 @@ import {
     EMPTY_SIMULATION_STATE,
     mergePositions,
 } from "./simulation";
-import { RandomInitEngine } from "./simulation/engines/nullEngine";
+import { ForceDirectedEngine } from "./simulation/engines/forceDirectedEngine";
 import {
     Navigator,
     NavigationState,
@@ -68,14 +68,17 @@ export class GraphViewerEngine {
         // Create renderer (reconciliation-based for performance)
         this.renderer = new SVGRenderer(this.svg);
 
-        // Default simulation: random positions (no actual layout)
-        this.simulationEngine = new RandomInitEngine(100);
+        // Default simulation: force-directed layout
+        this.simulationEngine = new ForceDirectedEngine();
 
         // Default navigation: auto-fit content in viewport
         this.navigator = new FitNavigator({ padding: 40, animationDuration: 300 });
 
         this.lastFrameTime = performance.now();
         this.startLoop();
+
+        // Emit initial state to React
+        this.emitState();
     }
 
     /**
