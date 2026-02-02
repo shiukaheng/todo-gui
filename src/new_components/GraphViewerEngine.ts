@@ -18,6 +18,7 @@ import {
 } from "./navigation";
 import { FitNavigator } from "./navigation/navigators/fitNavigator";
 import { SVGRenderer } from "./SVGRenderer";
+import { PerformanceMonitor } from "./PerformanceMonitor";
 
 /**
  * Callback type for pushing state updates back to React.
@@ -52,6 +53,9 @@ export class GraphViewerEngine {
     // Rendering: draws to SVG with reconciliation
     private renderer: SVGRenderer;
 
+    // Performance monitoring (optional)
+    private performanceMonitor: PerformanceMonitor | null = null;
+
     constructor(
         private container: HTMLDivElement,
         private dataSource: DataSource<TaskListOut>,
@@ -77,6 +81,9 @@ export class GraphViewerEngine {
         this.lastFrameTime = performance.now();
         this.startLoop();
 
+        // Enable performance monitor by default
+        this.setPerformanceMonitor(true);
+
         // Emit initial state to React
         this.emitState();
     }
@@ -99,6 +106,22 @@ export class GraphViewerEngine {
     setNavigator(navigator: Navigator): void {
         this.navigator.destroy?.();
         this.navigator = navigator;
+    }
+
+    /**
+     * Enable or disable the performance monitor (stats.js).
+     * @param enabled - Whether to show the monitor
+     * @param panel - Which panel to display (0=FPS, 1=MS, 2=MB)
+     */
+    setPerformanceMonitor(enabled: boolean, panel: 0 | 1 | 2 = 0): void {
+        if (enabled && !this.performanceMonitor) {
+            this.performanceMonitor = new PerformanceMonitor(this.container, panel);
+        } else if (!enabled && this.performanceMonitor) {
+            this.performanceMonitor.destroy();
+            this.performanceMonitor = null;
+        } else if (enabled && this.performanceMonitor) {
+            this.performanceMonitor.showPanel(panel);
+        }
     }
 
     /**
@@ -126,6 +149,8 @@ export class GraphViewerEngine {
      */
     private startLoop(): void {
         const tick = (currentTime: number) => {
+            this.performanceMonitor?.begin();
+
             this.frameCount++;
             const deltaTime = currentTime - this.lastFrameTime;
             this.lastFrameTime = currentTime;
@@ -214,6 +239,7 @@ export class GraphViewerEngine {
             // ─────────────────────────────────────────────────────────────
             this.renderer.render(positionedData, this.navigationState.transform);
 
+            this.performanceMonitor?.end();
             this.animationFrameId = requestAnimationFrame(tick);
         };
 
@@ -239,6 +265,7 @@ export class GraphViewerEngine {
         this.simulationEngine.destroy?.();
         this.navigator.destroy?.();
         this.renderer.clear();
+        this.performanceMonitor?.destroy();
 
         // Remove SVG from DOM
         this.svg.remove();
