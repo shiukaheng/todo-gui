@@ -1,8 +1,12 @@
 import { TaskListOut } from "todo-client";
-import { DataSource } from "./DataSource";
 import { GraphViewerEngineState } from "./GraphViewerEngineState";
 import { nestGraphData } from "../new_utils/nestGraphData";
-import { styleGraphData } from "./styleGraphData";
+import { styleGraphData, StyledGraphData } from "./styleGraphData";
+import { computeConnectedComponents, ComponentGraphData } from "./connectedComponents";
+import { NestedGraphData } from "../new_utils/nestGraphData";
+
+/** Concrete type for processed graph data: nested → components → styled. */
+type ProcessedGraphData = StyledGraphData<ComponentGraphData<NestedGraphData>>;
 import {
     SimulationEngine,
     SimulationState,
@@ -10,7 +14,6 @@ import {
     mergePositions,
     WebColaEngine,
 } from "./simulation";
-import { ForceDirectedEngine } from "./simulation/engines/forceDirectedEngine";
 import {
     Navigator,
     NavigationState,
@@ -29,8 +32,9 @@ export type EngineStateCallback = (state: GraphViewerEngineState) => void;
 /**
  * GraphViewerEngine - Imperative class that owns the animation loop.
  *
- * Data pipeline (each frame):
- *   Raw Neo4j data → nest → style → position → navigate → render
+ * Data flow:
+ *   setGraph(rawData) → nest → components → style → graphData (cached)
+ *   tick() → simulate → navigate → render
  *
  * Two pluggable systems:
  * - SimulationEngine: determines WHERE nodes are in world space
@@ -42,6 +46,9 @@ export class GraphViewerEngine {
     private lastFrameTime = 0;
     private isSimulating = true;
     private svg: SVGSVGElement;
+
+    // Graph data: processed and ready for simulation (set via setGraph())
+    private graphData: ProcessedGraphData | null = null;
 
     // Simulation: computes node positions in world space
     private simulationEngine: SimulationEngine;
@@ -59,7 +66,6 @@ export class GraphViewerEngine {
 
     constructor(
         private container: HTMLDivElement,
-        private dataSource: DataSource<TaskListOut>,
         private onStateChange: EngineStateCallback
     ) {
         console.log("[GraphViewerEngine] Created, starting animation loop");
@@ -73,8 +79,7 @@ export class GraphViewerEngine {
         // Create renderer (reconciliation-based for performance)
         this.renderer = new SVGRenderer(this.svg);
 
-        // Default simulation: force-directed layout
-        // this.simulationEngine = new ForceDirectedEngine();
+        // Default simulation: WebCola constraint-based layout
         this.simulationEngine = new WebColaEngine({
             flowDirection: "y",
             flowSeparation: 50,
@@ -92,6 +97,19 @@ export class GraphViewerEngine {
 
         // Emit initial state to React
         this.emitState();
+    }
+
+    /**
+     * Update the graph data. Performs nest → components → style transformations.
+     * Call this when the raw graph data changes (e.g., from subscription).
+     *
+     * @param taskList - Raw graph data from the API
+     */
+    setGraph(taskList: TaskListOut): void {
+        const nested = nestGraphData(taskList);
+        const withComponents = computeConnectedComponents(nested);
+        const styled = styleGraphData(withComponents);
+        this.graphData = styled;
     }
 
     /**
@@ -161,69 +179,35 @@ export class GraphViewerEngine {
             const deltaTime = currentTime - this.lastFrameTime;
             this.lastFrameTime = currentTime;
 
-            // ─────────────────────────────────────────────────────────────
-            // STEP 1: Read raw data from React (comes directly from Neo4j)
-            //
-            // The DataSource is a bridge from React's declarative world.
-            // It holds the latest task list and tracks whether data changed.
-            // ─────────────────────────────────────────────────────────────
-            const { data, isNew, version } = this.dataSource.read();
+            // Skip if no graph data has been set yet
+            if (!this.graphData) {
+                this.performanceMonitor?.end();
+                this.animationFrameId = requestAnimationFrame(tick);
+                return;
+            }
+
+            const graphData = this.graphData;
 
             // ─────────────────────────────────────────────────────────────
-            // STEP 2: Nest - wrap raw node properties in `.data`
+            // STEP 1: Simulate - compute world-space positions
             //
-            // Raw Neo4j data has properties directly on nodes. We wrap them
-            // in a `.data` property so we can add GUI-specific properties
-            // (style, position, etc.) without key collisions. Pure function.
-            // ─────────────────────────────────────────────────────────────
-            const nestedData = nestGraphData(data);
-
-            // ─────────────────────────────────────────────────────────────
-            // STEP 3: Style - derive visual attributes from node data
-            //
-            // Based on node properties (completed, priority, etc.), compute
-            // visual styling (colors, opacity, etc.). Pure function.
-            // ─────────────────────────────────────────────────────────────
-            const styledData = styleGraphData(nestedData);
-
-            // ─────────────────────────────────────────────────────────────
-            // STEP 4: Simulate - compute world-space positions
-            //
-            // The simulation engine determines WHERE nodes should be laid
-            // out in an abstract "world space" coordinate system.
-            //
-            // Receives full graph so it can access any node/edge properties
-            // (e.g., weight nodes by priority). Extracts what it needs internally.
-            //
-            // The engine is stateful (may track velocities internally) but
-            // has a functional interface. Positions are portable across
+            // The simulation engine computes WHERE nodes should be laid out
+            // in an abstract "world space" coordinate system. Stateful but
+            // with a functional interface. Positions are portable across
             // different engine implementations.
             // ─────────────────────────────────────────────────────────────
             this.simulationState = this.simulationEngine.step(
-                { graph: styledData, deltaTime },
+                { graph: graphData, deltaTime },
                 this.simulationState
             );
-            const positionedData = mergePositions(styledData, this.simulationState);
+            const positionedData = mergePositions(graphData, this.simulationState);
 
             // ─────────────────────────────────────────────────────────────
-            // STEP 5: Navigate - compute world → screen transform
+            // STEP 2: Navigate - compute world → screen transform
             //
-            // The navigator determines HOW we VIEW the world space:
-            // - Which region is visible (pan)
-            // - At what scale (zoom)
-            // - Optionally animated transitions
-            //
-            // Receives full positioned graph so it can access any node
-            // properties (e.g., focus on selected/highlighted nodes).
-            //
-            // This produces a ViewTransform (2D affine matrix) that maps
-            // world coordinates to screen pixels. Different navigators
-            // enable different behaviors:
-            // - FitNavigator: auto-fit all content
-            // - StaticNavigator: preserve current view
-            //
-            // The navigator is stateful (may track animation progress) but
-            // has a functional interface. The transform is portable.
+            // The navigator determines HOW we view the world: pan, zoom,
+            // and optionally animated transitions. Produces a ViewTransform
+            // (2D affine matrix) that maps world coordinates to screen pixels.
             // ─────────────────────────────────────────────────────────────
             this.navigationState = this.navigator.step(
                 {
@@ -235,13 +219,9 @@ export class GraphViewerEngine {
             );
 
             // ─────────────────────────────────────────────────────────────
-            // STEP 6: Render - draw to SVG
+            // STEP 3: Render - draw to SVG
             //
-            // The renderer takes positioned graph data and the view transform,
-            // then draws/updates SVG elements. Uses reconciliation to minimize
-            // DOM operations (only updates changed elements).
-            //
-            // This is a terminal side effect - no state produced.
+            // Uses reconciliation to minimize DOM operations.
             // ─────────────────────────────────────────────────────────────
             this.renderer.render(positionedData, this.navigationState.transform);
 
@@ -282,41 +262,8 @@ export class GraphViewerEngine {
 // TODO: Hoist UI state (selection, cursor) to React level
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// Features like a "node cursor" (keyboard navigation, selection highlighting)
-// should NOT live inside GraphViewerEngine. Instead:
-//
-// 1. Move nestGraphData() call to React level (in the component or hook)
-// 2. React maintains UI state: selectedNodeId, hoveredNodeId, cursorNodeId, etc.
-// 3. React injects these as extra properties on nested nodes BEFORE passing
-//    to the engine's DataSource
-//
-// Example flow:
-//   ```tsx
-//   // In React component:
-//   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-//
-//   const nestedData = useMemo(() => {
-//       const nested = nestGraphData(taskList);
-//       return {
-//           ...nested,
-//           nodes: nested.nodes.map(node => ({
-//               ...node,
-//               isSelected: node.id === selectedNodeId,
-//               isCursor: node.id === cursorNodeId,
-//           }))
-//       };
-//   }, [taskList, selectedNodeId, cursorNodeId]);
-//
-//   // Pass pre-nested data to engine
-//   dataSource.set(nestedData);
-//   ```
-//
-// Benefits:
-// - React handles complex UI state (keyboard nav, multi-select, etc.)
-// - Engine stays pure: just processes whatever data it receives
-// - Selection state can affect both styling AND navigation (focus on selected)
-// - Clear separation: React = state management, Engine = rendering
-//
-// The engine then just reads these properties in styleGraphData() and
-// navigator can read focusNodeId from the input.
+// React should maintain UI state (selectedNodeId, cursorNodeId, etc.) and
+// inject it into the data before calling setGraph(). The engine stays pure:
+// just processes whatever data it receives. Selection state can then affect
+// both styling AND navigation (focus on selected node).
 // ═══════════════════════════════════════════════════════════════════════════
