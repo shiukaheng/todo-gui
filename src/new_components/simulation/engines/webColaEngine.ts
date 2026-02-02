@@ -127,6 +127,12 @@ interface TopologySnapshot {
 // ENGINE
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * WebCola-based simulation engine implementing the SimulationEngine interface.
+ *
+ * Uses stress minimization (not physics) to find optimal node positions.
+ * Supports constraints like flow direction, alignment, and separation.
+ */
 export class WebColaEngine implements SimulationEngine {
     private config: Required<WebColaConfig>;
     private layout: ManualTickLayout | null = null;
@@ -148,6 +154,10 @@ export class WebColaEngine implements SimulationEngine {
         this.config = { ...DEFAULT_CONFIG, ...config };
     }
 
+    /**
+     * Advance simulation by one step. Detects topology changes and reconciles
+     * internal WebCola state. Ignores deltaTime (stress minimization is time-independent).
+     */
     step(input: SimulatorInput, prevState: SimulationState): SimulationState {
         const { graph } = input;
         // Note: deltaTime is intentionally ignored - WebCola uses stress minimization
@@ -181,6 +191,7 @@ export class WebColaEngine implements SimulationEngine {
         return this.extractState();
     }
 
+    /** Clean up WebCola layout and reset internal state. */
     destroy(): void {
         if (this.layout) {
             this.layout.stop();
@@ -197,12 +208,14 @@ export class WebColaEngine implements SimulationEngine {
     // TOPOLOGY CHANGE DETECTION
     // ───────────────────────────────────────────────────────────────────────
 
+    /** Create a string snapshot of node/edge IDs for cheap equality comparison. */
     private computeTopologySnapshot(graph: NestedGraphData): TopologySnapshot {
         const nodeIds = Object.keys(graph.tasks).sort().join(",");
         const edgeIds = Object.keys(graph.dependencies).sort().join(",");
         return { nodeIds, edgeIds };
     }
 
+    /** Compare two topology snapshots for equality. */
     private topologyEquals(a: TopologySnapshot, b: TopologySnapshot): boolean {
         return a.nodeIds === b.nodeIds && a.edgeIds === b.edgeIds;
     }
@@ -211,6 +224,11 @@ export class WebColaEngine implements SimulationEngine {
     // GRAPH RECONCILIATION
     // ───────────────────────────────────────────────────────────────────────
 
+    /**
+     * Rebuild internal cola node/link arrays from the incoming graph.
+     * Preserves positions from prevState where available, else from existing
+     * cola nodes, else random Gaussian initialization.
+     */
     private reconcileGraph(graph: NestedGraphData, prevState: SimulationState): void {
         const { tasks, dependencies } = graph;
 
@@ -279,6 +297,11 @@ export class WebColaEngine implements SimulationEngine {
         this.rebuildLayout();
     }
 
+    /**
+     * Create a new ManualTickLayout with current config and node/link arrays.
+     * Initializes distance matrix via start() but runs zero iterations,
+     * allowing smooth animated convergence through subsequent doTick() calls.
+     */
     private rebuildLayout(): void {
         const {
             linkDistance,
@@ -337,6 +360,10 @@ export class WebColaEngine implements SimulationEngine {
     // CONSTRAINT TRANSLATION
     // ───────────────────────────────────────────────────────────────────────
 
+    /**
+     * Convert high-level constraints (using string IDs) to WebCola format (using indices).
+     * Silently skips constraints referencing non-existent nodes.
+     */
     private translateConstraints(constraints: Constraint[]): any[] {
         const colaConstraints: any[] = [];
 
