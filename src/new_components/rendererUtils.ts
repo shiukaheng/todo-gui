@@ -42,7 +42,7 @@ export interface RenderGraphData {
 }
 
 export const FONT_SIZE = 20;
-export const STROKE_WIDTH = 2;
+export const STROKE_WIDTH = 4;
 export const PADDING = 8;
 
 export function colorToCSS(color: Color): string {

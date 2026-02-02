@@ -1,7 +1,7 @@
 import { TaskListOut } from "todo-client";
 import { GraphViewerEngineState } from "./GraphViewerEngineState";
 import { nestGraphData } from "../new_utils/nestGraphData";
-import { styleGraphData, StyledGraphData } from "./styleGraphData";
+import { baseStyleGraphData, conditionalStyleGraphData, StyledGraphData } from "./styleGraphData";
 import { computeConnectedComponents, ComponentGraphData } from "./connectedComponents";
 import { NestedGraphData } from "../new_utils/nestGraphData";
 
@@ -33,7 +33,7 @@ export type EngineStateCallback = (state: GraphViewerEngineState) => void;
  * GraphViewerEngine - Imperative class that owns the animation loop.
  *
  * Data flow:
- *   setGraph(rawData) → nest → components → style → graphData (cached)
+ *   setGraph(rawData) → nest → components → baseStyle → conditionalStyle → graphData (cached)
  *   tick() → simulate → navigate → render
  *
  * Two pluggable systems:
@@ -108,7 +108,8 @@ export class GraphViewerEngine {
     setGraph(taskList: TaskListOut): void {
         const nested = nestGraphData(taskList);
         const withComponents = computeConnectedComponents(nested);
-        const styled = styleGraphData(withComponents);
+        const baseStyled = baseStyleGraphData(withComponents);
+        const styled = conditionalStyleGraphData(baseStyled);
         this.graphData = styled;
     }
 

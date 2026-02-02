@@ -168,7 +168,8 @@ export type StyledGraphData<G extends NestedGraphData> = ExtendNestedGraphData<
     }, G
 >;
 
-export function styleGraphData<G extends NestedGraphData>(graphData: G): StyledGraphData<G> {
+/** Apply base styling: colors from coloring algorithm, default opacity/effects. */
+export function baseStyleGraphData<G extends NestedGraphData>(graphData: G): StyledGraphData<G> {
     const nodeColors = computeNodeColors(graphData);
 
     return {
@@ -185,4 +186,31 @@ export function styleGraphData<G extends NestedGraphData>(graphData: G): StyledG
             ])
         ),
     } as StyledGraphData<G>;
+}
+
+/** Darken a color by a factor (0-1). */
+function darkenColor(color: Color, factor: number): Color {
+    return [color[0] * factor, color[1] * factor, color[2] * factor];
+}
+
+/** Apply conditional styling based on node state (e.g., completed, actionable). */
+export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphData>>(graphData: G): G {
+    return {
+        ...graphData,
+        tasks: Object.fromEntries(
+            Object.entries(graphData.tasks).map(([taskId, task]) => {
+                const data = task.data as { calculatedCompleted?: boolean; depsClear?: boolean };
+                const isCompleted = data.calculatedCompleted;
+                const isActionable = data.depsClear && !isCompleted;
+
+                if (isCompleted) {
+                    return [taskId, { ...task, color: darkenColor(task.color, 0.5), borderColor: [0, 0.8, 0] as Color }];
+                }
+                if (isActionable) {
+                    return [taskId, { ...task, borderColor: [1, 0.8, 0] as Color }];
+                }
+                return [taskId, task];
+            })
+        ),
+    } as G;
 }
