@@ -202,7 +202,7 @@ export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphD
                 const isActionable = data.depsClear && !isCompleted;
 
                 if (isCompleted) {
-                    return [taskId, { ...task, brightnessMultiplier: 0.1, labelColor: [0, 1, 0] as Color }];
+                    return [taskId, { ...task, text: `✔ ${task.text}`, brightnessMultiplier: 0.1, labelColor: [0, 1, 0] as Color }];
                 }
                 if (isActionable) {
                     return [taskId, task];
