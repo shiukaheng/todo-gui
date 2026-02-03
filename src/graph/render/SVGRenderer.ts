@@ -26,6 +26,10 @@ const SELECTOR_RING_GAP = 2 * SCALE;
 const SELECTOR_RING_STROKE_WIDTH = 2 * SCALE;
 const SELECTOR_TEXT_OFFSET = 6 * SCALE;
 
+// Shortcut key overlay
+const SHORTCUT_KEY_MARGIN = 4 * SCALE;
+const SHORTCUT_KEY_FONT_SIZE = 10 * SCALE;
+
 // Off-screen indicator
 const INDICATOR_MARGIN = 17.5 * SCALE;
 const INDICATOR_SIZE = 6 * SCALE;
@@ -44,6 +48,7 @@ interface NodeElements {
     selectorRing: SVGRectElement;
     rect: SVGRectElement;
     text: SVGTextElement;
+    shortcutKeyText: SVGTextElement;
 }
 
 interface EdgeElements {
@@ -233,7 +238,7 @@ export class SVGRenderer {
             this.svg.appendChild(elements.group);
         }
 
-        const { group, selectorRing, rect, text } = elements;
+        const { group, selectorRing, rect, text, shortcutKeyText } = elements;
         const brightness = node.brightnessMultiplier;
 
         // Minimal style: square node with text below
@@ -275,6 +280,17 @@ export class SVGRenderer {
         text.setAttribute("fill", colorToCSSWithBrightness(node.labelColor, brightness));
         text.textContent = node.text;
 
+        // Shortcut key overlay: top-left of node square
+        if (node.shortcutKeyOverlay) {
+            shortcutKeyText.setAttribute("x", (x - squareSize / 2 - SHORTCUT_KEY_MARGIN).toString());
+            shortcutKeyText.setAttribute("y", (y - squareSize / 2).toString());
+            shortcutKeyText.setAttribute("fill", colorToCSSWithBrightness(node.labelColor, brightness));
+            shortcutKeyText.textContent = node.shortcutKeyOverlay;
+            shortcutKeyText.style.display = "";
+        } else {
+            shortcutKeyText.style.display = "none";
+        }
+
         group.setAttribute("opacity", node.opacity.toString());
     }
 
@@ -299,11 +315,21 @@ export class SVGRenderer {
         text.setAttribute("font-family", "monospace");
         text.style.pointerEvents = "none";
 
+        // Shortcut key overlay: top-left of node
+        const shortcutKeyText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        shortcutKeyText.setAttribute("text-anchor", "end");
+        shortcutKeyText.setAttribute("dominant-baseline", "auto");
+        shortcutKeyText.setAttribute("font-size", SHORTCUT_KEY_FONT_SIZE.toString());
+        shortcutKeyText.setAttribute("font-family", "monospace");
+        shortcutKeyText.style.pointerEvents = "none";
+        shortcutKeyText.style.display = "none";
+
         group.appendChild(selectorRing);
         group.appendChild(rect);
         group.appendChild(text);
+        group.appendChild(shortcutKeyText);
 
-        return { group, selectorRing, rect, text };
+        return { group, selectorRing, rect, text, shortcutKeyText };
     }
 
     private reconcileEdge(id: string, edge: RenderEdge, from: Vec2, to: Vec2, transform: ViewTransform): void {

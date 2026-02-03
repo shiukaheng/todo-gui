@@ -51,9 +51,6 @@ export type CursorNeighbors = {
 export interface GraphViewerEngineState {
     /** Whether the physics simulation is currently running */
     isSimulating: boolean;
-    cursorNeighbors: CursorNeighbors;
-
-
 
     // FUTURE IDEAS - uncomment and implement as needed:
     //
@@ -73,12 +70,14 @@ export interface GraphViewerEngineState {
 /** Initial state before the engine starts */
 export const INITIAL_ENGINE_STATE: GraphViewerEngineState = {
     isSimulating: false,
-    cursorNeighbors: {
-        topological: {
-            children: [],
-            parents: [],
-            peers: {},
-        },
+};
+
+/** Initial empty cursor neighbors */
+export const EMPTY_CURSOR_NEIGHBORS: CursorNeighbors = {
+    topological: {
+        children: [],
+        parents: [],
+        peers: {},
     },
 };
 

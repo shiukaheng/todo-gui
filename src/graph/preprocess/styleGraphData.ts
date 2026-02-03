@@ -161,6 +161,7 @@ export type StyledGraphData<G extends NestedGraphData> = ExtendNestedGraphData<
         opacity: number;
         brightnessMultiplier: number;
         selectorOutline: Color | null;  // Outer breathing ring, null = not shown
+        shortcutKeyOverlay: string | null;  // Text overlay on top-left of node, null = not shown
     },
     // Edge extra properties
     {
@@ -179,7 +180,7 @@ export function baseStyleGraphData<G extends NestedGraphData>(graphData: G): Sty
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, taskWrapper]) => [
                 taskId,
-                { ...taskWrapper, text: taskId, color: nodeColors.get(taskId) || [1, 1, 1] as Color, borderColor: [0.5, 0.5, 0.5] as Color, labelColor: [1, 1, 1] as Color, outlineWidth: 0, opacity: 1.0, brightnessMultiplier: 1.0, selectorOutline: null },
+                { ...taskWrapper, text: taskId, color: nodeColors.get(taskId) || [1, 1, 1] as Color, borderColor: [0.5, 0.5, 0.5] as Color, labelColor: [1, 1, 1] as Color, outlineWidth: 0, opacity: 1.0, brightnessMultiplier: 1.0, selectorOutline: null, shortcutKeyOverlay: null },
             ])
         ),
         dependencies: Object.fromEntries(

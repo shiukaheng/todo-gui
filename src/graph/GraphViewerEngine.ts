@@ -419,7 +419,6 @@ export class GraphViewerEngine {
     private emitState(): void {
         this.onStateChange({
             isSimulating: this.isSimulating,
-            cursorNeighbors: this.currentCursorNeighbors,
         });
     }
 

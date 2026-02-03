@@ -29,6 +29,7 @@ export interface RenderNode {
     opacity: number;
     brightnessMultiplier: number;
     selectorOutline: Color | null;  // Outer breathing ring, null = not shown
+    shortcutKeyOverlay: string | null;  // Text overlay on top-left of node, null = not shown
     position: Vec2;
 }
 
