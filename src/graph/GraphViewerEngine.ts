@@ -1,3 +1,94 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * GRAPH VIEWER ENGINE - Data Flow Documentation
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * This engine bridges React's declarative world with an imperative animation
+ * loop. Data flows bidirectionally between React and the engine.
+ *
+ * ┌─────────────────────────────────────────────────────────────────────────┐
+ * │                              REACT                                      │
+ * │                                                                         │
+ * │   const [appState, setAppState] = useState({ cursor: null });          │
+ * │   const engineState = useGraphViewerEngine(taskList, appState, ref);   │
+ * │                                                                         │
+ * └──────────────────────────┬──────────────────────┬───────────────────────┘
+ *                            │                      │
+ *              INPUTS (React → Engine)    OUTPUTS (Engine → React)
+ *                            │                      │
+ *                            ▼                      │
+ * ┌──────────────────────────────────────┐          │
+ * │  setGraph(taskList)                  │          │
+ * │  ─────────────────                   │          │
+ * │  Primary data source. Graph topology │          │
+ * │  and node properties from the API.   │          │
+ * │  Processed: nest → components →      │          │
+ * │             baseStyle → conditional  │          │
+ * └──────────────────────────────────────┘          │
+ *                            │                      │
+ *                            ▼                      │
+ * ┌──────────────────────────────────────┐          │
+ * │  setAppState(appState)               │          │
+ * │  ─────────────────────               │          │
+ * │  Secondary reactive source. UI state │          │
+ * │  owned by React (cursor, selection). │          │
+ * │  Applied per-frame in the loop.      │          │
+ * └──────────────────────────────────────┘          │
+ *                            │                      │
+ *                            ▼                      │
+ * ┌─────────────────────────────────────────────────┴───────────────────────┐
+ * │                         ANIMATION LOOP                                  │
+ * │                                                                         │
+ * │   tick() runs every frame via requestAnimationFrame:                   │
+ * │                                                                         │
+ * │   1. SIMULATE  - Compute node positions (world space)                  │
+ * │   2. STYLE     - Apply cursor/selection styling from appState          │
+ * │   3. NAVIGATE  - Compute view transform (pan/zoom)                     │
+ * │   4. RENDER    - Draw to SVG                                           │
+ * │                                                                         │
+ * │   Also handles: user input (drag, pan, zoom), initial fit              │
+ * │                                                                         │
+ * └─────────────────────────────────────────────────┬───────────────────────┘
+ *                                                   │
+ *                                                   ▼
+ *                            ┌──────────────────────────────────────┐
+ *                            │  onStateChange(engineState)          │
+ *                            │  ──────────────────────────          │
+ *                            │  Callback to push state to React.    │
+ *                            │  Called via emitState() when         │
+ *                            │  UI-relevant state changes.          │
+ *                            │                                      │
+ *                            │  Current fields:                     │
+ *                            │  - isSimulating: boolean             │
+ *                            │                                      │
+ *                            │  Future fields (add as needed):      │
+ *                            │  - hoveredNodeId: string | null      │
+ *                            │  - selectedNodeId: string | null     │
+ *                            │  - viewport bounds for overlays      │
+ *                            │                                      │
+ *                            │  ⚠️  THROTTLE: Don't emit every      │
+ *                            │  frame or you'll get 60 re-renders/s │
+ *                            └──────────────────────────────────────┘
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * SUMMARY
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * INPUTS (React → Engine):
+ *   - taskList    via setGraph()     → Graph data from API
+ *   - appState    via setAppState()  → UI state (cursor, selection)
+ *
+ * OUTPUTS (Engine → React):
+ *   - engineState via onStateChange() → Hover, selection, simulation status
+ *
+ * INTERNAL (not exposed to React):
+ *   - simulationState  (node positions, physics)
+ *   - navigationState  (pan/zoom transform)
+ *   - user input handling (drag, scroll, touch)
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
 import { TaskListOut } from "todo-client";
 import { GraphViewerEngineState } from "./GraphViewerEngineState";
 import { AppState, INITIAL_APP_STATE } from "./types";
@@ -81,14 +172,7 @@ export type EngineStateCallback = (state: GraphViewerEngineState) => void;
 
 /**
  * GraphViewerEngine - Imperative class that owns the animation loop.
- *
- * Data flow:
- *   setGraph(rawData) → nest → components → baseStyle → conditionalStyle → graphData (cached)
- *   tick() → simulate → navigate → render
- *
- * Two pluggable systems:
- * - SimulationEngine: determines WHERE nodes are in world space
- * - Navigator: determines HOW we VIEW the world (pan/zoom transform)
+ * See top-level comment for full data flow documentation.
  */
 export class GraphViewerEngine {
     private animationFrameId: number | null = null;
