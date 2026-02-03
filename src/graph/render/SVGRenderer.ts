@@ -280,11 +280,11 @@ export class SVGRenderer {
         text.setAttribute("fill", colorToCSSWithBrightness(node.labelColor, brightness));
         text.textContent = node.text;
 
-        // Shortcut key overlay: top-left of node square
+        // Shortcut key overlay: top-left of node square (fixed white color, not affected by node styling)
         if (node.shortcutKeyOverlay) {
             shortcutKeyText.setAttribute("x", (x - squareSize / 2 - SHORTCUT_KEY_MARGIN).toString());
             shortcutKeyText.setAttribute("y", (y - squareSize / 2).toString());
-            shortcutKeyText.setAttribute("fill", colorToCSSWithBrightness(node.labelColor, brightness));
+            shortcutKeyText.setAttribute("fill", "#ffffff");
             shortcutKeyText.textContent = node.shortcutKeyOverlay;
             shortcutKeyText.style.display = "";
         } else {
