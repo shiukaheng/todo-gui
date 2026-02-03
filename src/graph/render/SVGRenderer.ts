@@ -13,6 +13,32 @@ import {
 
 export { ViewTransform, RenderGraphData, RenderNode, RenderEdge };
 
+// Master scale coefficient - multiplies all size constants
+const SCALE = 2.0;
+
+// Node sizing
+const NODE_SQUARE_SIZE = FONT_SIZE * 0.6 * SCALE;
+const NODE_TEXT_GAP = 4 * SCALE;
+const NODE_OUTLINE_WIDTH_SCALE = 0.5;
+
+// Selector ring
+const SELECTOR_RING_GAP = 2 * SCALE;
+const SELECTOR_RING_STROKE_WIDTH = 2 * SCALE;
+const SELECTOR_TEXT_OFFSET = 6 * SCALE;
+
+// Off-screen indicator
+const INDICATOR_MARGIN = 17.5 * SCALE;
+const INDICATOR_SIZE = 6 * SCALE;
+
+// Edge sizing
+const EDGE_STROKE_WIDTH_SCALE = 0.5;
+const EDGE_DASH_ARRAY = `${5 * SCALE},${3 * SCALE}`;
+
+// Animation parameters
+const BREATH_RATE = 1.25;  // Cycles per second
+const BREATH_MIN_BRIGHTNESS = 0.1;
+const BREATH_MAX_BRIGHTNESS = 1.0;
+
 interface NodeElements {
     group: SVGGElement;
     selectorRing: SVGRectElement;
@@ -89,7 +115,7 @@ export class SVGRenderer {
             width: this.svg.clientWidth || 800,
             height: this.svg.clientHeight || 600,
         };
-        const margin = 20;  // Margin from edge for indicator
+        const margin = INDICATOR_MARGIN;
 
         // Find first node with selectorOutline (cursor)
         let cursorNode: RenderNode | null = null;
@@ -173,7 +199,7 @@ export class SVGRenderer {
 
         // Create equilateral triangle pointing in direction
         const indicator = this.getOffScreenIndicator();
-        const size = 8;  // Distance from center to each vertex
+        const size = INDICATOR_SIZE;
 
         // Equilateral triangle: vertices at 0°, 120°, 240° from center, rotated by angle
         const p1Angle = angle;
@@ -191,10 +217,7 @@ export class SVGRenderer {
 
         // Breathing animation (same as selector ring)
         const time = performance.now() / 1000;
-        const breathRate = 1.25;
-        const minBrightness = 0.25;
-        const maxBrightness = 1.0;
-        const breathBrightness = minBrightness + (maxBrightness - minBrightness) * (0.5 + 0.5 * Math.sin(time * breathRate * Math.PI * 2));
+        const breathBrightness = BREATH_MIN_BRIGHTNESS + (BREATH_MAX_BRIGHTNESS - BREATH_MIN_BRIGHTNESS) * (0.5 + 0.5 * Math.sin(time * BREATH_RATE * Math.PI * 2));
 
         indicator.setAttribute("fill", colorToCSSWithBrightness(cursorNode.selectorOutline!, breathBrightness));
         indicator.style.display = "";
@@ -213,29 +236,24 @@ export class SVGRenderer {
         const { group, selectorRing, rect, text } = elements;
         const brightness = node.brightnessMultiplier;
 
-        // Minimal style: square node with text below (half size)
-        const squareSize = FONT_SIZE * 0.6;
-        const textGap = 4;
+        // Minimal style: square node with text below
+        const squareSize = NODE_SQUARE_SIZE;
+        const textGap = NODE_TEXT_GAP;
 
         // Selector ring: outer breathing ring
         if (node.selectorOutline) {
             // Breathing animation: brightness oscillates with sine wave
-            const time = performance.now() / 1000;  // Convert to seconds
-            const breathRate = 1.25;  // Cycles per second
-            const minBrightness = 0.25;
-            const maxBrightness = 1.0;
-            const breathBrightness = minBrightness + (maxBrightness - minBrightness) * (0.5 + 0.5 * Math.sin(time * breathRate * Math.PI * 2));
+            const time = performance.now() / 1000;
+            const breathBrightness = BREATH_MIN_BRIGHTNESS + (BREATH_MAX_BRIGHTNESS - BREATH_MIN_BRIGHTNESS) * (0.5 + 0.5 * Math.sin(time * BREATH_RATE * Math.PI * 2));
 
-            const ringGap = 2;  // Gap between node and ring
-            const strokeWidth = 2;
-            const ringSize = squareSize + ringGap * 2 + strokeWidth;
+            const ringSize = squareSize + SELECTOR_RING_GAP * 2 + SELECTOR_RING_STROKE_WIDTH;
 
             selectorRing.setAttribute("x", (x - ringSize / 2).toString());
             selectorRing.setAttribute("y", (y - ringSize / 2).toString());
             selectorRing.setAttribute("width", ringSize.toString());
             selectorRing.setAttribute("height", ringSize.toString());
             selectorRing.setAttribute("stroke", colorToCSSWithBrightness(node.selectorOutline, breathBrightness));
-            selectorRing.setAttribute("stroke-width", strokeWidth.toString());
+            selectorRing.setAttribute("stroke-width", SELECTOR_RING_STROKE_WIDTH.toString());
             selectorRing.style.display = "";
         } else {
             selectorRing.style.display = "none";
@@ -248,10 +266,10 @@ export class SVGRenderer {
         rect.setAttribute("height", squareSize.toString());
         rect.setAttribute("fill", colorToCSSWithBrightness(node.color, brightness));
         rect.setAttribute("stroke", colorToCSS(node.borderColor));
-        rect.setAttribute("stroke-width", (node.outlineWidth * 0.5).toString());
+        rect.setAttribute("stroke-width", (node.outlineWidth * NODE_OUTLINE_WIDTH_SCALE).toString());
 
         // Update text below the square (offset extra if selector ring is present)
-        const selectorOffset = node.selectorOutline ? 6 : 0;
+        const selectorOffset = node.selectorOutline ? SELECTOR_TEXT_OFFSET : 0;
         text.setAttribute("x", x.toString());
         text.setAttribute("y", (y + squareSize / 2 + textGap + selectorOffset + FONT_SIZE / 2).toString());
         text.setAttribute("fill", colorToCSSWithBrightness(node.labelColor, brightness));
@@ -308,12 +326,12 @@ export class SVGRenderer {
         line.setAttribute("y2", y2.toString());
         line.setAttribute("stroke", colorToCSS(edge.color));
         line.setAttribute("opacity", edge.opacity.toString());
-        line.setAttribute("stroke-dasharray", edge.dotted ? "5,3" : "");
+        line.setAttribute("stroke-dasharray", edge.dotted ? EDGE_DASH_ARRAY : "");
     }
 
     private createEdgeElements(id: string): EdgeElements {
         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("stroke-width", (STROKE_WIDTH * 0.5).toString());
+        line.setAttribute("stroke-width", (STROKE_WIDTH * EDGE_STROKE_WIDTH_SCALE).toString());
         line.dataset.edgeId = id;
         line.style.pointerEvents = "stroke";
         return { line };
