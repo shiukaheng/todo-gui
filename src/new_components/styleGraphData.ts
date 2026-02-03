@@ -203,13 +203,13 @@ export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphD
                 const isActionable = data.depsClear && !isCompleted;
 
                 if (isCompleted) {
-                    return [taskId, { ...task, brightnessMultiplier: 0.25, borderColor: [0, 1, 0] as Color, outlineWidth: 4, glowIntensity: 0.8, glowRadius: 8 }];
+                    return [taskId, { ...task, brightnessMultiplier: 0.1, borderColor: [0, 1, 0] as Color, outlineWidth: 4, glowIntensity: 0.8, glowRadius: 8 }];
                 }
                 if (isActionable) {
                     return [taskId, { ...task, borderColor: [1, 0.9, 0.2] as Color, outlineWidth: 4, glowIntensity: 1, glowRadius: 8 }];
                 }
                 // Blocked: not completed and not actionable
-                return [taskId, { ...task, brightnessMultiplier: 0.25 }];
+                return [taskId, { ...task, brightnessMultiplier: 0.1 }];
             })
         ),
     } as G;
