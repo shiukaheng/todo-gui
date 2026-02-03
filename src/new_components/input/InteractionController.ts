@@ -285,14 +285,16 @@ export class InteractionController {
     private calculateVelocity(): { vx: number; vy: number } | null {
         if (this.velocitySamples.length < 2) return null;
 
-        const first = this.velocitySamples[0];
+        // Use only the last 2 samples for instantaneous velocity at release
+        // This prevents "speeding back up" when user slows down before releasing
+        const prev = this.velocitySamples[this.velocitySamples.length - 2];
         const last = this.velocitySamples[this.velocitySamples.length - 1];
-        const dt = (last.time - first.time) / 1000; // Convert to seconds
+        const dt = (last.time - prev.time) / 1000; // Convert to seconds
 
         if (dt < 0.001) return null;
 
-        const vx = (last.position.x - first.position.x) / dt;
-        const vy = (last.position.y - first.position.y) / dt;
+        const vx = (last.position.x - prev.position.x) / dt;
+        const vy = (last.position.y - prev.position.y) / dt;
 
         // Only return if above minimum threshold
         const speed = Math.sqrt(vx * vx + vy * vy);
