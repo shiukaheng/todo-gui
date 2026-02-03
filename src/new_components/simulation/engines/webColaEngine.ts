@@ -177,6 +177,8 @@ interface ColaNode extends ColaInputNode {
     id: string; // Our string ID, kept for reverse mapping
     x: number;
     y: number;
+    px?: number; // Desired x position (used during drag)
+    py?: number; // Desired y position (used during drag)
     componentId?: number; // Connected component ID (if available)
 }
 
@@ -250,16 +252,17 @@ export class WebColaEngine implements SimulationEngine {
 
             const node = this.colaNodes[index];
             if (status.pinned) {
-                node.x = status.position.x;
-                node.y = status.position.y;
-                node.fixed = 1;  // Bit 1: externally fixed
+                // WebCola drag pattern: set px/py as desired position, use bit 2 for drag state
+                node.px = status.position.x;
+                node.py = status.position.y;
+                node.fixed = (node.fixed ?? 0) | 2;  // Bit 2: drag state
             } else {
-                node.fixed = 0;
+                node.fixed = (node.fixed ?? 0) & ~2; // Clear bit 2 (drag state)
             }
         }
 
-        // Wake up the simulation so it reacts to the pinned node's position
-        // this.layout.resume();
+        // Wake up the simulation so it reacts to the dragged node's position
+        this.layout.resume();
     }
 
     /**
