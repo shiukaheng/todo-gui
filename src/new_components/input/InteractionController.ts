@@ -8,7 +8,7 @@
  * - Momentum: sets velocity on ManualNavigator after release
  */
 
-import { SimulationEngine, PinStatus, Position } from "../simulation";
+import { SimulationEngine, SimulationState, PinStatus, Position } from "../simulation";
 import { Navigator, NavigationState, isManualNavigator } from "../navigation";
 import { screenToWorld, Vec2 } from "../rendererUtils";
 import { UIEvent, ScreenPoint, InteractionTarget } from "./InputHandler";
@@ -29,6 +29,7 @@ export interface InteractionControllerDeps {
     getNavigator: () => Navigator;
     setNavigator: (navigator: Navigator) => void;
     getNavigationState: () => NavigationState;
+    getSimulationState: () => SimulationState;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -56,7 +57,7 @@ export class InteractionController {
 
     // ─── Node drag state ───
     private draggingNodeId: string | null = null;
-    private dragStartWorldPos: Position | null = null;
+    private dragOffset: Position | null = null; // Offset from cursor to node center
 
     // ─── Canvas drag state ───
     private isDraggingCanvas = false;
@@ -131,7 +132,7 @@ export class InteractionController {
 
         // Clear all state
         this.draggingNodeId = null;
-        this.dragStartWorldPos = null;
+        this.dragOffset = null;
         this.isDraggingCanvas = false;
         this.lastDragScreenPos = null;
         this.velocitySamples = [];
@@ -180,31 +181,43 @@ export class InteractionController {
         if (!this.deps) return;
 
         const transform = this.deps.getNavigationState().transform;
-        const worldPos = screenToWorld([screen.x, screen.y], transform);
+        const cursorWorld = screenToWorld([screen.x, screen.y], transform);
+
+        // Get node's current world position
+        const simState = this.deps.getSimulationState();
+        const nodePos = simState.positions[nodeId];
+        if (!nodePos) return;
 
         this.draggingNodeId = nodeId;
-        this.dragStartWorldPos = { x: worldPos[0], y: worldPos[1] };
+        // Store offset from cursor to node center (so node doesn't jump)
+        this.dragOffset = {
+            x: nodePos.x - cursorWorld[0],
+            y: nodePos.y - cursorWorld[1],
+        };
 
         // Pin the node at its current position
         const engine = this.deps.getSimulationEngine();
         const pins = new Map<string, PinStatus>();
-        pins.set(nodeId, { pinned: true, position: this.dragStartWorldPos });
+        pins.set(nodeId, { pinned: true, position: nodePos });
         engine.pinNodes(pins);
     }
 
     private updateNodeDrag(screen: ScreenPoint): void {
-        if (!this.deps || !this.draggingNodeId) return;
+        if (!this.deps || !this.draggingNodeId || !this.dragOffset) return;
 
         const transform = this.deps.getNavigationState().transform;
-        const worldPos = screenToWorld([screen.x, screen.y], transform);
+        const cursorWorld = screenToWorld([screen.x, screen.y], transform);
+
+        // Apply offset to keep node at same relative position to cursor
+        const newPos: Position = {
+            x: cursorWorld[0] + this.dragOffset.x,
+            y: cursorWorld[1] + this.dragOffset.y,
+        };
 
         // Update pin position
         const engine = this.deps.getSimulationEngine();
         const pins = new Map<string, PinStatus>();
-        pins.set(this.draggingNodeId, {
-            pinned: true,
-            position: { x: worldPos[0], y: worldPos[1] },
-        });
+        pins.set(this.draggingNodeId, { pinned: true, position: newPos });
         engine.pinNodes(pins);
     }
 
@@ -218,7 +231,7 @@ export class InteractionController {
         engine.pinNodes(pins);
 
         this.draggingNodeId = null;
-        this.dragStartWorldPos = null;
+        this.dragOffset = null;
     }
 
     // ─── Canvas dragging ───
@@ -459,7 +472,7 @@ export class InteractionController {
             engine.pinNodes(pins);
 
             this.draggingNodeId = null;
-            this.dragStartWorldPos = null;
+            this.dragOffset = null;
         }
 
         this.touchTransformActive = false;

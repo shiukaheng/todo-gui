@@ -257,6 +257,9 @@ export class WebColaEngine implements SimulationEngine {
                 node.fixed = 0;
             }
         }
+
+        // Wake up the simulation so it reacts to the pinned node's position
+        // this.layout.resume();
     }
 
     /**
@@ -646,6 +649,8 @@ export class WebColaEngine implements SimulationEngine {
             const index = this.nodeIdToIndex.get(taskId);
             if (index !== undefined && this.colaNodes[index]) {
                 const node = this.colaNodes[index];
+                // Skip pinned nodes - their positions are managed by pinNodes()
+                if (node.fixed) continue;
                 // Only update if position actually changed (avoid unnecessary perturbation)
                 if (Math.abs(node.x - pos.x) > 0.01 || Math.abs(node.y - pos.y) > 0.01) {
                     node.x = pos.x;

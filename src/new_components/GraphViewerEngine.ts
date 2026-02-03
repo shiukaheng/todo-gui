@@ -105,6 +105,7 @@ export class GraphViewerEngine {
             getNavigator: () => this.navigator,
             setNavigator: (navigator) => this.setNavigator(navigator),
             getNavigationState: () => this.navigationState,
+            getSimulationState: () => this.simulationState,
         });
         this.inputHandler.setCallback((event) => {
             this.interactionController.handleEvent(event);
