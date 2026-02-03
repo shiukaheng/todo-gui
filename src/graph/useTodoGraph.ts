@@ -1,5 +1,18 @@
-import { useState, useEffect } from 'react';
-import { subscribeToTasks, TaskListOut } from 'todo-client';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  subscribeToTasks,
+  TaskListOut,
+  TaskCreate,
+  TaskUpdate,
+  TaskOut,
+  DependencyOut,
+  OperationResult,
+  DefaultApi,
+  Configuration,
+} from 'todo-client';
+
+// Re-export types for convenience
+export type { TaskListOut, TaskCreate, TaskUpdate, TaskOut, DependencyOut, OperationResult };
 
 export interface TodoClientConfig {
   baseUrl: string;
@@ -7,6 +20,16 @@ export interface TodoClientConfig {
 
 export interface UseTodoGraphResult {
   graphData: TaskListOut | null;
+  // Task mutations
+  addTask: (task: TaskCreate) => Promise<TaskOut>;
+  updateTask: (taskId: string, update: TaskUpdate) => Promise<OperationResult>;
+  removeTask: (taskId: string) => Promise<OperationResult>;
+  renameTask: (taskId: string, newId: string) => Promise<OperationResult>;
+  // Dependency mutations
+  linkTasks: (fromId: string, toId: string) => Promise<DependencyOut>;
+  unlinkTasks: (fromId: string, toId: string) => Promise<OperationResult>;
+  // Database
+  initDb: () => Promise<OperationResult>;
 }
 
 /**
@@ -31,6 +54,11 @@ export interface UseTodoGraphResult {
  */
 export function useTodoGraph(config: TodoClientConfig | null): UseTodoGraphResult {
   const [graphData, setGraphData] = useState<TaskListOut | null>(null);
+
+  const api = useMemo(() => {
+    if (!config) return null;
+    return new DefaultApi(new Configuration({ basePath: config.baseUrl }));
+  }, [config?.baseUrl]);
 
   useEffect(() => {
     if (!config) {
@@ -59,5 +87,73 @@ export function useTodoGraph(config: TodoClientConfig | null): UseTodoGraphResul
     };
   }, [config?.baseUrl]);
 
-  return { graphData };
+  // Task mutations
+  const addTask = useCallback(
+    async (task: TaskCreate): Promise<TaskOut> => {
+      if (!api) throw new Error('API not initialized');
+      return api.addTaskApiTasksPost({ taskCreate: task });
+    },
+    [api]
+  );
+
+  const updateTask = useCallback(
+    async (taskId: string, update: TaskUpdate): Promise<OperationResult> => {
+      if (!api) throw new Error('API not initialized');
+      return api.setTaskApiTasksTaskIdPatch({ taskId, taskUpdate: update });
+    },
+    [api]
+  );
+
+  const removeTask = useCallback(
+    async (taskId: string): Promise<OperationResult> => {
+      if (!api) throw new Error('API not initialized');
+      return api.removeTaskApiTasksTaskIdDelete({ taskId });
+    },
+    [api]
+  );
+
+  const renameTask = useCallback(
+    async (taskId: string, newId: string): Promise<OperationResult> => {
+      if (!api) throw new Error('API not initialized');
+      return api.renameTaskApiTasksTaskIdRenamePost({
+        taskId,
+        renameRequest: { newId },
+      });
+    },
+    [api]
+  );
+
+  // Dependency mutations
+  const linkTasks = useCallback(
+    async (fromId: string, toId: string): Promise<DependencyOut> => {
+      if (!api) throw new Error('API not initialized');
+      return api.linkTasksApiLinksPost({ linkRequest: { fromId, toId } });
+    },
+    [api]
+  );
+
+  const unlinkTasks = useCallback(
+    async (fromId: string, toId: string): Promise<OperationResult> => {
+      if (!api) throw new Error('API not initialized');
+      return api.unlinkTasksApiLinksDelete({ linkRequest: { fromId, toId } });
+    },
+    [api]
+  );
+
+  // Database
+  const initDb = useCallback(async (): Promise<OperationResult> => {
+    if (!api) throw new Error('API not initialized');
+    return api.initDbApiInitPost();
+  }, [api]);
+
+  return {
+    graphData,
+    addTask,
+    updateTask,
+    removeTask,
+    renameTask,
+    linkTasks,
+    unlinkTasks,
+    initDb,
+  };
 }
