@@ -66,6 +66,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "stats.js": "^0.17.0",
+    "tinykeys": "^3.0.0",
     "todo-client": "github:shiukaheng/todo",
     "uuid": "^10.0.0",
     "webcola": "^3.4.0",
