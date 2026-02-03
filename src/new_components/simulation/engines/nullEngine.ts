@@ -5,13 +5,17 @@
  * compute any layout. Useful for testing the pipeline.
  */
 
-import { SimulatorInput, SimulationEngine, SimulationState, Position } from "../types";
+import { SimulatorInput, SimulationEngine, SimulationState, Position, PinStatus } from "../types";
 
 /**
  * Engine that places new tasks at origin (0,0)
  * and preserves existing positions unchanged.
  */
 export class NullEngine implements SimulationEngine {
+    pinNodes(_pins: ReadonlyMap<string, PinStatus>): void {
+        // No-op: null engine doesn't simulate, so pinning has no effect
+    }
+
     step(input: SimulatorInput, prevState: SimulationState): SimulationState {
         const positions: Record<string, Position> = {};
 
@@ -30,6 +34,10 @@ export class NullEngine implements SimulationEngine {
  */
 export class RandomInitEngine implements SimulationEngine {
     constructor(private radius: number = 100) {}
+
+    pinNodes(_pins: ReadonlyMap<string, PinStatus>): void {
+        // No-op: random init engine doesn't simulate, so pinning has no effect
+    }
 
     step(input: SimulatorInput, prevState: SimulationState): SimulationState {
         const positions: Record<string, Position> = {};

@@ -193,9 +193,9 @@ export class WebColaEngine implements SimulationEngine {
             if (status.pinned) {
                 node.x = status.position.x;
                 node.y = status.position.y;
-                node.fixed = true;
+                node.fixed = 1;  // Bit 1: externally fixed
             } else {
-                node.fixed = false;
+                node.fixed = 0;
             }
         }
     }
