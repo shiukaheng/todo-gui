@@ -3,13 +3,13 @@
  *
  * Responsibilities:
  * - Node dragging: pins nodes during drag via SimulationEngine.pinNodes()
- * - Canvas panning: updates ManualNavigator transform
- * - Zoom/rotate: updates ManualNavigator transform
- * - Momentum: sets velocity on ManualNavigator after release
+ * - Canvas panning: updates ManualNavigationEngine transform
+ * - Zoom/rotate: updates ManualNavigationEngine transform
+ * - Momentum: sets velocity on ManualNavigationEngine after release
  */
 
 import { SimulationEngine, SimulationState, PinStatus, Position } from "../simulation";
-import { Navigator, NavigationState, isManualNavigator } from "../navigation";
+import { NavigationEngine, NavigationState, isManualNavigationEngine } from "../navigation";
 import { screenToWorld, Vec2 } from "../render/utils";
 import { UIEvent, ScreenPoint, InteractionTarget } from "./InputHandler";
 
@@ -26,8 +26,8 @@ import { UIEvent, ScreenPoint, InteractionTarget } from "./InputHandler";
 export interface InteractionControllerDeps {
     getSimulationEngine: () => SimulationEngine;
     setSimulationEngine: (engine: SimulationEngine) => void;
-    getNavigator: () => Navigator;
-    setNavigator: (navigator: Navigator) => void;
+    getNavigationEngine: () => NavigationEngine;
+    setNavigationEngine: (engine: NavigationEngine) => void;
     getNavigationState: () => NavigationState;
     getSimulationState: () => SimulationState;
 }
@@ -122,10 +122,10 @@ export class InteractionController {
             engine.pinNodes(pins);
         }
 
-        // Stop any navigator momentum
+        // Stop any navigation engine momentum
         if (this.deps) {
-            const nav = this.deps.getNavigator();
-            if (isManualNavigator(nav)) {
+            const nav = this.deps.getNavigationEngine();
+            if (isManualNavigationEngine(nav)) {
                 nav.stopMomentum();
             }
         }
@@ -239,8 +239,8 @@ export class InteractionController {
     private startCanvasDrag(screen: ScreenPoint): void {
         if (!this.deps) return;
 
-        const nav = this.deps.getNavigator();
-        if (!isManualNavigator(nav)) return;
+        const nav = this.deps.getNavigationEngine();
+        if (!isManualNavigationEngine(nav)) return;
 
         // Stop any existing momentum
         nav.stopMomentum();
@@ -253,8 +253,8 @@ export class InteractionController {
     private updateCanvasDrag(screen: ScreenPoint): void {
         if (!this.deps || !this.isDraggingCanvas || !this.lastDragScreenPos) return;
 
-        const nav = this.deps.getNavigator();
-        if (!isManualNavigator(nav)) return;
+        const nav = this.deps.getNavigationEngine();
+        if (!isManualNavigationEngine(nav)) return;
 
         // Calculate delta and pan
         const dx = screen.x - this.lastDragScreenPos.x;
@@ -269,8 +269,8 @@ export class InteractionController {
     private endCanvasDrag(): void {
         if (!this.deps || !this.isDraggingCanvas) return;
 
-        const nav = this.deps.getNavigator();
-        if (isManualNavigator(nav)) {
+        const nav = this.deps.getNavigationEngine();
+        if (isManualNavigationEngine(nav)) {
             // Calculate release velocity and apply momentum
             const velocity = this.calculateVelocity();
             if (velocity) {
@@ -323,8 +323,8 @@ export class InteractionController {
     private handleZoom(screen: ScreenPoint, delta: number): void {
         if (!this.deps) return;
 
-        const nav = this.deps.getNavigator();
-        if (!isManualNavigator(nav)) return;
+        const nav = this.deps.getNavigationEngine();
+        if (!isManualNavigationEngine(nav)) return;
 
         // Convert delta to zoom factor
         // delta > 0 = zoom in, delta < 0 = zoom out
@@ -389,8 +389,8 @@ export class InteractionController {
             this.startNodeDrag(target.nodeId, center);
         } else {
             // Start canvas transform
-            const nav = this.deps.getNavigator();
-            if (isManualNavigator(nav)) {
+            const nav = this.deps.getNavigationEngine();
+            if (isManualNavigationEngine(nav)) {
                 nav.stopMomentum();
             }
 
@@ -414,8 +414,8 @@ export class InteractionController {
             this.updateNodeDrag(center);
         } else if (this.touchTransformActive) {
             // Apply canvas transform
-            const nav = this.deps.getNavigator();
-            if (!isManualNavigator(nav)) return;
+            const nav = this.deps.getNavigationEngine();
+            if (!isManualNavigationEngine(nav)) return;
 
             // Apply pan (delta from last position)
             if (this.lastDragScreenPos) {
@@ -446,8 +446,8 @@ export class InteractionController {
             this.endNodeDrag();
         } else if (this.touchTransformActive) {
             // Apply momentum
-            const nav = this.deps.getNavigator();
-            if (isManualNavigator(nav)) {
+            const nav = this.deps.getNavigationEngine();
+            if (isManualNavigationEngine(nav)) {
                 const velocity = this.calculateVelocity();
                 if (velocity) {
                     nav.setVelocity(velocity.vx, velocity.vy);

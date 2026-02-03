@@ -1,18 +1,18 @@
 /**
- * Fit Navigator
+ * Fit Navigation Engine
  *
- * A navigator that automatically fits all content in the viewport.
+ * A navigation engine that automatically fits all content in the viewport.
  * Useful for initial view or "show all" functionality.
  */
 
 import {
-    Navigator,
-    NavigatorInput,
+    NavigationEngine,
+    NavigationEngineInput,
     NavigationState,
 } from "../types";
 import { calculateWorldBounds, fitBoundsToViewport, lerpTransform } from "../utils";
 
-export interface FitNavigatorConfig {
+export interface FitNavigationEngineConfig {
     /** Padding around content in pixels. Default: 40 */
     padding?: number;
     /** Animation duration in ms. 0 = instant. Default: 300 */
@@ -20,21 +20,21 @@ export interface FitNavigatorConfig {
 }
 
 /**
- * Navigator that keeps all content fitted in the viewport.
+ * Navigation engine that keeps all content fitted in the viewport.
  * Smoothly animates when bounds change.
  */
-export class FitNavigator implements Navigator {
+export class FitNavigationEngine implements NavigationEngine {
     private padding: number;
     private animationDuration: number;
     private targetState: NavigationState | null = null;
     private animationProgress = 1; // 0 = start, 1 = done
 
-    constructor(config: FitNavigatorConfig = {}) {
+    constructor(config: FitNavigationEngineConfig = {}) {
         this.padding = config.padding ?? 40;
         this.animationDuration = config.animationDuration ?? 300;
     }
 
-    step(input: NavigatorInput, prevState: NavigationState): NavigationState {
+    step(input: NavigationEngineInput, prevState: NavigationState): NavigationState {
         // Calculate bounds from graph tasks
         const worldBounds = calculateWorldBounds(input.graph.tasks);
         if (!worldBounds) {

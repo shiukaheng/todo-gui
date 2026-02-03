@@ -1,5 +1,5 @@
 /**
- * Navigator Implementations
+ * Navigation Engine Implementations
  */
 
 export * from "./staticNavigator";

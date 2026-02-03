@@ -1,5 +1,5 @@
 /**
- * ManualNavigator - User-controlled pan/zoom/rotate navigation.
+ * ManualNavigationEngine - User-controlled pan/zoom/rotate navigation.
  *
  * Supports:
  * - Direct pan/zoom/rotate via method calls
@@ -8,9 +8,9 @@
  */
 
 import {
-    Navigator,
-    IManualNavigator,
-    NavigatorInput,
+    NavigationEngine,
+    IManualNavigationEngine,
+    NavigationEngineInput,
     NavigationState,
     ViewTransform,
     ScreenPoint,
@@ -26,7 +26,7 @@ import {
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-export interface ManualNavigatorConfig {
+export interface ManualNavigationEngineConfig {
     /** Initial transform. Default: identity centered in viewport */
     initialTransform?: ViewTransform;
 
@@ -43,7 +43,7 @@ export interface ManualNavigatorConfig {
     maxScale?: number;
 }
 
-const DEFAULT_CONFIG: Required<ManualNavigatorConfig> = {
+const DEFAULT_CONFIG: Required<ManualNavigationEngineConfig> = {
     initialTransform: IDENTITY_TRANSFORM,
     friction: 5,
     minVelocity: 10,
@@ -52,11 +52,11 @@ const DEFAULT_CONFIG: Required<ManualNavigatorConfig> = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MANUAL NAVIGATOR
+// MANUAL NAVIGATION ENGINE
 // ═══════════════════════════════════════════════════════════════════════════
 
-export class ManualNavigator implements IManualNavigator {
-    private config: Required<ManualNavigatorConfig>;
+export class ManualNavigationEngine implements IManualNavigationEngine {
+    private config: Required<ManualNavigationEngineConfig>;
 
     // Current transform (mutable for incremental updates)
     private transform: ViewTransform;
@@ -69,21 +69,21 @@ export class ManualNavigator implements IManualNavigator {
     private initialized = false;
     private hasExplicitInitialTransform: boolean;
 
-    constructor(config: ManualNavigatorConfig = {}) {
+    constructor(config: ManualNavigationEngineConfig = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
         this.transform = { ...this.config.initialTransform };
         this.hasExplicitInitialTransform = !!config.initialTransform;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // NAVIGATOR INTERFACE
+    // NAVIGATION ENGINE INTERFACE
     // ═══════════════════════════════════════════════════════════════════════
 
-    step(input: NavigatorInput, prevState: NavigationState): NavigationState {
+    step(input: NavigationEngineInput, prevState: NavigationState): NavigationState {
         const { deltaTime } = input;
         const dt = deltaTime / 1000; // Convert to seconds
 
-        // On first step, inherit transform from previous navigator (unless explicit initial was provided)
+        // On first step, inherit transform from previous engine (unless explicit initial was provided)
         if (!this.initialized) {
             if (!this.hasExplicitInitialTransform) {
                 this.transform = { ...prevState.transform };
@@ -123,7 +123,7 @@ export class ManualNavigator implements IManualNavigator {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // MANUAL NAVIGATOR INTERFACE
+    // MANUAL NAVIGATION ENGINE INTERFACE
     // ═══════════════════════════════════════════════════════════════════════
 
     pan(dx: number, dy: number): void {

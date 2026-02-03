@@ -1,24 +1,24 @@
 /**
- * Static Navigator
+ * Static Navigation Engine
  *
- * A minimal navigator that doesn't change the view automatically.
+ * A minimal navigation engine that doesn't change the view automatically.
  * Just preserves the current transform. Useful as a placeholder or
  * when external code manages the transform directly.
  */
 
 import {
-    Navigator,
-    NavigatorInput,
+    NavigationEngine,
+    NavigationEngineInput,
     NavigationState,
 } from "../types";
 
 /**
- * Navigator that preserves the current view.
+ * Navigation engine that preserves the current view.
  * Does not auto-pan or auto-zoom. The view stays exactly where it is.
  */
-export class StaticNavigator implements Navigator {
-    step(input: NavigatorInput, prevState: NavigationState): NavigationState {
-        // Static navigator doesn't change anything - just pass through
+export class StaticNavigationEngine implements NavigationEngine {
+    step(input: NavigationEngineInput, prevState: NavigationState): NavigationState {
+        // Static engine doesn't change anything - just pass through
         return prevState;
     }
 }

@@ -120,7 +120,7 @@
  * │  │  drag-start on node │     │  drag-start on canvas               │   │
  * │  │        │            │     │        │                            │   │
  * │  │        ▼            │     │        ▼                            │   │
- * │  │  SimulationEngine   │     │  Navigator (ManualNavigator)        │   │
+ * │  │  SimulationEngine   │     │  NavigationEngine (Manual)          │   │
  * │  │  .pinNodes()        │     │  .pan() / .zoom() / .rotate()       │   │
  * │  │        │            │     │        │                            │   │
  * │  │        ▼            │     │        ▼                            │   │
@@ -135,9 +135,9 @@
  * │  │  wheel event        │     │  pinch → zoom                       │   │
  * │  │        │            │     │  two-finger drag → pan              │   │
  * │  │        ▼            │     │  two-finger rotate → rotate         │   │
- * │  │  Navigator.zoom()   │     │        │                            │   │
+ * │  │  NavigationEngine   │     │        │                            │   │
  * │  │  around cursor      │     │        ▼                            │   │
- * │  │                     │     │  Navigator methods                  │   │
+ * │  │  .zoom()            │     │  NavigationEngine methods           │   │
  * │  └─────────────────────┘     └─────────────────────────────────────┘   │
  * └─────────────────────────────────────────────────────────────────────────┘
  *
@@ -165,13 +165,13 @@ import {
     WebColaEngine,
 } from "./simulation";
 import {
-    Navigator,
+    NavigationEngine,
     NavigationState,
     INITIAL_NAVIGATION_STATE,
     ViewportInfo,
     createPanZoomTransform,
 } from "./navigation";
-import { ManualNavigator } from "./navigation/navigators/manualNavigator";
+import { ManualNavigationEngine } from "./navigation/navigators/manualNavigator";
 import { SVGRenderer } from "./render/SVGRenderer";
 import { PerformanceMonitor } from "./render/PerformanceMonitor";
 import { InputHandler, InteractionController } from "./input";
@@ -251,7 +251,7 @@ export class GraphViewerEngine {
     private simulationState: SimulationState = EMPTY_SIMULATION_STATE;
 
     // Navigation: computes world → screen transform
-    private navigator: Navigator;
+    private navigationEngine: NavigationEngine;
     private navigationState: NavigationState = INITIAL_NAVIGATION_STATE;
 
     // Rendering: draws to SVG with reconciliation
@@ -293,15 +293,15 @@ export class GraphViewerEngine {
         });
 
         // Default navigation: manual pan/zoom/rotate
-        this.navigator = new ManualNavigator();
+        this.navigationEngine = new ManualNavigationEngine();
 
         // Set up input handling
         this.inputHandler = new InputHandler(this.svg);
         this.interactionController = new InteractionController({
             getSimulationEngine: () => this.simulationEngine,
             setSimulationEngine: (engine) => this.setSimulationEngine(engine),
-            getNavigator: () => this.navigator,
-            setNavigator: (navigator) => this.setNavigator(navigator),
+            getNavigationEngine: () => this.navigationEngine,
+            setNavigationEngine: (engine) => this.setNavigationEngine(engine),
             getNavigationState: () => this.navigationState,
             getSimulationState: () => this.simulationState,
         });
@@ -356,13 +356,13 @@ export class GraphViewerEngine {
     }
 
     /**
-     * Replace the navigator.
-     * Current view transform is preserved and passed to the new navigator.
-     * The old navigator is destroyed if it has a destroy method.
+     * Replace the navigation engine.
+     * Current view transform is preserved and passed to the new engine.
+     * The old engine is destroyed if it has a destroy method.
      */
-    setNavigator(navigator: Navigator): void {
-        this.navigator.destroy?.();
-        this.navigator = navigator;
+    setNavigationEngine(engine: NavigationEngine): void {
+        this.navigationEngine.destroy?.();
+        this.navigationEngine = engine;
     }
 
     /**
@@ -461,11 +461,11 @@ export class GraphViewerEngine {
             // ─────────────────────────────────────────────────────────────
             // STEP 2: Navigate - compute world → screen transform
             //
-            // The navigator determines HOW we view the world: pan, zoom,
+            // The navigation engine determines HOW we view the world: pan, zoom,
             // and optionally animated transitions. Produces a ViewTransform
             // (2D affine matrix) that maps world coordinates to screen pixels.
             // ─────────────────────────────────────────────────────────────
-            this.navigationState = this.navigator.step(
+            this.navigationState = this.navigationEngine.step(
                 {
                     graph: styledData,
                     viewport: this.getViewport(),
@@ -509,7 +509,7 @@ export class GraphViewerEngine {
 
         // Clean up compositional objects
         this.simulationEngine.destroy?.();
-        this.navigator.destroy?.();
+        this.navigationEngine.destroy?.();
         this.renderer.clear();
         this.performanceMonitor?.destroy();
 

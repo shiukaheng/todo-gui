@@ -1,10 +1,10 @@
 /**
- * Navigation Types
+ * Navigation Engine Types
  *
  * Defines the contract for viewport navigation (world space → screen space).
  *
- * The simulation engine determines WHERE nodes are in world space.
- * The navigation system determines HOW we VIEW that world space -
+ * The SimulationEngine determines WHERE nodes are in world space.
+ * The NavigationEngine determines HOW we VIEW that world space -
  * which part of the world is visible, at what zoom level, etc.
  *
  * This enables:
@@ -113,19 +113,19 @@ export interface ViewportInfo {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// NAVIGATOR
+// NAVIGATION ENGINE
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Input to the navigator's step function.
+ * Input to the navigation engine's step function.
  *
- * Receives the full positioned graph data so navigators can access any
+ * Receives the full positioned graph data so engines can access any
  * task properties they need (e.g., focus on selected/highlighted tasks).
  *
- * Tasks exist on an infinite 2D plane. The navigator decides which
+ * Tasks exist on an infinite 2D plane. The navigation engine decides which
  * part of that plane is visible on screen.
  */
-export interface NavigatorInput<G extends NestedGraphData = NestedGraphData> {
+export interface NavigationEngineInput<G extends NestedGraphData = NestedGraphData> {
     /** Full graph data with positions (tasks have .position: [x, y]). */
     readonly graph: PositionedGraphData<G>;
 
@@ -137,16 +137,16 @@ export interface NavigatorInput<G extends NestedGraphData = NestedGraphData> {
 }
 
 /**
- * A navigator computes view transforms (how we look at the world).
+ * A navigation engine computes view transforms (how we look at the world).
  *
- * The `step` function has a functional signature but the navigator itself
+ * The `step` function has a functional signature but the engine itself
  * may maintain internal state (animation progress, momentum, etc.)
  *
  * Contract:
  * - MUST return a valid ViewTransform
  * - SHOULD smoothly interpolate when animating
  */
-export interface Navigator {
+export interface NavigationEngine {
     /**
      * Compute the next navigation state.
      *
@@ -154,17 +154,17 @@ export interface Navigator {
      * @param prevState - Previous navigation state
      * @returns New navigation state
      */
-    step(input: NavigatorInput, prevState: NavigationState): NavigationState;
+    step(input: NavigationEngineInput, prevState: NavigationState): NavigationState;
 
     /**
-     * Clean up any resources held by the navigator (timers, listeners, etc.)
-     * Called when the navigator is replaced or the parent is destroyed.
+     * Clean up any resources held by the engine (timers, listeners, etc.)
+     * Called when the engine is replaced or the parent is destroyed.
      */
     destroy?(): void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MANUAL NAVIGATOR
+// MANUAL NAVIGATION ENGINE
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -176,10 +176,10 @@ export interface ScreenPoint {
 }
 
 /**
- * Extended navigator interface for manual pan/zoom/rotate control.
+ * Extended navigation engine interface for manual pan/zoom/rotate control.
  * Used by InteractionController for handling user gestures.
  */
-export interface IManualNavigator extends Navigator {
+export interface IManualNavigationEngine extends NavigationEngine {
     /**
      * Apply incremental pan in screen pixels.
      */
@@ -201,7 +201,7 @@ export interface IManualNavigator extends Navigator {
 
     /**
      * Set velocity for momentum scrolling.
-     * Navigator applies and decays velocity in step().
+     * Engine applies and decays velocity in step().
      * @param vx - Horizontal velocity in screen pixels per second
      * @param vy - Vertical velocity in screen pixels per second
      */
@@ -219,15 +219,15 @@ export interface IManualNavigator extends Navigator {
 }
 
 /**
- * Type guard to check if a navigator supports manual control.
+ * Type guard to check if a navigation engine supports manual control.
  */
-export function isManualNavigator(nav: Navigator): nav is IManualNavigator {
+export function isManualNavigationEngine(engine: NavigationEngine): engine is IManualNavigationEngine {
     return (
-        "pan" in nav &&
-        "zoom" in nav &&
-        "rotate" in nav &&
-        "setVelocity" in nav &&
-        "stopMomentum" in nav
+        "pan" in engine &&
+        "zoom" in engine &&
+        "rotate" in engine &&
+        "setVelocity" in engine &&
+        "stopMomentum" in engine
     );
 }
 
