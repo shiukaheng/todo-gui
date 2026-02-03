@@ -5,11 +5,10 @@ import { AppState, INITIAL_APP_STATE } from "./types";
 
 interface GraphViewerProps {
     taskList: TaskListOut;
-    onNodeClick?: (nodeId: string) => void;
     onCursorChange?: (nodeId: string | null) => void;
 }
 
-export function GraphViewer({ taskList, onNodeClick, onCursorChange }: GraphViewerProps) {
+export function GraphViewer({ taskList, onCursorChange }: GraphViewerProps) {
     // Ref to the DOM container where the engine will render
     const viewportContainerRef = useRef<HTMLDivElement>(null);
 
@@ -22,16 +21,10 @@ export function GraphViewer({ taskList, onNodeClick, onCursorChange }: GraphView
         onCursorChange?.(nodeId);
     }, [onCursorChange]);
 
-    // Handle node clicks - update cursor and forward to parent
-    const handleNodeClick = useCallback((nodeId: string) => {
-        setCursor(nodeId);
-        onNodeClick?.(nodeId);
-    }, [setCursor, onNodeClick]);
-
     // Hook manages engine lifecycle and data flow
     // Returns engine state that can drive React UI
     const engineState = useGraphViewerEngine(taskList, appState, viewportContainerRef, {
-        onNodeClick: handleNodeClick,
+        onNodeClick: setCursor,
     });
 
     return (
