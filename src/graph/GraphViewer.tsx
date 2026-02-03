@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useImperativeHandle, RefObject } from "react";
+import { useRef, useState, useCallback, useImperativeHandle, useEffect, RefObject } from "react";
 import { TaskListOut } from "todo-client";
 import { useGraphViewerEngine } from "./useGraphViewerEngine";
 import { AppState, INITIAL_APP_STATE, NavDirectionMapping, DEFAULT_NAV_MAPPING } from "./types";
@@ -56,6 +56,43 @@ export function GraphViewer({
     // Expose handle via ref
     useImperativeHandle(handleRef, () => navigationHandle, [navigationHandle]);
 
+    // Keyboard navigation (for testing)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Arrow keys for navigation
+            switch (e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    navigationHandle.up();
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    navigationHandle.down();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    navigationHandle.left();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    navigationHandle.right();
+                    break;
+                case 'Escape':
+                    navigationHandle.escape();
+                    break;
+                default:
+                    // Number keys for disambiguation
+                    if (ambiguousSelectors.includes(e.key)) {
+                        navigationHandle.chooseAmbiguous(e.key);
+                    }
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [navigationHandle, ambiguousSelectors]);
+
     // Hook manages engine lifecycle and data flow
     // Returns engine state that can drive React UI
     const engineState = useGraphViewerEngine(taskList, appState, viewportContainerRef, {
@@ -75,10 +112,12 @@ export function GraphViewer({
                 Simulating: {engineState.isSimulating ? "yes" : "no"}
             </div>
 
-            {/* TODO: Add more React UI as needed */}
-            {/* {engineState.selectedNodeId && (
-                <NodeInfoPanel nodeId={engineState.selectedNodeId} />
-            )} */}
+            {/* Navigation info text */}
+            {engineState.navInfoText && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded font-mono text-sm">
+                    {engineState.navInfoText}
+                </div>
+            )}
         </div>
     );
 }
