@@ -28,6 +28,7 @@ export interface RenderNode {
     outlineWidth: number;
     opacity: number;
     brightnessMultiplier: number;
+    selectorOutline: Color | null;  // Outer breathing ring, null = not shown
     position: Vec2;
 }
 

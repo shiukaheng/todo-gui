@@ -160,6 +160,7 @@ export type StyledGraphData<G extends NestedGraphData> = ExtendNestedGraphData<
         outlineWidth: number;
         opacity: number;
         brightnessMultiplier: number;
+        selectorOutline: Color | null;  // Outer breathing ring, null = not shown
     },
     // Edge extra properties
     {
@@ -178,7 +179,7 @@ export function baseStyleGraphData<G extends NestedGraphData>(graphData: G): Sty
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, taskWrapper]) => [
                 taskId,
-                { ...taskWrapper, text: taskId, color: nodeColors.get(taskId) || [1, 1, 1] as Color, borderColor: [0.5, 0.5, 0.5] as Color, labelColor: [1, 1, 1] as Color, outlineWidth: 0, opacity: 1.0, brightnessMultiplier: 1.0 },
+                { ...taskWrapper, text: taskId, color: nodeColors.get(taskId) || [1, 1, 1] as Color, borderColor: [0.5, 0.5, 0.5] as Color, labelColor: [1, 1, 1] as Color, outlineWidth: 0, opacity: 1.0, brightnessMultiplier: 1.0, selectorOutline: null },
             ])
         ),
         dependencies: Object.fromEntries(
@@ -234,11 +235,10 @@ export function cursorStyleGraphData<G extends StyledGraphData<NestedGraphData>>
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, task]) => {
                 if (taskId === cursor) {
-                    // Cursor node: cyan label
+                    // Cursor node: white selector outline ring
                     return [taskId, {
                         ...task,
-                        labelColor: [0, 1, 1] as Color,  // Cyan
-                        brightnessMultiplier: Math.max(task.brightnessMultiplier, 1.0), // Ensure visible
+                        selectorOutline: [1, 1, 1] as Color,  // White
                     }];
                 }
                 return [taskId, task];

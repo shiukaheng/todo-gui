@@ -25,6 +25,7 @@ Defines style properties and computes them based on node/edge state.
     outlineWidth: number;      // stroke width
     opacity: number;
     brightnessMultiplier: number;
+    selectorOutline: Color | null;  // outer breathing ring, null = hidden
 }
 ```
 
@@ -82,9 +83,9 @@ Renders styled data to SVG.
 
 ## Current Node States
 
-| State | brightnessMultiplier | labelColor |
-|-------|---------------------|------------|
-| Completed | 0.1 | green `[0,1,0]` |
-| Actionable | 1.0 | white `[1,1,1]` |
-| Blocked | 0.1 | white `[1,1,1]` |
-| Cursor | 1.0 (min) | cyan `[0,1,1]` |
+| State | brightnessMultiplier | labelColor | selectorOutline |
+|-------|---------------------|------------|-----------------|
+| Completed | 0.1 | green `[0,1,0]` | null |
+| Actionable | 1.0 | white `[1,1,1]` | null |
+| Blocked | 0.1 | white `[1,1,1]` | null |
+| Cursor | 1.0 (min) | (unchanged) | white `[1,1,1]` |

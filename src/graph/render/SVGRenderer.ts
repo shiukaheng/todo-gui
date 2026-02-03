@@ -15,6 +15,7 @@ export { ViewTransform, RenderGraphData, RenderNode, RenderEdge };
 
 interface NodeElements {
     group: SVGGElement;
+    selectorRing: SVGRectElement;
     rect: SVGRectElement;
     text: SVGTextElement;
 }
@@ -78,12 +79,36 @@ export class SVGRenderer {
             this.svg.appendChild(elements.group);
         }
 
-        const { group, rect, text } = elements;
+        const { group, selectorRing, rect, text } = elements;
         const brightness = node.brightnessMultiplier;
 
         // Minimal style: square node with text below (half size)
         const squareSize = FONT_SIZE * 0.6;
         const textGap = 4;
+
+        // Selector ring: outer breathing ring
+        if (node.selectorOutline) {
+            // Breathing animation: brightness oscillates with sine wave
+            const time = performance.now() / 1000;  // Convert to seconds
+            const breathRate = 1.25;  // Cycles per second
+            const minBrightness = 0.25;
+            const maxBrightness = 1.0;
+            const breathBrightness = minBrightness + (maxBrightness - minBrightness) * (0.5 + 0.5 * Math.sin(time * breathRate * Math.PI * 2));
+
+            const ringGap = 4;  // Gap between node and ring
+            const strokeWidth = 2;
+            const ringSize = squareSize + ringGap * 2 + strokeWidth;
+
+            selectorRing.setAttribute("x", (x - ringSize / 2).toString());
+            selectorRing.setAttribute("y", (y - ringSize / 2).toString());
+            selectorRing.setAttribute("width", ringSize.toString());
+            selectorRing.setAttribute("height", ringSize.toString());
+            selectorRing.setAttribute("stroke", colorToCSSWithBrightness(node.selectorOutline, breathBrightness));
+            selectorRing.setAttribute("stroke-width", strokeWidth.toString());
+            selectorRing.style.display = "";
+        } else {
+            selectorRing.style.display = "none";
+        }
 
         // Update rect as a square centered at position
         rect.setAttribute("x", (x - squareSize / 2).toString());
@@ -94,9 +119,10 @@ export class SVGRenderer {
         rect.setAttribute("stroke", colorToCSS(node.borderColor));
         rect.setAttribute("stroke-width", (node.outlineWidth * 0.5).toString());
 
-        // Update text below the square
+        // Update text below the square (offset extra if selector ring is present)
+        const selectorOffset = node.selectorOutline ? 6 : 0;
         text.setAttribute("x", x.toString());
-        text.setAttribute("y", (y + squareSize / 2 + textGap + FONT_SIZE / 2).toString());
+        text.setAttribute("y", (y + squareSize / 2 + textGap + selectorOffset + FONT_SIZE / 2).toString());
         text.setAttribute("fill", colorToCSSWithBrightness(node.labelColor, brightness));
         text.textContent = node.text;
 
@@ -108,6 +134,12 @@ export class SVGRenderer {
         group.dataset.nodeId = id;
         group.style.pointerEvents = "all";
 
+        // Selector ring: outer breathing ring (rendered behind the node)
+        const selectorRing = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        selectorRing.style.pointerEvents = "none";
+        selectorRing.setAttribute("fill", "none");
+        selectorRing.style.display = "none";
+
         const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
         rect.style.pointerEvents = "all";
 
@@ -118,10 +150,11 @@ export class SVGRenderer {
         text.setAttribute("font-family", "monospace");
         text.style.pointerEvents = "none";
 
+        group.appendChild(selectorRing);
         group.appendChild(rect);
         group.appendChild(text);
 
-        return { group, rect, text };
+        return { group, selectorRing, rect, text };
     }
 
     private reconcileEdge(id: string, edge: RenderEdge, from: Vec2, to: Vec2, transform: ViewTransform): void {
