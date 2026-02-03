@@ -449,17 +449,28 @@ export class WebColaEngine implements SimulationEngine {
             this.layout.avoidOverlaps(avoidOverlaps);
         }
 
-        // Initialize layout WITHOUT running iterations
-        // This sets up distance matrix and Descent, but doesn't move nodes
-        // Animation happens naturally through doTick() calls
-        this.layout.start(
-            0,     // No unconstrained iterations
-            0,     // No user constraint iterations
-            0,     // No all-constraint iterations
-            0,     // No grid snap iterations
-            false, // keepRunning = false
-            false  // centerGraph = false (preserve positions from prevState)
-        );
+        // Initialize layout
+        // When constraints are applied (especially after delay), run some iterations
+        // to kickstart constraint satisfaction. Otherwise, nodes may not move.
+        if (withConstraints) {
+            this.layout.start(
+                0,     // No unconstrained iterations (positions already settled)
+                10,    // Some user constraint iterations
+                10,    // Some all-constraint iterations
+                0,     // No grid snap iterations
+                false, // keepRunning = false
+                false  // centerGraph = false (preserve positions)
+            );
+        } else {
+            this.layout.start(
+                0,     // No unconstrained iterations
+                0,     // No user constraint iterations
+                0,     // No all-constraint iterations
+                0,     // No grid snap iterations
+                false, // keepRunning = false
+                false  // centerGraph = false (preserve positions from prevState)
+            );
+        }
 
         // IMPORTANT: resume() sets alpha to 0.1, which allows tick() to run
         // Without this, alpha is 0 and tick() immediately returns "converged"
