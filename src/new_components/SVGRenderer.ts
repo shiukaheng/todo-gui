@@ -36,28 +36,6 @@ export class SVGRenderer {
         this.svg.style.userSelect = "none";
         this.defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
         this.svg.appendChild(this.defs);
-
-        // Create arrowhead marker
-        this.createArrowheadMarker();
-    }
-
-    /** Create the arrowhead marker definition. */
-    private createArrowheadMarker(): void {
-        const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
-        marker.setAttribute("id", "arrowhead");
-        marker.setAttribute("markerWidth", "10");
-        marker.setAttribute("markerHeight", "7");
-        marker.setAttribute("refX", "9");  // Position at tip
-        marker.setAttribute("refY", "3.5");
-        marker.setAttribute("orient", "auto");
-        marker.setAttribute("markerUnits", "strokeWidth");
-
-        const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-        polygon.setAttribute("points", "0 0, 10 3.5, 0 7");
-        polygon.setAttribute("fill", "context-stroke");  // Inherit stroke color from line
-
-        marker.appendChild(polygon);
-        this.defs.appendChild(marker);
     }
 
     /** Get or create a glow filter for the given radius and intensity. */
@@ -231,7 +209,6 @@ export class SVGRenderer {
     private createEdgeElements(id: string): EdgeElements {
         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
         line.setAttribute("stroke-width", STROKE_WIDTH.toString());
-        line.setAttribute("marker-end", "url(#arrowhead)");
         line.dataset.edgeId = id;
         line.style.pointerEvents = "stroke";
         return { line };
