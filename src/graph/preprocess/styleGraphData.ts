@@ -1,4 +1,5 @@
 import { NestedGraphData, ExtendNestedGraphData } from "./nestGraphData";
+import { AppState } from "../types";
 
 export type Color = [number, number, number]; // RGB color representation
 export type SpecialEffect = "glow" | "none";
@@ -210,6 +211,43 @@ export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphD
                 }
                 // Blocked: not completed and not actionable
                 return [taskId, { ...task, brightnessMultiplier: 0.1 }];
+            })
+        ),
+    } as G;
+}
+
+/**
+ * Apply cursor styling based on AppState.
+ * The cursored node gets a distinctive highlight.
+ */
+export function cursorStyleGraphData<G extends StyledGraphData<NestedGraphData>>(
+    graphData: G,
+    appState: AppState
+): G {
+    const { cursor } = appState;
+
+    // No cursor, return unchanged
+    if (!cursor) return graphData;
+
+    // Check if cursor points to a valid node
+    if (!(cursor in graphData.tasks)) return graphData;
+
+    return {
+        ...graphData,
+        tasks: Object.fromEntries(
+            Object.entries(graphData.tasks).map(([taskId, task]) => {
+                if (taskId === cursor) {
+                    // Cursor node: cyan border with strong glow
+                    return [taskId, {
+                        ...task,
+                        borderColor: [0, 1, 1] as Color,  // Cyan
+                        outlineWidth: 6,
+                        glowIntensity: 1.5,
+                        glowRadius: 12,
+                        brightnessMultiplier: Math.max(task.brightnessMultiplier, 1.0), // Ensure visible
+                    }];
+                }
+                return [taskId, task];
             })
         ),
     } as G;

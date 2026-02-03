@@ -2,19 +2,22 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { TaskListOut } from "todo-client";
 import { GraphViewerEngine, EngineStateCallback } from "./GraphViewerEngine";
 import { GraphViewerEngineState, INITIAL_ENGINE_STATE } from "./GraphViewerEngineState";
+import { AppState, INITIAL_APP_STATE } from "./types";
 
 /**
  * useGraphViewerEngine - React hook that manages the engine lifecycle and data flow.
  *
  * Data flow:
- *   React props (taskList) → engine.setGraph() → engine animation loop → setEngineState() → React
+ *   React props (taskList, appState) → engine.setGraph/setAppState() → engine animation loop → setEngineState() → React
  *
  * @param taskList - The task data from React props
+ * @param appState - The app state (cursor, selection, etc.) from React props
  * @param viewportContainerRef - Ref to the DOM container where the engine renders
  * @returns The current engine state (for React UI to consume)
  */
 export function useGraphViewerEngine(
     taskList: TaskListOut,
+    appState: AppState = INITIAL_APP_STATE,
     viewportContainerRef: React.RefObject<HTMLDivElement>
 ): GraphViewerEngineState {
     const [engineState, setEngineState] = useState<GraphViewerEngineState>(INITIAL_ENGINE_STATE);
@@ -49,6 +52,11 @@ export function useGraphViewerEngine(
     useEffect(() => {
         engineRef.current?.setGraph(taskList);
     }, [taskList]);
+
+    // Push app state updates when appState changes
+    useEffect(() => {
+        engineRef.current?.setAppState(appState);
+    }, [appState]);
 
     return engineState;
 }

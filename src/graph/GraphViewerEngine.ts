@@ -1,7 +1,8 @@
 import { TaskListOut } from "todo-client";
 import { GraphViewerEngineState } from "./GraphViewerEngineState";
+import { AppState, INITIAL_APP_STATE } from "./types";
 import { nestGraphData, NestedGraphData } from "./preprocess/nestGraphData";
-import { baseStyleGraphData, conditionalStyleGraphData, StyledGraphData } from "./preprocess/styleGraphData";
+import { baseStyleGraphData, conditionalStyleGraphData, cursorStyleGraphData, StyledGraphData } from "./preprocess/styleGraphData";
 import { computeConnectedComponents, ComponentGraphData } from "./preprocess/connectedComponents";
 
 /** Concrete type for processed graph data: nested → components → styled. */
@@ -99,6 +100,9 @@ export class GraphViewerEngine {
     // Graph data: processed and ready for simulation (set via setGraph())
     private graphData: ProcessedGraphData | null = null;
 
+    // App state: UI state like cursor, selection, etc. (set via setAppState())
+    private appState: AppState = INITIAL_APP_STATE;
+
     // Simulation: computes node positions in world space
     private simulationEngine: SimulationEngine;
     private simulationState: SimulationState = EMPTY_SIMULATION_STATE;
@@ -184,6 +188,18 @@ export class GraphViewerEngine {
         let styled = baseStyleGraphData(withComponents);
         styled = conditionalStyleGraphData(styled);
         this.graphData = styled;
+    }
+
+    /**
+     * Update the app state. This is the secondary reactive source.
+     * Call this when UI state changes (cursor, selection, etc.)
+     *
+     * @param appState - New app state from React
+     */
+    setAppState(appState: AppState): void {
+        this.appState = appState;
+        // Note: Could trigger immediate effects here if needed
+        // For now, the animation loop will pick up the new state
     }
 
     /**
@@ -292,6 +308,14 @@ export class GraphViewerEngine {
             }
 
             // ─────────────────────────────────────────────────────────────
+            // STEP 1.6: Apply AppState styling (cursor, selection, etc.)
+            //
+            // AppState is the secondary reactive source. Apply styling
+            // based on current UI state (cursor highlight, etc.)
+            // ─────────────────────────────────────────────────────────────
+            const styledData = cursorStyleGraphData(positionedData, this.appState);
+
+            // ─────────────────────────────────────────────────────────────
             // STEP 2: Navigate - compute world → screen transform
             //
             // The navigator determines HOW we view the world: pan, zoom,
@@ -300,7 +324,7 @@ export class GraphViewerEngine {
             // ─────────────────────────────────────────────────────────────
             this.navigationState = this.navigator.step(
                 {
-                    graph: positionedData,
+                    graph: styledData,
                     viewport: this.getViewport(),
                     deltaTime,
                 },
@@ -312,7 +336,7 @@ export class GraphViewerEngine {
             //
             // Uses reconciliation to minimize DOM operations.
             // ─────────────────────────────────────────────────────────────
-            this.renderer.render(positionedData, this.navigationState.transform);
+            this.renderer.render(styledData, this.navigationState.transform);
 
             this.performanceMonitor?.end();
             this.animationFrameId = requestAnimationFrame(tick);
