@@ -111,8 +111,8 @@ export class GraphViewerEngine {
     setGraph(taskList: TaskListOut): void {
         const nested = nestGraphData(taskList);
         const withComponents = computeConnectedComponents(nested);
-        const baseStyled = baseStyleGraphData(withComponents);
-        const styled = conditionalStyleGraphData(baseStyled);
+        let styled = baseStyleGraphData(withComponents);
+        styled = conditionalStyleGraphData(styled);
         this.graphData = styled;
     }
 

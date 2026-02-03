@@ -15,6 +15,7 @@ import {
     SimulatorInput,
     SimulationState,
     Position,
+    PinStatus,
 } from "../types";
 import { NestedGraphData } from "../../../new_utils/nestGraphData";
 
@@ -165,8 +166,38 @@ export class WebColaEngine implements SimulationEngine {
     // Track if we've done initial layout
     private initialized = false;
 
+    // Pinned nodes (for dragging)
+    private pinnedNodes: Map<string, PinStatus> = new Map();
+
     constructor(config: WebColaConfig = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
+    }
+
+    /**
+     * Update pin status for nodes. Pinned nodes are fixed at their position.
+     */
+    pinNodes(pins: ReadonlyMap<string, PinStatus>): void {
+        this.pinnedNodes = new Map(pins);
+        this.applyPinsToLayout();
+    }
+
+    /** Apply current pin status to the WebCola layout. */
+    private applyPinsToLayout(): void {
+        if (!this.layout) return;
+
+        for (const [nodeId, status] of this.pinnedNodes) {
+            const index = this.nodeIdToIndex.get(nodeId);
+            if (index === undefined) continue;
+
+            const node = this.colaNodes[index];
+            if (status.pinned) {
+                node.x = status.position.x;
+                node.y = status.position.y;
+                node.fixed = true;
+            } else {
+                node.fixed = false;
+            }
+        }
     }
 
     /**

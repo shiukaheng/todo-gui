@@ -40,6 +40,13 @@ export const EMPTY_SIMULATION_STATE: SimulationState = {
     positions: {},
 };
 
+/**
+ * Pin status for a node - either unpinned or pinned at a specific position.
+ */
+export type PinStatus =
+    | { pinned: false }
+    | { pinned: true; position: Position };
+
 // ═══════════════════════════════════════════════════════════════════════════
 // SIMULATION ENGINE
 // ═══════════════════════════════════════════════════════════════════════════
@@ -80,6 +87,14 @@ export interface SimulationEngine {
      * @returns New positions for all nodes in graph
      */
     step(input: SimulatorInput, prevState: SimulationState): SimulationState;
+
+    /**
+     * Update pin status for nodes. Pinned nodes are fixed at their position
+     * and don't move during simulation (used for dragging).
+     *
+     * @param pins - Map of node ID to pin status
+     */
+    pinNodes(pins: ReadonlyMap<string, PinStatus>): void;
 
     /**
      * Clean up any resources held by the engine (timers, workers, etc.)

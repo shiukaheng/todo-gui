@@ -6,7 +6,7 @@
  * - Tension: Connected nodes attract via spring forces
  */
 
-import { SimulationEngine, SimulatorInput, SimulationState, Position } from "../types";
+import { SimulationEngine, SimulatorInput, SimulationState, Position, PinStatus } from "../types";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -70,9 +70,17 @@ function gaussianRandom(): number {
 export class ForceDirectedEngine implements SimulationEngine {
     private config: Required<ForceDirectedConfig>;
     private velocities: Record<string, Vec2> = {};
+    private pinnedNodes: Map<string, PinStatus> = new Map();
 
     constructor(config: ForceDirectedConfig = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
+    }
+
+    /**
+     * Update pin status for nodes. Pinned nodes are fixed at their position.
+     */
+    pinNodes(pins: ReadonlyMap<string, PinStatus>): void {
+        this.pinnedNodes = new Map(pins);
     }
 
     step(input: SimulatorInput, prevState: SimulationState): SimulationState {
@@ -169,6 +177,15 @@ export class ForceDirectedEngine implements SimulationEngine {
         const friction = this.config.friction;
 
         for (const taskId of taskIds) {
+            // Check if node is pinned
+            const pinStatus = this.pinnedNodes.get(taskId);
+            if (pinStatus?.pinned) {
+                // Pinned: set position to pin location, zero velocity
+                positions[taskId] = [pinStatus.position.x, pinStatus.position.y];
+                this.velocities[taskId] = [0, 0];
+                continue;
+            }
+
             // Update velocity: v = friction * (v + F * dt)
             const vel = this.velocities[taskId];
             const force = forces[taskId];
