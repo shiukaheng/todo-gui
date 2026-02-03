@@ -12,13 +12,22 @@ import { StyledGraphData } from "./styleGraphData";
 import { CursorNeighbors } from "../GraphViewerEngineState";
 import { NavState, NavDirectionMapping, NavTarget } from "../graphNavigation/types";
 
-function getArrowForTarget(target: NavTarget): string {
-    switch (target) {
-        case 'parents': return '→';
-        case 'children': return '←';
-        case 'prevPeer': return '↑';
-        case 'nextPeer': return '↓';
+type Direction = 'up' | 'down' | 'left' | 'right';
+
+const DIRECTION_ARROWS: Record<Direction, string> = {
+    up: '↑',
+    down: '↓',
+    left: '←',
+    right: '→',
+};
+
+function getArrowForTarget(target: NavTarget, mapping: NavDirectionMapping): string {
+    // Find which direction maps to this target
+    for (const [dir, t] of Object.entries(mapping)) {
+        if (t === target) return DIRECTION_ARROWS[dir as Direction];
     }
+    // Fallback
+    return '?';
 }
 
 export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphData>>(
@@ -26,7 +35,7 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
     cursorNeighbors: CursorNeighbors,
     navState: NavState,
     selectors: string[],
-    _directionMapping: NavDirectionMapping
+    directionMapping: NavDirectionMapping
 ): G {
     const { topological } = cursorNeighbors;
     const { parents, children, peers } = topological;
@@ -35,10 +44,10 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
     const overlays = new Map<string, string>();
 
     // Get arrows for each target type based on direction mapping
-    const parentArrow = getArrowForTarget('parents');
-    const childArrow = getArrowForTarget('children');
-    const prevPeerArrow = getArrowForTarget('prevPeer');
-    const nextPeerArrow = getArrowForTarget('nextPeer');
+    const parentArrow = getArrowForTarget('parents', directionMapping);
+    const childArrow = getArrowForTarget('children', directionMapping);
+    const prevPeerArrow = getArrowForTarget('prevPeer', directionMapping);
+    const nextPeerArrow = getArrowForTarget('nextPeer', directionMapping);
 
     // Check if we're in disambiguation mode
     const isConfirmingParents = navState.type === 'confirmingTarget' && navState.targetType === 'parents';
