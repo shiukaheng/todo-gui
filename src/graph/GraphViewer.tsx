@@ -106,12 +106,6 @@ export function GraphViewer({
         <div className="absolute w-full h-full bg-black">
             {/* Engine renders into this container (canvas, SVG, or DOM nodes) */}
             <div className="absolute w-full h-full" ref={viewportContainerRef} />
-
-            {/* React UI driven by engine state */}
-            <div className="absolute top-2 left-2 text-white text-xs font-mono opacity-50">
-                Simulating: {engineState.isSimulating ? "yes" : "no"}
-            </div>
-
             {/* Navigation info text */}
             {engineState.navInfoText && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white font-mono text-sm">

@@ -333,7 +333,7 @@ export class GraphViewerEngine {
         this.startLoop();
 
         // Enable performance monitor by default
-        this.setPerformanceMonitor(true);
+        // this.setPerformanceMonitor(true);
 
         // Emit initial state to React
         this.emitState();
