@@ -215,7 +215,7 @@ export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphD
                 let styledTask = { ...task, shape, hollow };
 
                 if (isCompleted) {
-                    return [taskId, { ...styledTask, text: `✔ ${styledTask.text}`, brightnessMultiplier: 0.1, labelColor: [0, 1, 0] as Color }];
+                    return [taskId, { ...styledTask, text: `✔ ${styledTask.text}`, labelColor: [0, 1, 0] as Color }];
                 }
                 if (isActionable) {
                     return [taskId, styledTask];
