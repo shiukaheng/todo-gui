@@ -85,7 +85,7 @@ export class GraphViewerEngine {
             flowSeparation: 100,
             symmetricDiffLinkLengths: true,
             flowReversed: true,
-            // componentGrouping: true,
+            componentGrouping: true,
             // componentPadding: 10,
         });
 
