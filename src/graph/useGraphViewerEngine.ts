@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { TaskListOut } from "todo-client";
 import { GraphViewerEngine, EngineStateCallback, GraphViewerEngineOptions } from "./GraphViewerEngine";
-import { GraphViewerEngineState, INITIAL_ENGINE_STATE } from "./GraphViewerEngineState";
+import { GraphViewerEngineState, INITIAL_ENGINE_STATE, CursorNeighbors } from "./GraphViewerEngineState";
 import { AppState } from "./types";
+import { NavState } from "./graphNavigation/types";
+
+export interface UseGraphViewerEngineOptions extends GraphViewerEngineOptions {
+    onCursorNeighborsChange?: (neighbors: CursorNeighbors) => void;
+    navState?: NavState;
+    selectors?: string[];
+}
 
 /**
  * useGraphViewerEngine - React hook that manages the engine lifecycle and data flow.
@@ -13,14 +20,14 @@ import { AppState } from "./types";
  * @param taskList - The task data from React props
  * @param appState - The app state (cursor, selection, etc.) from React props
  * @param viewportContainerRef - Ref to the DOM container where the engine renders
- * @param options - Engine options (callbacks like onNodeClick)
+ * @param options - Engine options (callbacks like onNodeClick, onCursorNeighborsChange)
  * @returns The current engine state (for React UI to consume)
  */
 export function useGraphViewerEngine(
     taskList: TaskListOut,
     appState: AppState,
     viewportContainerRef: React.RefObject<HTMLDivElement>,
-    options?: GraphViewerEngineOptions
+    options?: UseGraphViewerEngineOptions
 ): GraphViewerEngineState {
     const [engineState, setEngineState] = useState<GraphViewerEngineState>(INITIAL_ENGINE_STATE);
 
@@ -36,8 +43,9 @@ export function useGraphViewerEngine(
     const optionsRef = useRef(options);
     optionsRef.current = options;
 
-    const stableOptions = useRef<GraphViewerEngineOptions>({
+    const stableOptions = useRef<UseGraphViewerEngineOptions>({
         onNodeClick: (nodeId) => optionsRef.current?.onNodeClick?.(nodeId),
+        onCursorNeighborsChange: (neighbors) => optionsRef.current?.onCursorNeighborsChange?.(neighbors),
     }).current;
 
     const engineRef = useRef<GraphViewerEngine | null>(null);
@@ -67,6 +75,14 @@ export function useGraphViewerEngine(
     useEffect(() => {
         engineRef.current?.setAppState(appState);
     }, [appState]);
+
+    // Push nav state updates when navState or selectors change
+    useEffect(() => {
+        engineRef.current?.setNavState(
+            optionsRef.current?.navState,
+            optionsRef.current?.selectors
+        );
+    }, [options?.navState, options?.selectors]);
 
     return engineState;
 }

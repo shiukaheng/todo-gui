@@ -48,9 +48,24 @@ export type CursorNeighbors = {
     }
 }
 
+/** Initial empty cursor neighbors */
+export const EMPTY_CURSOR_NEIGHBORS: CursorNeighbors = {
+    topological: {
+        children: [],
+        parents: [],
+        peers: {},
+    },
+};
+
 export interface GraphViewerEngineState {
     /** Whether the physics simulation is currently running */
     isSimulating: boolean;
+
+    /** Current cursor neighbors for navigation */
+    cursorNeighbors: CursorNeighbors;
+
+    /** Info text for navigation state (e.g., "Select parent (1-3)"), null when idle */
+    navInfoText: string | null;
 
     // FUTURE IDEAS - uncomment and implement as needed:
     //
@@ -70,15 +85,8 @@ export interface GraphViewerEngineState {
 /** Initial state before the engine starts */
 export const INITIAL_ENGINE_STATE: GraphViewerEngineState = {
     isSimulating: false,
-};
-
-/** Initial empty cursor neighbors */
-export const EMPTY_CURSOR_NEIGHBORS: CursorNeighbors = {
-    topological: {
-        children: [],
-        parents: [],
-        peers: {},
-    },
+    cursorNeighbors: EMPTY_CURSOR_NEIGHBORS,
+    navInfoText: null,
 };
 
 export type SortAxis = 'x' | 'y';

@@ -149,7 +149,9 @@
  */
 
 import { TaskListOut } from "todo-client";
-import { CursorNeighbors, GraphViewerEngineState } from "./GraphViewerEngineState";
+import { CursorNeighbors, GraphViewerEngineState, computeCursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
+import { NavState, IDLE_STATE, getNavInfoText } from "./graphNavigation/types";
+import { navigationStyleGraphData } from "./preprocess/navigationStyleGraphData";
 import { AppState, INITIAL_APP_STATE } from "./types";
 import { nestGraphData, NestedGraphData } from "./preprocess/nestGraphData";
 import { baseStyleGraphData, conditionalStyleGraphData, cursorStyleGraphData, StyledGraphData } from "./preprocess/styleGraphData";
@@ -234,11 +236,10 @@ export type EngineStateCallback = (state: GraphViewerEngineState) => void;
  */
 export interface GraphViewerEngineOptions {
     onNodeClick?: (nodeId: string) => void;
+    onCursorNeighborsChange?: (neighbors: CursorNeighbors) => void;
 }
 
-function calculateCursorNeighbors<G extends PositionedGraphData<any>>(graphData: G, cursor: string): CursorNeighbors {
-    throw new Error("Not implemented yet");
-}
+const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
 /**
  * GraphViewerEngine - Imperative class that owns the animation loop.
@@ -278,19 +279,17 @@ export class GraphViewerEngine {
     // Track if we've done the initial fit-to-graph
     private initialFitDone = false;
 
-    private currentCursorNeighbors: CursorNeighbors = {
-        topological: {
-            children: [],
-            parents: [],
-            peers: {},
-        },
-    };
+    private currentCursorNeighbors: CursorNeighbors = EMPTY_CURSOR_NEIGHBORS;
+    private navState: NavState = IDLE_STATE;
+    private selectors: string[] = DEFAULT_SELECTORS;
+    private options?: GraphViewerEngineOptions;
 
     constructor(
         private container: HTMLDivElement,
         private onStateChange: EngineStateCallback,
         options?: GraphViewerEngineOptions
     ) {
+        this.options = options;
         console.log("[GraphViewerEngine] Created, starting animation loop");
 
         // Create SVG element
@@ -367,6 +366,23 @@ export class GraphViewerEngine {
     }
 
     /**
+     * Update the navigation state and selectors.
+     * Call this when nav state changes from the navigation handle.
+     *
+     * @param navState - New nav state
+     * @param selectors - Available selector keys (e.g., ['1', '2', '3', ...])
+     */
+    setNavState(navState?: NavState, selectors?: string[]): void {
+        if (navState !== undefined) {
+            this.navState = navState;
+        }
+        if (selectors !== undefined) {
+            this.selectors = selectors;
+        }
+        this.emitState();
+    }
+
+    /**
      * Replace the simulation engine.
      * Current positions are preserved and passed to the new engine.
      * The old engine is destroyed if it has a destroy method.
@@ -417,17 +433,55 @@ export class GraphViewerEngine {
      * Call this when something UI-relevant changes (selection, hover, etc.)
      */
     private emitState(): void {
+        // Compute candidate count for info text
+        let candidateCount = 0;
+        if (this.navState.type === 'confirmingTarget') {
+            const { topological } = this.currentCursorNeighbors;
+            candidateCount = this.navState.targetType === 'parents'
+                ? topological.parents.length
+                : topological.children.length;
+        } else if (this.navState.type === 'selectingParentForPeers') {
+            candidateCount = Object.keys(this.currentCursorNeighbors.topological.peers).length;
+        }
+
         this.onStateChange({
             isSimulating: this.isSimulating,
+            cursorNeighbors: this.currentCursorNeighbors,
+            navInfoText: getNavInfoText(this.navState, candidateCount),
         });
     }
 
     /**
-     * Emits event for relevant neighbors of the node on cursor. 
+     * Computes and emits cursor neighbors if changed.
      */
     private updateRelevantNeighbors(positionedData: PositionedGraphData<any>): void {
         const { cursor } = this.appState;
-        // TODO: Use the calculation function, compare with current, if changed, apply and emit.
+
+        // Build positions map from positioned data
+        const positions: { [key: string]: [number, number] } = {};
+        for (const [taskId, task] of Object.entries(positionedData.tasks)) {
+            const taskData = task as any;
+            if (taskData.position) {
+                positions[taskId] = taskData.position;
+            }
+        }
+
+        // Compute new neighbors
+        const newNeighbors = computeCursorNeighbors(
+            cursor,
+            positionedData.dependencies,
+            positions
+        );
+
+        // Check if neighbors changed (simple JSON comparison for now)
+        const oldJson = JSON.stringify(this.currentCursorNeighbors);
+        const newJson = JSON.stringify(newNeighbors);
+
+        if (oldJson !== newJson) {
+            this.currentCursorNeighbors = newNeighbors;
+            this.options?.onCursorNeighborsChange?.(newNeighbors);
+            this.emitState();
+        }
     }
 
     /**
@@ -486,7 +540,20 @@ export class GraphViewerEngine {
             // AppState is the secondary reactive source. Apply styling
             // based on current UI state (cursor highlight, etc.)
             // ─────────────────────────────────────────────────────────────
-            const styledData = cursorStyleGraphData(positionedData, this.appState);
+            let styledData = cursorStyleGraphData(positionedData, this.appState);
+
+            // ─────────────────────────────────────────────────────────────
+            // STEP 1.7: Apply navigation styling (shortcut key overlays)
+            //
+            // Shows navigation hints on reachable nodes.
+            // ─────────────────────────────────────────────────────────────
+            styledData = navigationStyleGraphData(
+                styledData,
+                this.currentCursorNeighbors,
+                this.navState,
+                this.selectors,
+                this.appState.navDirectionMapping
+            );
 
             // ─────────────────────────────────────────────────────────────
             // STEP 2: Navigate - compute world → screen transform
