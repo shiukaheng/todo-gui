@@ -19,11 +19,60 @@ import {
     NavigationState,
     INITIAL_NAVIGATION_STATE,
     ViewportInfo,
+    createPanZoomTransform,
 } from "./navigation";
 import { ManualNavigator } from "./navigation/navigators/manualNavigator";
 import { SVGRenderer } from "./SVGRenderer";
 import { PerformanceMonitor } from "./PerformanceMonitor";
 import { InputHandler, InteractionController } from "./input";
+import { PositionedGraphData } from "./simulation/utils";
+
+/**
+ * Compute a transform that fits all nodes in the viewport.
+ * Returns null if there are no nodes.
+ */
+function computeFitTransform(
+    positionedData: PositionedGraphData<any>,
+    viewport: ViewportInfo,
+    padding: number = 50
+) {
+    const positions = Object.values(positionedData.tasks)
+        .map((t: any) => t.position)
+        .filter((p): p is [number, number] => p !== undefined);
+
+    if (positions.length === 0) return null;
+
+    // Compute bounding box
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [x, y] of positions) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+    }
+
+    const boundsWidth = maxX - minX || 1;
+    const boundsHeight = maxY - minY || 1;
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    // Compute scale to fit bounds in viewport (with padding)
+    const availableWidth = viewport.width - padding * 2;
+    const availableHeight = viewport.height - padding * 2;
+    const scale = Math.min(
+        availableWidth / boundsWidth,
+        availableHeight / boundsHeight,
+        2 // Cap max zoom to avoid over-zooming on small graphs
+    );
+
+    // Compute translation to center the graph
+    // screenCenter = worldCenter * scale + translate
+    // translate = screenCenter - worldCenter * scale
+    const panX = viewport.width / 2 - centerX * scale;
+    const panY = viewport.height / 2 - centerY * scale;
+
+    return createPanZoomTransform(scale, panX, panY);
+}
 
 /**
  * Callback type for pushing state updates back to React.
@@ -68,6 +117,9 @@ export class GraphViewerEngine {
 
     // Performance monitoring (optional)
     private performanceMonitor: PerformanceMonitor | null = null;
+
+    // Track if we've done the initial fit-to-graph
+    private initialFitDone = false;
 
     constructor(
         private container: HTMLDivElement,
@@ -224,6 +276,21 @@ export class GraphViewerEngine {
                 this.simulationState
             );
             const positionedData = mergePositions(graphData, this.simulationState);
+
+            // ─────────────────────────────────────────────────────────────
+            // STEP 1.5: Initial fit - center graph in viewport on first frame
+            //
+            // Compute bounding box of all nodes and set transform to fit
+            // the graph in the viewport with some padding.
+            // ─────────────────────────────────────────────────────────────
+            if (!this.initialFitDone) {
+                const viewport = this.getViewport();
+                const fitTransform = computeFitTransform(positionedData, viewport);
+                if (fitTransform) {
+                    this.navigationState = { transform: fitTransform };
+                    this.initialFitDone = true;
+                }
+            }
 
             // ─────────────────────────────────────────────────────────────
             // STEP 2: Navigate - compute world → screen transform
