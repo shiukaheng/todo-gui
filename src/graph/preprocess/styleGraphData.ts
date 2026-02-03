@@ -2,7 +2,6 @@ import { NestedGraphData, ExtendNestedGraphData } from "./nestGraphData";
 import { AppState } from "../types";
 
 export type Color = [number, number, number]; // RGB color representation
-export type SpecialEffect = "glow" | "none";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SEEDED PRNG (cyrb128 + sfc32)
@@ -157,11 +156,9 @@ export type StyledGraphData<G extends NestedGraphData> = ExtendNestedGraphData<
         text: string;
         color: Color;
         borderColor: Color;
+        labelColor: Color;
         outlineWidth: number;
-        glowIntensity: number;
-        glowRadius: number;
         opacity: number;
-        specialEffect: SpecialEffect;
         brightnessMultiplier: number;
     },
     // Edge extra properties
@@ -181,7 +178,7 @@ export function baseStyleGraphData<G extends NestedGraphData>(graphData: G): Sty
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, taskWrapper]) => [
                 taskId,
-                { ...taskWrapper, text: taskId, color: nodeColors.get(taskId) || [1, 1, 1] as Color, borderColor: [0.5, 0.5, 0.5] as Color, outlineWidth: 0, glowIntensity: 0, glowRadius: 0, opacity: 1.0, specialEffect: "none" as SpecialEffect, brightnessMultiplier: 1.0 },
+                { ...taskWrapper, text: taskId, color: nodeColors.get(taskId) || [1, 1, 1] as Color, borderColor: [0.5, 0.5, 0.5] as Color, labelColor: [1, 1, 1] as Color, outlineWidth: 0, opacity: 1.0, brightnessMultiplier: 1.0 },
             ])
         ),
         dependencies: Object.fromEntries(
@@ -204,10 +201,10 @@ export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphD
                 const isActionable = data.depsClear && !isCompleted;
 
                 if (isCompleted) {
-                    return [taskId, { ...task, brightnessMultiplier: 0.1, borderColor: [0, 1, 0] as Color, outlineWidth: 4, glowIntensity: 0, glowRadius: 0 }];
+                    return [taskId, { ...task, brightnessMultiplier: 0.1, labelColor: [0, 1, 0] as Color }];
                 }
                 if (isActionable) {
-                    return [taskId, { ...task, borderColor: [1, 0.9, 0.2] as Color, outlineWidth: 4, glowIntensity: 0, glowRadius: 0 }];
+                    return [taskId, task];
                 }
                 // Blocked: not completed and not actionable
                 return [taskId, { ...task, brightnessMultiplier: 0.1 }];
@@ -237,13 +234,10 @@ export function cursorStyleGraphData<G extends StyledGraphData<NestedGraphData>>
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, task]) => {
                 if (taskId === cursor) {
-                    // Cursor node: cyan border
+                    // Cursor node: cyan label
                     return [taskId, {
                         ...task,
-                        borderColor: [0, 1, 1] as Color,  // Cyan
-                        outlineWidth: 6,
-                        glowIntensity: 0,
-                        glowRadius: 0,
+                        labelColor: [0, 1, 1] as Color,  // Cyan
                         brightnessMultiplier: Math.max(task.brightnessMultiplier, 1.0), // Ensure visible
                     }];
                 }

@@ -24,9 +24,8 @@ export interface RenderNode {
     text: string;
     color: Color;
     borderColor: Color;
+    labelColor: Color;
     outlineWidth: number;
-    glowIntensity: number;
-    glowRadius: number;
     opacity: number;
     brightnessMultiplier: number;
     position: Vec2;
