@@ -216,21 +216,30 @@ export class WebColaEngine implements SimulationEngine {
         const currentTopology = this.computeTopologySnapshot(graph);
         const topologyChanged = !this.topologyEquals(currentTopology, this.lastTopology);
 
-        if (topologyChanged || !this.initialized) {
+        const isFirstInit = !this.initialized;
+
+        if (topologyChanged || isFirstInit) {
             // Topology changed - full reconciliation
             this.reconcileGraph(graph, prevState);
             this.lastTopology = currentTopology;
             this.initialized = true;
 
-            // Start without constraints, apply them after delay
-            this.lastMutationTime = performance.now();
-            this.constraintsApplied = false;
-            this.rebuildLayout(false);
+            if (isFirstInit) {
+                // First initialization: start without constraints, apply after delay
+                this.lastMutationTime = performance.now();
+                this.constraintsApplied = false;
+                this.rebuildLayout(false);
+            } else {
+                // Subsequent changes: go straight to constrained layout
+                this.constraintsApplied = true;
+                this.lastMutationTime = null;
+                this.rebuildLayout(true);
+            }
         } else {
             // Topology unchanged - just sync any external position changes
             this.syncPositionsFromState(prevState);
 
-            // Check if it's time to apply constraints (1 second after mutation)
+            // Check if it's time to apply constraints (1 second after first init)
             if (!this.constraintsApplied && this.lastMutationTime !== null) {
                 const elapsed = performance.now() - this.lastMutationTime;
                 if (elapsed >= 1000) {
