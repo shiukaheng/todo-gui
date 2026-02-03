@@ -1,9 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { useGraphViewerEngine } from "./useGraphViewerEngine";
 import { AppState, INITIAL_APP_STATE } from "./types";
-import { CursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
-import { NavState, IDLE_STATE } from "./graphNavigation/types";
-import { useGraphNavigationHandle } from "./graphNavigation/useGraphNavigationHandle";
 import { useTodo } from "./TodoContext";
 
 const SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
@@ -17,30 +14,21 @@ export function GraphViewer() {
     // Internal app state (cursor, selection, etc.)
     const [appState, setAppState] = useState<AppState>(INITIAL_APP_STATE);
 
-    // Navigation state for the state machine
-    const [navState, setNavState] = useState<NavState>(IDLE_STATE);
-
-    // Cursor neighbors (updated by engine callback)
-    const [cursorNeighbors, setCursorNeighbors] = useState<CursorNeighbors>(EMPTY_CURSOR_NEIGHBORS);
-
     // Update cursor
     const setCursor = useCallback((nodeId: string | null) => {
         setAppState((prev) => ({ ...prev, cursor: nodeId }));
     }, []);
 
-    // Create navigation handle
-    const navigationHandle = useGraphNavigationHandle({
-        cursorNeighbors,
-        navDirectionMapping: appState.navDirectionMapping,
-        selectors: SELECTORS,
+    // Hook manages engine lifecycle, navigation, and data flow
+    // Note: taskList is guaranteed non-null because App guards before rendering GraphViewer
+    const { engineState, navigationHandle } = useGraphViewerEngine(taskList!, appState, viewportContainerRef, {
+        onNodeClick: setCursor,
         onCursorChange: setCursor,
-        onNavStateChange: setNavState,
     });
 
-    // Keyboard navigation (for testing)
+    // Keyboard navigation
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Arrow keys for navigation
             switch (e.key) {
                 case 'ArrowUp':
                     e.preventDefault();
@@ -62,7 +50,6 @@ export function GraphViewer() {
                     navigationHandle.escape();
                     break;
                 default:
-                    // Number keys for disambiguation
                     if (SELECTORS.includes(e.key)) {
                         navigationHandle.chooseAmbiguous(e.key);
                     }
@@ -73,16 +60,6 @@ export function GraphViewer() {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [navigationHandle]);
-
-    // Hook manages engine lifecycle and data flow
-    // Returns engine state that can drive React UI
-    // Note: taskList is guaranteed non-null because App guards before rendering GraphViewer
-    const engineState = useGraphViewerEngine(taskList!, appState, viewportContainerRef, {
-        onNodeClick: setCursor,
-        onCursorNeighborsChange: setCursorNeighbors,
-        navState,
-        selectors: SELECTORS,
-    });
 
     return (
         <div className="absolute w-full h-full bg-black">

@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { TaskListOut } from "todo-client";
 import { GraphViewerEngine, EngineStateCallback, GraphViewerEngineOptions } from "./GraphViewerEngine";
-import { GraphViewerEngineState, INITIAL_ENGINE_STATE, CursorNeighbors } from "./GraphViewerEngineState";
+import { GraphViewerEngineState, INITIAL_ENGINE_STATE } from "./GraphViewerEngineState";
 import { AppState } from "./types";
-import { NavState } from "./graphNavigation/types";
+import { NavState, IDLE_STATE, GraphNavigationHandle } from "./graphNavigation/types";
+import { useGraphNavigationHandle } from "./graphNavigation/useGraphNavigationHandle";
+
+const SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
 export interface UseGraphViewerEngineOptions extends GraphViewerEngineOptions {
-    onCursorNeighborsChange?: (neighbors: CursorNeighbors) => void;
-    navState?: NavState;
-    selectors?: string[];
+    onCursorChange?: (nodeId: string | null) => void;
+}
+
+export interface UseGraphViewerEngineResult {
+    engineState: GraphViewerEngineState;
+    navigationHandle: GraphNavigationHandle;
 }
 
 /**
@@ -20,16 +26,17 @@ export interface UseGraphViewerEngineOptions extends GraphViewerEngineOptions {
  * @param taskList - The task data from React props
  * @param appState - The app state (cursor, selection, etc.) from React props
  * @param viewportContainerRef - Ref to the DOM container where the engine renders
- * @param options - Engine options (callbacks like onNodeClick, onCursorNeighborsChange)
- * @returns The current engine state (for React UI to consume)
+ * @param options - Engine options (callbacks like onNodeClick)
+ * @returns The current engine state and navigation handle
  */
 export function useGraphViewerEngine(
     taskList: TaskListOut,
     appState: AppState,
     viewportContainerRef: React.RefObject<HTMLDivElement>,
     options?: UseGraphViewerEngineOptions
-): GraphViewerEngineState {
+): UseGraphViewerEngineResult {
     const [engineState, setEngineState] = useState<GraphViewerEngineState>(INITIAL_ENGINE_STATE);
+    const [navState, setNavState] = useState<NavState>(IDLE_STATE);
 
     // Stable callback pattern: engine holds this for its lifetime
     const onStateChangeRef = useRef<EngineStateCallback>(setEngineState);
@@ -45,7 +52,6 @@ export function useGraphViewerEngine(
 
     const stableOptions = useRef<UseGraphViewerEngineOptions>({
         onNodeClick: (nodeId) => optionsRef.current?.onNodeClick?.(nodeId),
-        onCursorNeighborsChange: (neighbors) => optionsRef.current?.onCursorNeighborsChange?.(neighbors),
     }).current;
 
     const engineRef = useRef<GraphViewerEngine | null>(null);
@@ -76,13 +82,24 @@ export function useGraphViewerEngine(
         engineRef.current?.setAppState(appState);
     }, [appState]);
 
-    // Push nav state updates when navState or selectors change
+    // Push nav state updates when navState changes
     useEffect(() => {
-        engineRef.current?.setNavState(
-            optionsRef.current?.navState,
-            optionsRef.current?.selectors
-        );
-    }, [options?.navState, options?.selectors]);
+        engineRef.current?.setNavState(navState, SELECTORS);
+    }, [navState]);
 
-    return engineState;
+    // Cursor change handler for navigation
+    const handleCursorChange = useCallback((nodeId: string | null) => {
+        optionsRef.current?.onCursorChange?.(nodeId);
+    }, []);
+
+    // Navigation handle (uses cursorNeighbors from engine state)
+    const navigationHandle = useGraphNavigationHandle({
+        cursorNeighbors: engineState.cursorNeighbors,
+        navDirectionMapping: appState.navDirectionMapping,
+        selectors: SELECTORS,
+        onCursorChange: handleCursorChange,
+        onNavStateChange: setNavState,
+    });
+
+    return { engineState, navigationHandle };
 }

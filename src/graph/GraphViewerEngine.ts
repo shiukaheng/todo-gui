@@ -236,7 +236,6 @@ export type EngineStateCallback = (state: GraphViewerEngineState) => void;
  */
 export interface GraphViewerEngineOptions {
     onNodeClick?: (nodeId: string) => void;
-    onCursorNeighborsChange?: (neighbors: CursorNeighbors) => void;
 }
 
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
@@ -479,7 +478,6 @@ export class GraphViewerEngine {
 
         if (oldJson !== newJson) {
             this.currentCursorNeighbors = newNeighbors;
-            this.options?.onCursorNeighborsChange?.(newNeighbors);
             this.emitState();
         }
     }
