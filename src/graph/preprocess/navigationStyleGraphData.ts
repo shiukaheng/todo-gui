@@ -67,15 +67,13 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
     const hasMultipleParents = parentIds.length > 1;
 
     if (parentIds.length === 1) {
-        // Single parent: show simple up/down on peers
-        const peerList = peers[parentIds[0]];
-        if (peerList.length > 0) {
-            // First peer gets down arrow (next peer in sorted order)
-            overlays.set(peerList[0], nextPeerArrow);
-            // Last peer gets up arrow (prev peer in sorted order)
-            if (peerList.length > 1) {
-                overlays.set(peerList[peerList.length - 1], prevPeerArrow);
-            }
+        // Single parent: show up/down arrows on closest peers
+        const peerInfo = peers[parentIds[0]];
+        if (peerInfo.prevPeer) {
+            overlays.set(peerInfo.prevPeer, prevPeerArrow);
+        }
+        if (peerInfo.nextPeer) {
+            overlays.set(peerInfo.nextPeer, nextPeerArrow);
         }
     } else if (hasMultipleParents) {
         // Multiple parents: show ?-suffixed arrows to indicate disambiguation needed
@@ -91,12 +89,13 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
         } else {
             // Show ? hints on peers to indicate disambiguation needed
             for (const parentId of parentIds) {
-                const peerList = peers[parentId];
-                for (const peerId of peerList) {
-                    // Only add if not already set (parent/child takes precedence)
-                    if (!overlays.has(peerId)) {
-                        overlays.set(peerId, `${prevPeerArrow}?`);
-                    }
+                const peerInfo = peers[parentId];
+                // Show ? on whichever peers exist for this parent
+                if (peerInfo.prevPeer && !overlays.has(peerInfo.prevPeer)) {
+                    overlays.set(peerInfo.prevPeer, `${prevPeerArrow}?`);
+                }
+                if (peerInfo.nextPeer && !overlays.has(peerInfo.nextPeer)) {
+                    overlays.set(peerInfo.nextPeer, `${nextPeerArrow}?`);
                 }
             }
         }

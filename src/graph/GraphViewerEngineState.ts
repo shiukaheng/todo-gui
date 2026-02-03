@@ -38,12 +38,20 @@
  * every N frames.
  */
 
+export type PeerInfo = {
+    /** Closest peer above cursor (lower Y), or null if none */
+    prevPeer: string | null;
+    /** Closest peer below cursor (higher Y), or null if none */
+    nextPeer: string | null;
+}
+
 export type CursorNeighbors = {
     topological: {
         children: string[]
         parents: string[]
+        /** For each parent, the prev/next peers relative to cursor position */
         peers: {
-            [parentId: string]: string[]
+            [parentId: string]: PeerInfo
         }
     }
 }
@@ -157,14 +165,48 @@ export function computeCursorNeighbors(
         parentToChildren.get(fromId)!.push(toId);
     }
 
-    // Compute peers: siblings that share a parent with cursor
-    const peers: { [parentId: string]: string[] } = {};
+    // Compute peers: for each parent, find closest peer above and below cursor
+    const cursorPos = positions[cursorId];
+    const peers: { [parentId: string]: PeerInfo } = {};
+
     for (const parentId of parents) {
         const siblings = parentToChildren.get(parentId) || [];
         // Exclude the cursor itself from peers
         const peersForParent = siblings.filter(id => id !== cursorId);
-        if (peersForParent.length > 0) {
-            peers[parentId] = sortByAxis(peersForParent);
+
+        if (peersForParent.length > 0 && cursorPos) {
+            let prevPeer: string | null = null;
+            let nextPeer: string | null = null;
+            let prevPeerDist = Infinity;
+            let nextPeerDist = Infinity;
+
+            for (const peerId of peersForParent) {
+                const peerPos = positions[peerId];
+                if (!peerPos) continue;
+
+                const peerAxisVal = peerPos[axisIndex];
+                const cursorAxisVal = cursorPos[axisIndex];
+
+                if (peerAxisVal < cursorAxisVal) {
+                    // Peer is above cursor (lower Y)
+                    const dist = cursorAxisVal - peerAxisVal;
+                    if (dist < prevPeerDist) {
+                        prevPeerDist = dist;
+                        prevPeer = peerId;
+                    }
+                } else if (peerAxisVal > cursorAxisVal) {
+                    // Peer is below cursor (higher Y)
+                    const dist = peerAxisVal - cursorAxisVal;
+                    if (dist < nextPeerDist) {
+                        nextPeerDist = dist;
+                        nextPeer = peerId;
+                    }
+                }
+            }
+
+            if (prevPeer !== null || nextPeer !== null) {
+                peers[parentId] = { prevPeer, nextPeer };
+            }
         }
     }
 

@@ -95,17 +95,9 @@ export function useGraphNavigationHandle(
                 // If single parent, use that. Otherwise, return empty (needs parent selection first)
                 const parentIds = Object.keys(topological.peers);
                 if (parentIds.length === 1) {
-                    const peers = topological.peers[parentIds[0]];
-                    // Find current cursor's position among peers and return prev/next
-                    // Note: The cursor is NOT in the peers list (filtered out in computeCursorNeighbors)
-                    // So we just return the peer in the appropriate direction
-                    if (target === 'prevPeer') {
-                        // Return last peer (higher Y = below cursor visually, but prev in sorted order)
-                        return peers.length > 0 ? [peers[peers.length - 1]] : [];
-                    } else {
-                        // Return first peer
-                        return peers.length > 0 ? [peers[0]] : [];
-                    }
+                    const peerInfo = topological.peers[parentIds[0]];
+                    const peer = target === 'prevPeer' ? peerInfo.prevPeer : peerInfo.nextPeer;
+                    return peer ? [peer] : [];
                 }
                 return [];
             }
@@ -141,10 +133,10 @@ export function useGraphNavigationHandle(
             }
 
             if (parentIds.length === 1) {
-                // Single parent: navigate directly
-                const peers = neighbors.topological.peers[parentIds[0]];
-                if (peers.length > 0) {
-                    const targetPeer = peerDir === 'prev' ? peers[peers.length - 1] : peers[0];
+                // Single parent: navigate directly to closest peer in direction
+                const peerInfo = neighbors.topological.peers[parentIds[0]];
+                const targetPeer = peerDir === 'prev' ? peerInfo.prevPeer : peerInfo.nextPeer;
+                if (targetPeer) {
                     onCursorChangeRef.current(targetPeer);
                     setNavState(IDLE_STATE);
                 }
@@ -210,11 +202,11 @@ export function useGraphNavigationHandle(
             const parentIds = Object.keys(neighbors.topological.peers);
             if (selectorIndex < parentIds.length) {
                 const parentId = parentIds[selectorIndex];
-                const peers = neighbors.topological.peers[parentId];
-                if (peers.length > 0) {
-                    const targetPeer = currentState.peerDirection === 'prev'
-                        ? peers[peers.length - 1]
-                        : peers[0];
+                const peerInfo = neighbors.topological.peers[parentId];
+                const targetPeer = currentState.peerDirection === 'prev'
+                    ? peerInfo.prevPeer
+                    : peerInfo.nextPeer;
+                if (targetPeer) {
                     onCursorChangeRef.current(targetPeer);
                     setNavState(IDLE_STATE);
                     pendingDirectionRef.current = null;
