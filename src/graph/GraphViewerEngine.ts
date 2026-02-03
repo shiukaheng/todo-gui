@@ -87,6 +87,65 @@
  *   - user input handling (drag, scroll, touch)
  *
  * ═══════════════════════════════════════════════════════════════════════════
+ * USER INPUT FLOW
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * User interactions (mouse, touch, wheel) are handled internally by the engine
+ * and do NOT flow through React. This keeps interactions responsive (no React
+ * re-render latency).
+ *
+ * ┌─────────────────┐
+ * │   DOM Events    │  (mousedown, mousemove, wheel, touchstart, etc.)
+ * │   on <svg>      │
+ * └────────┬────────┘
+ *          │
+ *          ▼
+ * ┌─────────────────┐
+ * │  InputHandler   │  Normalizes events into UIEvents:
+ * │                 │  - drag-start, drag-move, drag-end
+ * │                 │  - click, tap, long-press
+ * │                 │  - zoom (wheel)
+ * │                 │  - touch-transform (pinch/rotate)
+ * └────────┬────────┘
+ *          │
+ *          ▼
+ * ┌─────────────────────────────────────────────────────────────────────────┐
+ * │  InteractionController                                                  │
+ * │                                                                         │
+ * │  Interprets UIEvents and manipulates engine systems:                   │
+ * │                                                                         │
+ * │  ┌─────────────────────┐     ┌─────────────────────────────────────┐   │
+ * │  │  NODE DRAGGING      │     │  CANVAS NAVIGATION                  │   │
+ * │  │                     │     │                                     │   │
+ * │  │  drag-start on node │     │  drag-start on canvas               │   │
+ * │  │        │            │     │        │                            │   │
+ * │  │        ▼            │     │        ▼                            │   │
+ * │  │  SimulationEngine   │     │  Navigator (ManualNavigator)        │   │
+ * │  │  .pinNodes()        │     │  .pan() / .zoom() / .rotate()       │   │
+ * │  │        │            │     │        │                            │   │
+ * │  │        ▼            │     │        ▼                            │   │
+ * │  │  Node follows       │     │  View transform updates             │   │
+ * │  │  cursor in world    │     │  (affects all nodes on screen)      │   │
+ * │  │  space              │     │                                     │   │
+ * │  └─────────────────────┘     └─────────────────────────────────────┘   │
+ * │                                                                         │
+ * │  ┌─────────────────────┐     ┌─────────────────────────────────────┐   │
+ * │  │  WHEEL ZOOM         │     │  TOUCH GESTURES                     │   │
+ * │  │                     │     │                                     │   │
+ * │  │  wheel event        │     │  pinch → zoom                       │   │
+ * │  │        │            │     │  two-finger drag → pan              │   │
+ * │  │        ▼            │     │  two-finger rotate → rotate         │   │
+ * │  │  Navigator.zoom()   │     │        │                            │   │
+ * │  │  around cursor      │     │        ▼                            │   │
+ * │  │                     │     │  Navigator methods                  │   │
+ * │  └─────────────────────┘     └─────────────────────────────────────┘   │
+ * └─────────────────────────────────────────────────────────────────────────┘
+ *
+ * KEY POINT: Dragging a node pins it via SimulationEngine.pinNodes(), which
+ * fixes the node's position while other nodes continue to simulate around it.
+ * On drag-end, the node is unpinned and rejoins the simulation.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import { TaskListOut } from "todo-client";
