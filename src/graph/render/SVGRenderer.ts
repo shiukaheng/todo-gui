@@ -28,10 +28,21 @@ export class SVGRenderer {
     private svg: SVGSVGElement;
     private nodeElements: Map<string, NodeElements> = new Map();
     private edgeElements: Map<string, EdgeElements> = new Map();
+    private offScreenIndicator: SVGPolygonElement | null = null;
 
     constructor(svg: SVGSVGElement) {
         this.svg = svg;
         this.svg.style.userSelect = "none";
+    }
+
+    /** Get or create the off-screen indicator element */
+    private getOffScreenIndicator(): SVGPolygonElement {
+        if (!this.offScreenIndicator) {
+            this.offScreenIndicator = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+            this.offScreenIndicator.style.pointerEvents = "none";
+            this.svg.appendChild(this.offScreenIndicator);
+        }
+        return this.offScreenIndicator;
     }
 
     render(data: RenderGraphData, transform: ViewTransform): void {
@@ -67,6 +78,126 @@ export class SVGRenderer {
         for (const [id, node] of Object.entries(data.tasks)) {
             this.reconcileNode(id, node, transform);
         }
+
+        // Off-screen indicator for cursor nodes
+        this.updateOffScreenIndicator(data, transform);
+    }
+
+    /** Update off-screen indicator for nodes with selectorOutline that are outside viewport */
+    private updateOffScreenIndicator(data: RenderGraphData, transform: ViewTransform): void {
+        const viewport = {
+            width: this.svg.clientWidth || 800,
+            height: this.svg.clientHeight || 600,
+        };
+        const margin = 20;  // Margin from edge for indicator
+
+        // Find first node with selectorOutline (cursor)
+        let cursorNode: RenderNode | null = null;
+        for (const node of Object.values(data.tasks)) {
+            if (node.selectorOutline) {
+                cursorNode = node;
+                break;
+            }
+        }
+
+        if (!cursorNode) {
+            if (this.offScreenIndicator) {
+                this.offScreenIndicator.style.display = "none";
+            }
+            return;
+        }
+
+        const [screenX, screenY] = worldToScreen(cursorNode.position, transform);
+
+        // Check if on screen
+        const isOnScreen =
+            screenX >= 0 &&
+            screenX <= viewport.width &&
+            screenY >= 0 &&
+            screenY <= viewport.height;
+
+        if (isOnScreen) {
+            if (this.offScreenIndicator) {
+                this.offScreenIndicator.style.display = "none";
+            }
+            return;
+        }
+
+        // Determine which edges the cursor is beyond
+        const offLeft = screenX < 0;
+        const offRight = screenX > viewport.width;
+        const offTop = screenY < 0;
+        const offBottom = screenY > viewport.height;
+
+        // Determine angle based on direction
+        let angle: number;
+        let indicatorX: number;
+        let indicatorY: number;
+
+        // Corner cases (dynamic rotation pointing directly at cursor)
+        if (offLeft && offTop) {
+            indicatorX = margin;
+            indicatorY = margin;
+            angle = Math.atan2(screenY - indicatorY, screenX - indicatorX);
+        } else if (offRight && offTop) {
+            indicatorX = viewport.width - margin;
+            indicatorY = margin;
+            angle = Math.atan2(screenY - indicatorY, screenX - indicatorX);
+        } else if (offLeft && offBottom) {
+            indicatorX = margin;
+            indicatorY = viewport.height - margin;
+            angle = Math.atan2(screenY - indicatorY, screenX - indicatorX);
+        } else if (offRight && offBottom) {
+            indicatorX = viewport.width - margin;
+            indicatorY = viewport.height - margin;
+            angle = Math.atan2(screenY - indicatorY, screenX - indicatorX);
+        }
+        // Edge cases (orthogonal)
+        else if (offLeft) {
+            angle = Math.PI;  // Point left (180°)
+            indicatorX = margin;
+            indicatorY = Math.max(margin, Math.min(viewport.height - margin, screenY));
+        } else if (offRight) {
+            angle = 0;  // Point right (0°)
+            indicatorX = viewport.width - margin;
+            indicatorY = Math.max(margin, Math.min(viewport.height - margin, screenY));
+        } else if (offTop) {
+            angle = Math.PI * 1.5;  // Point up (270°)
+            indicatorX = Math.max(margin, Math.min(viewport.width - margin, screenX));
+            indicatorY = margin;
+        } else {
+            angle = Math.PI * 0.5;  // Point down (90°)
+            indicatorX = Math.max(margin, Math.min(viewport.width - margin, screenX));
+            indicatorY = viewport.height - margin;
+        }
+
+        // Create equilateral triangle pointing in direction
+        const indicator = this.getOffScreenIndicator();
+        const size = 8;  // Distance from center to each vertex
+
+        // Equilateral triangle: vertices at 0°, 120°, 240° from center, rotated by angle
+        const p1Angle = angle;
+        const p2Angle = angle + Math.PI * 2 / 3;
+        const p3Angle = angle + Math.PI * 4 / 3;
+
+        const p1x = indicatorX + Math.cos(p1Angle) * size;
+        const p1y = indicatorY + Math.sin(p1Angle) * size;
+        const p2x = indicatorX + Math.cos(p2Angle) * size;
+        const p2y = indicatorY + Math.sin(p2Angle) * size;
+        const p3x = indicatorX + Math.cos(p3Angle) * size;
+        const p3y = indicatorY + Math.sin(p3Angle) * size;
+
+        indicator.setAttribute("points", `${p1x},${p1y} ${p2x},${p2y} ${p3x},${p3y}`);
+
+        // Breathing animation (same as selector ring)
+        const time = performance.now() / 1000;
+        const breathRate = 1.25;
+        const minBrightness = 0.25;
+        const maxBrightness = 1.0;
+        const breathBrightness = minBrightness + (maxBrightness - minBrightness) * (0.5 + 0.5 * Math.sin(time * breathRate * Math.PI * 2));
+
+        indicator.setAttribute("fill", colorToCSSWithBrightness(cursorNode.selectorOutline!, breathBrightness));
+        indicator.style.display = "";
     }
 
     private reconcileNode(id: string, node: RenderNode, transform: ViewTransform): void {
@@ -95,7 +226,7 @@ export class SVGRenderer {
             const maxBrightness = 1.0;
             const breathBrightness = minBrightness + (maxBrightness - minBrightness) * (0.5 + 0.5 * Math.sin(time * breathRate * Math.PI * 2));
 
-            const ringGap = 4;  // Gap between node and ring
+            const ringGap = 2;  // Gap between node and ring
             const strokeWidth = 2;
             const ringSize = squareSize + ringGap * 2 + strokeWidth;
 
@@ -197,5 +328,9 @@ export class SVGRenderer {
         }
         this.nodeElements.clear();
         this.edgeElements.clear();
+        if (this.offScreenIndicator) {
+            this.offScreenIndicator.remove();
+            this.offScreenIndicator = null;
+        }
     }
 }
