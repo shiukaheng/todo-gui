@@ -114,6 +114,61 @@ const DEFAULT_CONFIG: Required<WebColaConfig> = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
+// SEEDED PRNG (cyrb128 + sfc32)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function cyrb128(str: string): [number, number, number, number] {
+    let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
+    for (let i = 0; i < str.length; i++) {
+        const k = str.charCodeAt(i);
+        h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+        h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+        h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+        h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+    }
+    h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+    h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+    h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+    h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+    h1 ^= h2 ^ h3 ^ h4; h2 ^= h1; h3 ^= h1; h4 ^= h1;
+    return [h1 >>> 0, h2 >>> 0, h3 >>> 0, h4 >>> 0];
+}
+
+function sfc32(a: number, b: number, c: number, d: number): () => number {
+    return function() {
+        a |= 0; b |= 0; c |= 0; d |= 0;
+        const t = (a + b | 0) + d | 0;
+        d = d + 1 | 0;
+        a = b ^ b >>> 9;
+        b = c + (c << 3) | 0;
+        c = (c << 21 | c >>> 11);
+        c = c + t | 0;
+        return (t >>> 0) / 4294967296;
+    };
+}
+
+/** Create a seeded random number generator from a string. */
+function seededRandom(str: string): () => number {
+    const seed = cyrb128(str);
+    const rng = sfc32(seed[0], seed[1], seed[2], seed[3]);
+    // Warm up the generator
+    for (let i = 0; i < 15; i++) rng();
+    return rng;
+}
+
+/** Seeded Box-Muller transform for Gaussian random based on node ID. */
+function seededGaussian(nodeId: string): { x: number; y: number } {
+    const rng = seededRandom(nodeId);
+    let u = 0, v = 0;
+    while (u === 0) u = rng();
+    while (v === 0) v = rng();
+    const mag = Math.sqrt(-2.0 * Math.log(u));
+    const x = mag * Math.cos(2.0 * Math.PI * v);
+    const y = mag * Math.sin(2.0 * Math.PI * v);
+    return { x, y };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // INTERNAL TYPES
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -318,9 +373,10 @@ export class WebColaEngine implements SimulationEngine {
                     x = this.colaNodes[existingIndex].x;
                     y = this.colaNodes[existingIndex].y;
                 } else {
-                    // Random initialization (Gaussian around origin)
-                    x = this.gaussianRandom() * 100;
-                    y = this.gaussianRandom() * 100;
+                    // Deterministic initialization based on node ID
+                    const initPos = seededGaussian(taskId);
+                    x = initPos.x * 100;
+                    y = initPos.y * 100;
                 }
             }
 
@@ -617,17 +673,5 @@ export class WebColaEngine implements SimulationEngine {
         }
 
         return { positions };
-    }
-
-    // ───────────────────────────────────────────────────────────────────────
-    // UTILITIES
-    // ───────────────────────────────────────────────────────────────────────
-
-    /** Box-Muller transform for Gaussian random */
-    private gaussianRandom(): number {
-        let u = 0, v = 0;
-        while (u === 0) u = Math.random();
-        while (v === 0) v = Math.random();
-        return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
     }
 }
