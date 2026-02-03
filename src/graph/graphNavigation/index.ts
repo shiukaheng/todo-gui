@@ -6,4 +6,3 @@
 
 export * from "./types";
 export { GraphNavigationController } from "./GraphNavigationController";
-export type { GraphNavigationControllerOptions } from "./GraphNavigationController";

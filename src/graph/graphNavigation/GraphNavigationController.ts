@@ -1,8 +1,8 @@
 /**
- * GraphNavigationController - Imperative class for keyboard-driven graph navigation
+ * GraphNavigationController - State machine for keyboard-driven graph navigation
  *
- * Implements the navigation state machine for traversing the graph with
- * disambiguation UI for multiple targets.
+ * Owned by GraphViewerEngine. Exposes a handle for navigation actions and
+ * notifies on state changes for styling updates.
  */
 
 import { CursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "../GraphViewerEngineState";
@@ -13,17 +13,7 @@ import {
     NavDirectionMapping,
     GraphNavigationHandle,
     IDLE_STATE,
-    DEFAULT_NAV_MAPPING,
 } from "./types";
-
-export interface GraphNavigationControllerOptions {
-    onCursorChange: (nodeId: string) => void;
-    onNavStateChange: (state: NavState) => void;
-    navDirectionMapping?: NavDirectionMapping;
-    selectors?: string[];
-}
-
-const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
 function getPeerDirection(target: NavTarget): 'prev' | 'next' | null {
     if (target === 'prevPeer') return 'prev';
@@ -37,20 +27,30 @@ function getTargetType(target: NavTarget): 'parents' | 'children' | null {
     return null;
 }
 
-export class GraphNavigationController implements GraphNavigationHandle {
+export class GraphNavigationController {
     private navState: NavState = IDLE_STATE;
     private pendingDirection: NavDirection | null = null;
     private cursorNeighbors: CursorNeighbors = EMPTY_CURSOR_NEIGHBORS;
-    private navDirectionMapping: NavDirectionMapping;
-    private selectors: string[];
-    private onCursorChange: (nodeId: string) => void;
-    private onNavStateChange: (state: NavState) => void;
 
-    constructor(options: GraphNavigationControllerOptions) {
-        this.onCursorChange = options.onCursorChange;
-        this.onNavStateChange = options.onNavStateChange;
-        this.navDirectionMapping = options.navDirectionMapping ?? DEFAULT_NAV_MAPPING;
-        this.selectors = options.selectors ?? DEFAULT_SELECTORS;
+    readonly handle: GraphNavigationHandle;
+
+    constructor(
+        private readonly navDirectionMapping: NavDirectionMapping,
+        private readonly selectors: string[],
+        private readonly onCursorChange: (nodeId: string) => void,
+        private readonly onStateChange: (state: NavState) => void
+    ) {
+        const self = this;
+        // Create the handle that exposes navigation actions
+        this.handle = {
+            up: () => self.handleDirection('up'),
+            down: () => self.handleDirection('down'),
+            left: () => self.handleDirection('left'),
+            right: () => self.handleDirection('right'),
+            chooseAmbiguous: (selector: string) => self.chooseAmbiguous(selector),
+            escape: () => self.escape(),
+            get state() { return self.navState; },
+        };
     }
 
     get state(): NavState {
@@ -59,22 +59,13 @@ export class GraphNavigationController implements GraphNavigationHandle {
 
     setCursorNeighbors(neighbors: CursorNeighbors): void {
         this.cursorNeighbors = neighbors;
-        // Reset to IDLE when neighbors change
         this.setNavState(IDLE_STATE);
         this.pendingDirection = null;
     }
 
-    setNavDirectionMapping(mapping: NavDirectionMapping): void {
-        this.navDirectionMapping = mapping;
-    }
-
-    setSelectors(selectors: string[]): void {
-        this.selectors = selectors;
-    }
-
     private setNavState(newState: NavState): void {
         this.navState = newState;
-        this.onNavStateChange(newState);
+        this.onStateChange(newState);
     }
 
     private getCandidates(target: NavTarget): string[] {
@@ -103,7 +94,7 @@ export class GraphNavigationController implements GraphNavigationHandle {
 
         // If already in confirmingTarget for same direction, move to first target
         if (this.navState.type === 'confirmingTarget' && this.pendingDirection === direction) {
-            const candidates = this.getCandidates(this.navState.targetType === 'parents' ? 'parents' : 'children');
+            const candidates = this.getCandidates(this.navState.targetType);
             if (candidates.length > 0) {
                 this.onCursorChange(candidates[0]);
                 this.setNavState(IDLE_STATE);
@@ -131,7 +122,6 @@ export class GraphNavigationController implements GraphNavigationHandle {
                 return;
             }
 
-            // Multiple parents: enter selectingParentForPeers mode
             this.setNavState({
                 type: 'selectingParentForPeers',
                 peerDirection: peerDir,
@@ -154,7 +144,6 @@ export class GraphNavigationController implements GraphNavigationHandle {
             return;
         }
 
-        // Multiple targets: enter confirmingTarget mode
         this.setNavState({
             type: 'confirmingTarget',
             direction,
@@ -163,30 +152,12 @@ export class GraphNavigationController implements GraphNavigationHandle {
         this.pendingDirection = direction;
     }
 
-    up(): void {
-        this.handleDirection('up');
-    }
-
-    down(): void {
-        this.handleDirection('down');
-    }
-
-    left(): void {
-        this.handleDirection('left');
-    }
-
-    right(): void {
-        this.handleDirection('right');
-    }
-
-    chooseAmbiguous(selector: string): boolean {
+    private chooseAmbiguous(selector: string): boolean {
         const selectorIndex = this.selectors.indexOf(selector);
         if (selectorIndex === -1) return false;
 
         if (this.navState.type === 'confirmingTarget') {
-            const candidates = this.getCandidates(
-                this.navState.targetType === 'parents' ? 'parents' : 'children'
-            );
+            const candidates = this.getCandidates(this.navState.targetType);
             if (selectorIndex < candidates.length) {
                 this.onCursorChange(candidates[selectorIndex]);
                 this.setNavState(IDLE_STATE);
@@ -217,7 +188,7 @@ export class GraphNavigationController implements GraphNavigationHandle {
         return false;
     }
 
-    escape(): void {
+    private escape(): void {
         this.setNavState(IDLE_STATE);
         this.pendingDirection = null;
     }

@@ -293,12 +293,12 @@ export class GraphViewerEngine {
         console.log("[GraphViewerEngine] Created, starting animation loop");
 
         // Create navigation controller for keyboard-driven cursor movement
-        this.navigationController = new GraphNavigationController({
-            onCursorChange: (nodeId) => options?.onCursorChange?.(nodeId),
-            onNavStateChange: () => this.emitState(),
-            navDirectionMapping: INITIAL_APP_STATE.navDirectionMapping,
-            selectors: DEFAULT_SELECTORS,
-        });
+        this.navigationController = new GraphNavigationController(
+            INITIAL_APP_STATE.navDirectionMapping,
+            DEFAULT_SELECTORS,
+            (nodeId) => options?.onCursorChange?.(nodeId),
+            () => this.emitState()
+        );
 
         // Create SVG element
         this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -369,14 +369,13 @@ export class GraphViewerEngine {
      */
     setAppState(appState: AppState): void {
         this.appState = appState;
-        this.navigationController.setNavDirectionMapping(appState.navDirectionMapping);
     }
 
     /**
      * Get the navigation handle for keyboard-driven cursor movement.
      */
     getNavigationHandle(): GraphNavigationHandle {
-        return this.navigationController;
+        return this.navigationController.handle;
     }
 
     /**
