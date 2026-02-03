@@ -8809,7 +8809,7 @@ to-regex-range@^5.0.1:
 
 "todo-client@github:shiukaheng/todo":
   version "0.1.0"
-  resolved "git+ssh://git@github.com/shiukaheng/todo.git#9b06d3fe4f53b154a06df976df1506c26db58e2c"
+  resolved "git+ssh://git@github.com/shiukaheng/todo.git#8c9e58cc1c6ee224af82e4da2cd2d68f4a3781db"
 
 toidentifier@1.0.1:
   version "1.0.1"
