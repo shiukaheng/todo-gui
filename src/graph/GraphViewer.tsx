@@ -1,36 +1,21 @@
-import { useRef, useState, useCallback, useImperativeHandle, useEffect, RefObject } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { useGraphViewerEngine } from "./useGraphViewerEngine";
-import { AppState, INITIAL_APP_STATE, NavDirectionMapping, DEFAULT_NAV_MAPPING } from "./types";
+import { AppState, INITIAL_APP_STATE } from "./types";
 import { CursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
-import { NavState, IDLE_STATE, GraphNavigationHandle } from "./graphNavigation/types";
+import { NavState, IDLE_STATE } from "./graphNavigation/types";
 import { useGraphNavigationHandle } from "./graphNavigation/useGraphNavigationHandle";
 import { useTodo } from "./TodoContext";
 
-const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+const SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
-interface GraphViewerProps {
-    onCursorChange?: (nodeId: string | null) => void;
-    handleRef?: RefObject<GraphNavigationHandle | null>;
-    ambiguousSelectors?: string[];
-    navDirectionMapping?: NavDirectionMapping;
-}
-
-export function GraphViewer({
-    onCursorChange,
-    handleRef,
-    ambiguousSelectors = DEFAULT_SELECTORS,
-    navDirectionMapping = DEFAULT_NAV_MAPPING,
-}: GraphViewerProps) {
+export function GraphViewer() {
     const { graphData: taskList } = useTodo();
 
     // Ref to the DOM container where the engine will render
     const viewportContainerRef = useRef<HTMLDivElement>(null);
 
     // Internal app state (cursor, selection, etc.)
-    const [appState, setAppState] = useState<AppState>({
-        ...INITIAL_APP_STATE,
-        navDirectionMapping,
-    });
+    const [appState, setAppState] = useState<AppState>(INITIAL_APP_STATE);
 
     // Navigation state for the state machine
     const [navState, setNavState] = useState<NavState>(IDLE_STATE);
@@ -38,23 +23,19 @@ export function GraphViewer({
     // Cursor neighbors (updated by engine callback)
     const [cursorNeighbors, setCursorNeighbors] = useState<CursorNeighbors>(EMPTY_CURSOR_NEIGHBORS);
 
-    // Update cursor and notify parent
+    // Update cursor
     const setCursor = useCallback((nodeId: string | null) => {
         setAppState((prev) => ({ ...prev, cursor: nodeId }));
-        onCursorChange?.(nodeId);
-    }, [onCursorChange]);
+    }, []);
 
     // Create navigation handle
     const navigationHandle = useGraphNavigationHandle({
         cursorNeighbors,
         navDirectionMapping: appState.navDirectionMapping,
-        selectors: ambiguousSelectors,
+        selectors: SELECTORS,
         onCursorChange: setCursor,
         onNavStateChange: setNavState,
     });
-
-    // Expose handle via ref
-    useImperativeHandle(handleRef, () => navigationHandle, [navigationHandle]);
 
     // Keyboard navigation (for testing)
     useEffect(() => {
@@ -82,7 +63,7 @@ export function GraphViewer({
                     break;
                 default:
                     // Number keys for disambiguation
-                    if (ambiguousSelectors.includes(e.key)) {
+                    if (SELECTORS.includes(e.key)) {
                         navigationHandle.chooseAmbiguous(e.key);
                     }
                     break;
@@ -91,7 +72,7 @@ export function GraphViewer({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [navigationHandle, ambiguousSelectors]);
+    }, [navigationHandle]);
 
     // Hook manages engine lifecycle and data flow
     // Returns engine state that can drive React UI
@@ -100,7 +81,7 @@ export function GraphViewer({
         onNodeClick: setCursor,
         onCursorNeighborsChange: setCursorNeighbors,
         navState,
-        selectors: ambiguousSelectors,
+        selectors: SELECTORS,
     });
 
     return (
