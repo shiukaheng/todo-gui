@@ -33,6 +33,7 @@ export class SVGRenderer {
 
     constructor(svg: SVGSVGElement) {
         this.svg = svg;
+        this.svg.style.userSelect = "none";
         this.defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
         this.svg.appendChild(this.defs);
     }
