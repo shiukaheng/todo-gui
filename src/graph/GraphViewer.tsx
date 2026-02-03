@@ -1,15 +1,14 @@
 import { useRef, useState, useCallback, useImperativeHandle, useEffect, RefObject } from "react";
-import { TaskListOut } from "todo-client";
 import { useGraphViewerEngine } from "./useGraphViewerEngine";
 import { AppState, INITIAL_APP_STATE, NavDirectionMapping, DEFAULT_NAV_MAPPING } from "./types";
 import { CursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
 import { NavState, IDLE_STATE, GraphNavigationHandle } from "./graphNavigation/types";
 import { useGraphNavigationHandle } from "./graphNavigation/useGraphNavigationHandle";
+import { useTodo } from "./TodoContext";
 
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
 interface GraphViewerProps {
-    taskList: TaskListOut;
     onCursorChange?: (nodeId: string | null) => void;
     handleRef?: RefObject<GraphNavigationHandle | null>;
     ambiguousSelectors?: string[];
@@ -17,12 +16,13 @@ interface GraphViewerProps {
 }
 
 export function GraphViewer({
-    taskList,
     onCursorChange,
     handleRef,
     ambiguousSelectors = DEFAULT_SELECTORS,
     navDirectionMapping = DEFAULT_NAV_MAPPING,
 }: GraphViewerProps) {
+    const { graphData: taskList } = useTodo();
+
     // Ref to the DOM container where the engine will render
     const viewportContainerRef = useRef<HTMLDivElement>(null);
 
@@ -95,7 +95,8 @@ export function GraphViewer({
 
     // Hook manages engine lifecycle and data flow
     // Returns engine state that can drive React UI
-    const engineState = useGraphViewerEngine(taskList, appState, viewportContainerRef, {
+    // Note: taskList is guaranteed non-null because App guards before rendering GraphViewer
+    const engineState = useGraphViewerEngine(taskList!, appState, viewportContainerRef, {
         onNodeClick: setCursor,
         onCursorNeighborsChange: setCursorNeighbors,
         navState,
