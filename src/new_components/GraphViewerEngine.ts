@@ -81,9 +81,12 @@ export class GraphViewerEngine {
 
         // Default simulation: WebCola constraint-based layout
         this.simulationEngine = new WebColaEngine({
-            flowDirection: "y",
-            flowSeparation: 50,
+            flowDirection: "x",
+            flowSeparation: 100,
             symmetricDiffLinkLengths: true,
+            flowReversed: true,
+            // componentGrouping: true,
+            // componentPadding: 10,
         });
 
         // Default navigation: auto-fit content in viewport

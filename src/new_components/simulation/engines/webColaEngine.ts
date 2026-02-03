@@ -80,6 +80,8 @@ export interface WebColaConfig {
     avoidOverlaps?: boolean;
     /** Flow direction for directed graphs. Default: undefined (no flow) */
     flowDirection?: "x" | "y";
+    /** Reverse the flow direction (right-to-left for x, bottom-to-top for y). Default: false */
+    flowReversed?: boolean;
     /** Minimum separation for flow constraints. Default: 50 */
     flowSeparation?: number;
     /** Use symmetric diff for adaptive link lengths. Default: false */
@@ -100,6 +102,7 @@ const DEFAULT_CONFIG: Required<WebColaConfig> = {
     linkDistance: 150,
     avoidOverlaps: false,
     flowDirection: undefined as unknown as "x" | "y",
+    flowReversed: false,
     flowSeparation: 50,
     symmetricDiffLinkLengths: false,
     convergenceThreshold: 0.01,
@@ -279,8 +282,9 @@ export class WebColaEngine implements SimulationEngine {
             newNodeIdToIndex.set(taskId, index);
         }
 
-        // Build new link array
+        // Build new link array (swap source/target if flow is reversed)
         const newLinks: ColaLink[] = [];
+        const reversed = this.config.flowReversed;
         for (const [depId, dep] of Object.entries(dependencies)) {
             const sourceIndex = newNodeIdToIndex.get(dep.data.fromId);
             const targetIndex = newNodeIdToIndex.get(dep.data.toId);
@@ -292,8 +296,8 @@ export class WebColaEngine implements SimulationEngine {
 
             newLinks.push({
                 id: depId,
-                source: newNodes[sourceIndex],
-                target: newNodes[targetIndex],
+                source: reversed ? newNodes[targetIndex] : newNodes[sourceIndex],
+                target: reversed ? newNodes[sourceIndex] : newNodes[targetIndex],
             });
         }
 
@@ -318,13 +322,13 @@ export class WebColaEngine implements SimulationEngine {
             newNodes.push(virtualRoot);
             newNodeIdToIndex.set(VIRTUAL_ROOT_ID, virtualIndex);
 
-            // Connect virtual root to all parentless nodes
+            // Connect virtual root to all parentless nodes (swap if reversed)
             for (const rootId of rootNodeIds) {
-                const targetIndex = newNodeIdToIndex.get(rootId)!;
+                const rootIndex = newNodeIdToIndex.get(rootId)!;
                 newLinks.push({
                     id: `__virtual_link_${rootId}__`,
-                    source: virtualRoot,
-                    target: newNodes[targetIndex],
+                    source: reversed ? newNodes[rootIndex] : virtualRoot,
+                    target: reversed ? virtualRoot : newNodes[rootIndex],
                 });
             }
         }
