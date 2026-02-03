@@ -150,7 +150,8 @@
 
 import { TaskListOut } from "todo-client";
 import { CursorNeighbors, GraphViewerEngineState, computeCursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
-import { NavState, IDLE_STATE, getNavInfoText } from "./graphNavigation/types";
+import { NavState, IDLE_STATE, getNavInfoText, GraphNavigationHandle } from "./graphNavigation/types";
+import { GraphNavigationController } from "./graphNavigation/GraphNavigationController";
 import { navigationStyleGraphData } from "./preprocess/navigationStyleGraphData";
 import { AppState, INITIAL_APP_STATE } from "./types";
 import { nestGraphData, NestedGraphData } from "./preprocess/nestGraphData";
@@ -236,6 +237,7 @@ export type EngineStateCallback = (state: GraphViewerEngineState) => void;
  */
 export interface GraphViewerEngineOptions {
     onNodeClick?: (nodeId: string) => void;
+    onCursorChange?: (nodeId: string) => void;
 }
 
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
@@ -278,18 +280,25 @@ export class GraphViewerEngine {
     // Track if we've done the initial fit-to-graph
     private initialFitDone = false;
 
+    // Graph navigation (keyboard-driven cursor movement)
+    private navigationController: GraphNavigationController;
     private currentCursorNeighbors: CursorNeighbors = EMPTY_CURSOR_NEIGHBORS;
-    private navState: NavState = IDLE_STATE;
     private selectors: string[] = DEFAULT_SELECTORS;
-    private options?: GraphViewerEngineOptions;
 
     constructor(
         private container: HTMLDivElement,
         private onStateChange: EngineStateCallback,
         options?: GraphViewerEngineOptions
     ) {
-        this.options = options;
         console.log("[GraphViewerEngine] Created, starting animation loop");
+
+        // Create navigation controller for keyboard-driven cursor movement
+        this.navigationController = new GraphNavigationController({
+            onCursorChange: (nodeId) => options?.onCursorChange?.(nodeId),
+            onNavStateChange: () => this.emitState(),
+            navDirectionMapping: INITIAL_APP_STATE.navDirectionMapping,
+            selectors: DEFAULT_SELECTORS,
+        });
 
         // Create SVG element
         this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -360,25 +369,14 @@ export class GraphViewerEngine {
      */
     setAppState(appState: AppState): void {
         this.appState = appState;
-        // Note: Could trigger immediate effects here if needed
-        // For now, the animation loop will pick up the new state
+        this.navigationController.setNavDirectionMapping(appState.navDirectionMapping);
     }
 
     /**
-     * Update the navigation state and selectors.
-     * Call this when nav state changes from the navigation handle.
-     *
-     * @param navState - New nav state
-     * @param selectors - Available selector keys (e.g., ['1', '2', '3', ...])
+     * Get the navigation handle for keyboard-driven cursor movement.
      */
-    setNavState(navState?: NavState, selectors?: string[]): void {
-        if (navState !== undefined) {
-            this.navState = navState;
-        }
-        if (selectors !== undefined) {
-            this.selectors = selectors;
-        }
-        this.emitState();
+    getNavigationHandle(): GraphNavigationHandle {
+        return this.navigationController;
     }
 
     /**
@@ -432,21 +430,23 @@ export class GraphViewerEngine {
      * Call this when something UI-relevant changes (selection, hover, etc.)
      */
     private emitState(): void {
+        const navState = this.navigationController.state;
+
         // Compute candidate count for info text
         let candidateCount = 0;
-        if (this.navState.type === 'confirmingTarget') {
+        if (navState.type === 'confirmingTarget') {
             const { topological } = this.currentCursorNeighbors;
-            candidateCount = this.navState.targetType === 'parents'
+            candidateCount = navState.targetType === 'parents'
                 ? topological.parents.length
                 : topological.children.length;
-        } else if (this.navState.type === 'selectingParentForPeers') {
+        } else if (navState.type === 'selectingParentForPeers') {
             candidateCount = Object.keys(this.currentCursorNeighbors.topological.peers).length;
         }
 
         this.onStateChange({
             isSimulating: this.isSimulating,
             cursorNeighbors: this.currentCursorNeighbors,
-            navInfoText: getNavInfoText(this.navState, candidateCount),
+            navInfoText: getNavInfoText(navState, candidateCount),
         });
     }
 
@@ -478,6 +478,7 @@ export class GraphViewerEngine {
 
         if (oldJson !== newJson) {
             this.currentCursorNeighbors = newNeighbors;
+            this.navigationController.setCursorNeighbors(newNeighbors);
             this.emitState();
         }
     }
@@ -548,7 +549,7 @@ export class GraphViewerEngine {
             styledData = navigationStyleGraphData(
                 styledData,
                 this.currentCursorNeighbors,
-                this.navState,
+                this.navigationController.state,
                 this.selectors,
                 this.appState.navDirectionMapping
             );

@@ -1,21 +1,28 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { TaskListOut } from "todo-client";
 import { GraphViewerEngine, EngineStateCallback, GraphViewerEngineOptions } from "./GraphViewerEngine";
 import { GraphViewerEngineState, INITIAL_ENGINE_STATE } from "./GraphViewerEngineState";
 import { AppState } from "./types";
-import { NavState, IDLE_STATE, GraphNavigationHandle } from "./graphNavigation/types";
-import { useGraphNavigationHandle } from "./graphNavigation/useGraphNavigationHandle";
-
-const SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+import { GraphNavigationHandle } from "./graphNavigation/types";
 
 export interface UseGraphViewerEngineOptions extends GraphViewerEngineOptions {
-    onCursorChange?: (nodeId: string | null) => void;
 }
 
 export interface UseGraphViewerEngineResult {
     engineState: GraphViewerEngineState;
     navigationHandle: GraphNavigationHandle;
 }
+
+// No-op navigation handle for when engine isn't ready
+const NOOP_NAVIGATION_HANDLE: GraphNavigationHandle = {
+    up: () => {},
+    down: () => {},
+    left: () => {},
+    right: () => {},
+    chooseAmbiguous: () => false,
+    escape: () => {},
+    get state() { return { type: 'idle' as const }; },
+};
 
 /**
  * useGraphViewerEngine - React hook that manages the engine lifecycle and data flow.
@@ -26,7 +33,7 @@ export interface UseGraphViewerEngineResult {
  * @param taskList - The task data from React props
  * @param appState - The app state (cursor, selection, etc.) from React props
  * @param viewportContainerRef - Ref to the DOM container where the engine renders
- * @param options - Engine options (callbacks like onNodeClick)
+ * @param options - Engine options (callbacks like onNodeClick, onCursorChange)
  * @returns The current engine state and navigation handle
  */
 export function useGraphViewerEngine(
@@ -36,7 +43,7 @@ export function useGraphViewerEngine(
     options?: UseGraphViewerEngineOptions
 ): UseGraphViewerEngineResult {
     const [engineState, setEngineState] = useState<GraphViewerEngineState>(INITIAL_ENGINE_STATE);
-    const [navState, setNavState] = useState<NavState>(IDLE_STATE);
+    const [engineReady, setEngineReady] = useState(false);
 
     // Stable callback pattern: engine holds this for its lifetime
     const onStateChangeRef = useRef<EngineStateCallback>(setEngineState);
@@ -50,9 +57,10 @@ export function useGraphViewerEngine(
     const optionsRef = useRef(options);
     optionsRef.current = options;
 
-    const stableOptions = useRef<UseGraphViewerEngineOptions>({
+    const stableOptions = useMemo<GraphViewerEngineOptions>(() => ({
         onNodeClick: (nodeId) => optionsRef.current?.onNodeClick?.(nodeId),
-    }).current;
+        onCursorChange: (nodeId) => optionsRef.current?.onCursorChange?.(nodeId),
+    }), []);
 
     const engineRef = useRef<GraphViewerEngine | null>(null);
 
@@ -65,10 +73,12 @@ export function useGraphViewerEngine(
         }
 
         engineRef.current = new GraphViewerEngine(container, stableCallback, stableOptions);
+        setEngineReady(true);
 
         return () => {
             engineRef.current?.destroy();
             engineRef.current = null;
+            setEngineReady(false);
         };
     }, [stableCallback, stableOptions]);
 
@@ -82,24 +92,10 @@ export function useGraphViewerEngine(
         engineRef.current?.setAppState(appState);
     }, [appState]);
 
-    // Push nav state updates when navState changes
-    useEffect(() => {
-        engineRef.current?.setNavState(navState, SELECTORS);
-    }, [navState]);
-
-    // Cursor change handler for navigation
-    const handleCursorChange = useCallback((nodeId: string | null) => {
-        optionsRef.current?.onCursorChange?.(nodeId);
-    }, []);
-
-    // Navigation handle (uses cursorNeighbors from engine state)
-    const navigationHandle = useGraphNavigationHandle({
-        cursorNeighbors: engineState.cursorNeighbors,
-        navDirectionMapping: appState.navDirectionMapping,
-        selectors: SELECTORS,
-        onCursorChange: handleCursorChange,
-        onNavStateChange: setNavState,
-    });
+    // Get navigation handle from engine (or no-op if not ready)
+    const navigationHandle = engineReady && engineRef.current
+        ? engineRef.current.getNavigationHandle()
+        : NOOP_NAVIGATION_HANDLE;
 
     return { engineState, navigationHandle };
 }

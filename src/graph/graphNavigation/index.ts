@@ -5,5 +5,5 @@
  */
 
 export * from "./types";
-export { useGraphNavigationHandle } from "./useGraphNavigationHandle";
-export type { UseGraphNavigationHandleOptions } from "./useGraphNavigationHandle";
+export { GraphNavigationController } from "./GraphNavigationController";
+export type { GraphNavigationControllerOptions } from "./GraphNavigationController";
