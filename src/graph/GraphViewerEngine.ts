@@ -230,6 +230,13 @@ function computeFitTransform(
 export type EngineStateCallback = (state: GraphViewerEngineState) => void;
 
 /**
+ * Options for GraphViewerEngine.
+ */
+export interface GraphViewerEngineOptions {
+    onNodeClick?: (nodeId: string) => void;
+}
+
+/**
  * GraphViewerEngine - Imperative class that owns the animation loop.
  * See top-level comment for full data flow documentation.
  */
@@ -269,7 +276,8 @@ export class GraphViewerEngine {
 
     constructor(
         private container: HTMLDivElement,
-        private onStateChange: EngineStateCallback
+        private onStateChange: EngineStateCallback,
+        options?: GraphViewerEngineOptions
     ) {
         console.log("[GraphViewerEngine] Created, starting animation loop");
 
@@ -304,6 +312,7 @@ export class GraphViewerEngine {
             setNavigationEngine: (engine) => this.setNavigationEngine(engine),
             getNavigationState: () => this.navigationState,
             getSimulationState: () => this.simulationState,
+            onNodeClick: options?.onNodeClick,
         });
         this.inputHandler.setCallback((event) => {
             this.interactionController.handleEvent(event);

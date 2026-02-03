@@ -30,6 +30,7 @@ export interface InteractionControllerDeps {
     setNavigationEngine: (engine: NavigationEngine) => void;
     getNavigationState: () => NavigationState;
     getSimulationState: () => SimulationState;
+    onNodeClick?: (nodeId: string) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -337,10 +338,8 @@ export class InteractionController {
     // ═══════════════════════════════════════════════════════════════════════
 
     private handleClick(target: InteractionTarget, screen: ScreenPoint): void {
-        // TODO: Implement click handling (selection, etc.)
-        // For now, just log
         if (target.type === "node") {
-            console.log("[InteractionController] Click on node:", target.nodeId);
+            this.deps?.onNodeClick?.(target.nodeId);
         }
     }
 

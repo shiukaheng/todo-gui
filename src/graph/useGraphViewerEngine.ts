@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { TaskListOut } from "todo-client";
-import { GraphViewerEngine, EngineStateCallback } from "./GraphViewerEngine";
+import { GraphViewerEngine, EngineStateCallback, GraphViewerEngineOptions } from "./GraphViewerEngine";
 import { GraphViewerEngineState, INITIAL_ENGINE_STATE } from "./GraphViewerEngineState";
-import { AppState, INITIAL_APP_STATE } from "./types";
+import { AppState } from "./types";
 
 /**
  * useGraphViewerEngine - React hook that manages the engine lifecycle and data flow.
@@ -13,12 +13,14 @@ import { AppState, INITIAL_APP_STATE } from "./types";
  * @param taskList - The task data from React props
  * @param appState - The app state (cursor, selection, etc.) from React props
  * @param viewportContainerRef - Ref to the DOM container where the engine renders
+ * @param options - Engine options (callbacks like onNodeClick)
  * @returns The current engine state (for React UI to consume)
  */
 export function useGraphViewerEngine(
     taskList: TaskListOut,
-    appState: AppState = INITIAL_APP_STATE,
-    viewportContainerRef: React.RefObject<HTMLDivElement>
+    appState: AppState,
+    viewportContainerRef: React.RefObject<HTMLDivElement>,
+    options?: GraphViewerEngineOptions
 ): GraphViewerEngineState {
     const [engineState, setEngineState] = useState<GraphViewerEngineState>(INITIAL_ENGINE_STATE);
 
@@ -30,6 +32,14 @@ export function useGraphViewerEngine(
         onStateChangeRef.current(state);
     }, []);
 
+    // Stable ref for options callbacks
+    const optionsRef = useRef(options);
+    optionsRef.current = options;
+
+    const stableOptions = useRef<GraphViewerEngineOptions>({
+        onNodeClick: (nodeId) => optionsRef.current?.onNodeClick?.(nodeId),
+    }).current;
+
     const engineRef = useRef<GraphViewerEngine | null>(null);
 
     // Engine lifecycle (create on mount, destroy on unmount)
@@ -40,13 +50,13 @@ export function useGraphViewerEngine(
             return;
         }
 
-        engineRef.current = new GraphViewerEngine(container, stableCallback);
+        engineRef.current = new GraphViewerEngine(container, stableCallback, stableOptions);
 
         return () => {
             engineRef.current?.destroy();
             engineRef.current = null;
         };
-    }, [stableCallback]);
+    }, [stableCallback, stableOptions]);
 
     // Push data updates when taskList changes
     useEffect(() => {
