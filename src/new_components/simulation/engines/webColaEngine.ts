@@ -475,6 +475,9 @@ export class WebColaEngine implements SimulationEngine {
         // IMPORTANT: resume() sets alpha to 0.1, which allows tick() to run
         // Without this, alpha is 0 and tick() immediately returns "converged"
         this.layout.resume();
+
+        // Re-apply any pinned nodes to the new layout
+        this.applyPinsToLayout();
     }
 
     // ───────────────────────────────────────────────────────────────────────
