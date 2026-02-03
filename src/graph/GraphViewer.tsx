@@ -114,7 +114,7 @@ export function GraphViewer({
 
             {/* Navigation info text */}
             {engineState.navInfoText && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded font-mono text-sm">
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white font-mono text-sm">
                     {engineState.navInfoText}
                 </div>
             )}
