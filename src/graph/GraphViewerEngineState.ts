@@ -37,9 +37,23 @@
  * React re-renders. Only emit when state meaningfully changes, or at most
  * every N frames.
  */
+
+export type CursorNeighbors = {
+    topological: {
+        children: string[]
+        parents: string[]
+        peers: {
+            [parentId: string]: string[]
+        }
+    }
+}
+
 export interface GraphViewerEngineState {
     /** Whether the physics simulation is currently running */
     isSimulating: boolean;
+    cursorNeighbors: CursorNeighbors;
+
+
 
     // FUTURE IDEAS - uncomment and implement as needed:
     //
@@ -59,4 +73,99 @@ export interface GraphViewerEngineState {
 /** Initial state before the engine starts */
 export const INITIAL_ENGINE_STATE: GraphViewerEngineState = {
     isSimulating: false,
+    cursorNeighbors: {
+        topological: {
+            children: [],
+            parents: [],
+            peers: {},
+        },
+    },
 };
+
+export type SortAxis = 'x' | 'y';
+
+type Vec2 = [number, number];
+
+/**
+ * Compute the relevant neighbors for a cursor node.
+ *
+ * @param cursorId - The ID of the cursor node, or null if no cursor
+ * @param dependencies - Map of dependency ID to { data: { fromId, toId } }
+ * @param positions - Map of node ID to [x, y] position
+ * @param sortDir - Axis to sort neighbors by ('x' or 'y', default 'y')
+ * @returns CursorNeighbors with children, parents, and peers sorted by position
+ */
+export function computeCursorNeighbors(
+    cursorId: string | null,
+    dependencies: { [key: string]: { data: { fromId: string; toId: string } } },
+    positions: { [key: string]: Vec2 },
+    sortDir: SortAxis = 'y'
+): CursorNeighbors {
+    const empty: CursorNeighbors = {
+        topological: {
+            children: [],
+            parents: [],
+            peers: {},
+        },
+    };
+
+    if (!cursorId) {
+        return empty;
+    }
+
+    const axisIndex = sortDir === 'x' ? 0 : 1;
+
+    const sortByAxis = (ids: string[]): string[] => {
+        return [...ids].sort((a, b) => {
+            const posA = positions[a];
+            const posB = positions[b];
+            if (!posA || !posB) return 0;
+            return posA[axisIndex] - posB[axisIndex];
+        });
+    };
+
+    const children: string[] = [];
+    const parents: string[] = [];
+
+    // Build parent->children map for peer computation
+    const parentToChildren: Map<string, string[]> = new Map();
+
+    for (const dep of Object.values(dependencies)) {
+        const { fromId, toId } = dep.data;
+
+        // cursor -> child (cursor is parent, toId is child)
+        if (fromId === cursorId) {
+            children.push(toId);
+        }
+
+        // parent -> cursor (fromId is parent, cursor is child)
+        if (toId === cursorId) {
+            parents.push(fromId);
+        }
+
+        // Build parent->children index for peer lookup
+        if (!parentToChildren.has(fromId)) {
+            parentToChildren.set(fromId, []);
+        }
+        parentToChildren.get(fromId)!.push(toId);
+    }
+
+    // Compute peers: siblings that share a parent with cursor
+    const peers: { [parentId: string]: string[] } = {};
+    for (const parentId of parents) {
+        const siblings = parentToChildren.get(parentId) || [];
+        // Exclude the cursor itself from peers
+        const peersForParent = siblings.filter(id => id !== cursorId);
+        if (peersForParent.length > 0) {
+            peers[parentId] = sortByAxis(peersForParent);
+        }
+    }
+
+    return {
+        topological: {
+            children: sortByAxis(children),
+            parents: sortByAxis(parents),
+            peers,
+        },
+    };
+}

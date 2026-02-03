@@ -149,7 +149,7 @@
  */
 
 import { TaskListOut } from "todo-client";
-import { GraphViewerEngineState } from "./GraphViewerEngineState";
+import { CursorNeighbors, GraphViewerEngineState } from "./GraphViewerEngineState";
 import { AppState, INITIAL_APP_STATE } from "./types";
 import { nestGraphData, NestedGraphData } from "./preprocess/nestGraphData";
 import { baseStyleGraphData, conditionalStyleGraphData, cursorStyleGraphData, StyledGraphData } from "./preprocess/styleGraphData";
@@ -236,6 +236,10 @@ export interface GraphViewerEngineOptions {
     onNodeClick?: (nodeId: string) => void;
 }
 
+function calculateCursorNeighbors<G extends PositionedGraphData<any>>(graphData: G, cursor: string): CursorNeighbors {
+    throw new Error("Not implemented yet");
+}
+
 /**
  * GraphViewerEngine - Imperative class that owns the animation loop.
  * See top-level comment for full data flow documentation.
@@ -273,6 +277,14 @@ export class GraphViewerEngine {
 
     // Track if we've done the initial fit-to-graph
     private initialFitDone = false;
+
+    private currentCursorNeighbors: CursorNeighbors = {
+        topological: {
+            children: [],
+            parents: [],
+            peers: {},
+        },
+    };
 
     constructor(
         private container: HTMLDivElement,
@@ -407,7 +419,16 @@ export class GraphViewerEngine {
     private emitState(): void {
         this.onStateChange({
             isSimulating: this.isSimulating,
+            cursorNeighbors: this.currentCursorNeighbors,
         });
+    }
+
+    /**
+     * Emits event for relevant neighbors of the node on cursor. 
+     */
+    private updateRelevantNeighbors(positionedData: PositionedGraphData<any>): void {
+        const { cursor } = this.appState;
+        // TODO: Use the calculation function, compare with current, if changed, apply and emit.
     }
 
     /**
@@ -443,6 +464,7 @@ export class GraphViewerEngine {
                 this.simulationState
             );
             const positionedData = mergePositions(graphData, this.simulationState);
+            this.updateRelevantNeighbors(positionedData);
 
             // ─────────────────────────────────────────────────────────────
             // STEP 1.5: Initial fit - center graph in viewport on first frame
