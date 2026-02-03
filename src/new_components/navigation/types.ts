@@ -163,3 +163,71 @@ export interface Navigator {
     destroy?(): void;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// MANUAL NAVIGATOR
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Screen point for manual navigation operations.
+ */
+export interface ScreenPoint {
+    readonly x: number;
+    readonly y: number;
+}
+
+/**
+ * Extended navigator interface for manual pan/zoom/rotate control.
+ * Used by InteractionController for handling user gestures.
+ */
+export interface ManualNavigator extends Navigator {
+    /**
+     * Apply incremental pan in screen pixels.
+     */
+    pan(dx: number, dy: number): void;
+
+    /**
+     * Zoom around a screen point.
+     * @param center - Screen coordinates to zoom around
+     * @param factor - Zoom multiplier (>1 = zoom in, <1 = zoom out)
+     */
+    zoom(center: ScreenPoint, factor: number): void;
+
+    /**
+     * Rotate around a screen point.
+     * @param center - Screen coordinates to rotate around
+     * @param radians - Rotation angle in radians
+     */
+    rotate(center: ScreenPoint, radians: number): void;
+
+    /**
+     * Set velocity for momentum scrolling.
+     * Navigator applies and decays velocity in step().
+     * @param vx - Horizontal velocity in screen pixels per second
+     * @param vy - Vertical velocity in screen pixels per second
+     */
+    setVelocity(vx: number, vy: number): void;
+
+    /**
+     * Stop any ongoing momentum immediately.
+     */
+    stopMomentum(): void;
+
+    /**
+     * Required destroy for cleanup.
+     */
+    destroy(): void;
+}
+
+/**
+ * Type guard to check if a navigator supports manual control.
+ */
+export function isManualNavigator(nav: Navigator): nav is ManualNavigator {
+    return (
+        "pan" in nav &&
+        "zoom" in nav &&
+        "rotate" in nav &&
+        "setVelocity" in nav &&
+        "stopMomentum" in nav
+    );
+}
+
