@@ -169,6 +169,10 @@ export class WebColaEngine implements SimulationEngine {
     // Pinned nodes (for dragging)
     private pinnedNodes: Map<string, PinStatus> = new Map();
 
+    // Track time since last graph mutation (for delayed constraint application)
+    private lastMutationTime: number | null = null;
+    private constraintsApplied = false;
+
     constructor(config: WebColaConfig = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
     }
@@ -217,9 +221,24 @@ export class WebColaEngine implements SimulationEngine {
             this.reconcileGraph(graph, prevState);
             this.lastTopology = currentTopology;
             this.initialized = true;
+
+            // Start without constraints, apply them after delay
+            this.lastMutationTime = performance.now();
+            this.constraintsApplied = false;
+            this.rebuildLayout(false);
         } else {
             // Topology unchanged - just sync any external position changes
             this.syncPositionsFromState(prevState);
+
+            // Check if it's time to apply constraints (1 second after mutation)
+            if (!this.constraintsApplied && this.lastMutationTime !== null) {
+                const elapsed = performance.now() - this.lastMutationTime;
+                if (elapsed >= 1000) {
+                    this.constraintsApplied = true;
+                    this.lastMutationTime = null;
+                    this.rebuildLayout(true);
+                }
+            }
         }
 
         // Always tick - this animates smoothly from current positions toward optimal
@@ -368,17 +387,17 @@ export class WebColaEngine implements SimulationEngine {
         this.colaNodes = newNodes;
         this.colaLinks = newLinks;
         this.nodeIdToIndex = newNodeIdToIndex;
-
-        // Recreate layout
-        this.rebuildLayout();
+        // Note: rebuildLayout() is called by step() after reconcileGraph()
     }
 
     /**
      * Create a new ManualTickLayout with current config and node/link arrays.
      * Initializes distance matrix via start() but runs zero iterations,
      * allowing smooth animated convergence through subsequent doTick() calls.
+     *
+     * @param withConstraints - If false, skip flow/groups/constraints for initial settling
      */
-    private rebuildLayout(): void {
+    private rebuildLayout(withConstraints: boolean = true): void {
         const {
             linkDistance,
             avoidOverlaps,
@@ -398,31 +417,36 @@ export class WebColaEngine implements SimulationEngine {
             .convergenceThreshold(convergenceThreshold)
             .handleDisconnected(true);
 
-        // Auto-create groups from connected components (if componentId present)
-        const componentGroups = this.buildComponentGroups();
-        if (componentGroups) {
-            // WebCola accepts indices in leaves[], converts to nodes internally
-            // Type assertion needed because @types/webcola expects Node[]
-            this.layout.groups(componentGroups as any);
-            this.layout.avoidOverlaps(true); // Required for group separation
+        if (withConstraints) {
+            // Auto-create groups from connected components (if componentId present)
+            const componentGroups = this.buildComponentGroups();
+            if (componentGroups) {
+                // WebCola accepts indices in leaves[], converts to nodes internally
+                // Type assertion needed because @types/webcola expects Node[]
+                this.layout.groups(componentGroups as any);
+                this.layout.avoidOverlaps(true); // Required for group separation
+            } else {
+                this.layout.avoidOverlaps(avoidOverlaps);
+            }
+
+            // Optional: flow direction for directed graphs
+            if (flowDirection) {
+                this.layout.flowLayout(flowDirection, flowSeparation);
+            }
+
+            // Optional: adaptive link lengths based on graph structure
+            if (symmetricDiffLinkLengths) {
+                this.layout.symmetricDiffLinkLengths(linkDistance / 10);
+            }
+
+            // Translate high-level constraints to WebCola format
+            if (constraints.length > 0) {
+                const colaConstraints = this.translateConstraints(constraints);
+                this.layout.constraints(colaConstraints);
+            }
         } else {
+            // No constraints mode - just basic overlap avoidance if configured
             this.layout.avoidOverlaps(avoidOverlaps);
-        }
-
-        // Optional: flow direction for directed graphs
-        if (flowDirection) {
-            this.layout.flowLayout(flowDirection, flowSeparation);
-        }
-
-        // Optional: adaptive link lengths based on graph structure
-        if (symmetricDiffLinkLengths) {
-            this.layout.symmetricDiffLinkLengths(linkDistance / 10);
-        }
-
-        // Translate high-level constraints to WebCola format
-        if (constraints.length > 0) {
-            const colaConstraints = this.translateConstraints(constraints);
-            this.layout.constraints(colaConstraints);
         }
 
         // Initialize layout WITHOUT running iterations
