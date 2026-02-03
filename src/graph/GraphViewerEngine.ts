@@ -171,7 +171,7 @@ import {
     ViewportInfo,
     createPanZoomTransform,
 } from "./navigation";
-import { ManualNavigationEngine } from "./navigation/navigators/manualNavigator";
+import { ManualNavigationEngine } from "./navigation/navigators";
 import { SVGRenderer } from "./render/SVGRenderer";
 import { PerformanceMonitor } from "./render/PerformanceMonitor";
 import { InputHandler, InteractionController } from "./input";

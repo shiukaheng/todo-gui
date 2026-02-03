@@ -2,6 +2,6 @@
  * Navigation Engine Implementations
  */
 
-export * from "./staticNavigator";
-export * from "./fitNavigator";
-export * from "./manualNavigator";
+export * from "./staticNavigationEngine";
+export * from "./fitNavigationEngine";
+export * from "./manualNavigationEngine";
