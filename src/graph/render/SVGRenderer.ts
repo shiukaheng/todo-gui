@@ -4,6 +4,7 @@ import {
     RenderNode,
     RenderEdge,
     Vec2,
+    Color,
     FONT_SIZE,
     STROKE_WIDTH,
     colorToCSS,
@@ -46,7 +47,7 @@ const BREATH_MAX_BRIGHTNESS = 1.0;
 interface NodeElements {
     group: SVGGElement;
     selectorRing: SVGRectElement;
-    rect: SVGRectElement;
+    shape: SVGPathElement;  // Can render square or D-shape
     text: SVGTextElement;
     shortcutKeyText: SVGTextElement;
 }
@@ -76,7 +77,7 @@ export class SVGRenderer {
         return this.offScreenIndicator;
     }
 
-    render(data: RenderGraphData, transform: ViewTransform): void {
+    render(data: RenderGraphData, transform: ViewTransform, backgroundColor: Color = [0, 0, 0]): void {
         const currentNodeIds = new Set(Object.keys(data.tasks));
         const currentEdgeIds = new Set(Object.keys(data.dependencies));
 
@@ -107,7 +108,7 @@ export class SVGRenderer {
 
         // Update or create nodes
         for (const [id, node] of Object.entries(data.tasks)) {
-            this.reconcileNode(id, node, transform);
+            this.reconcileNode(id, node, transform, backgroundColor);
         }
 
         // Off-screen indicator for cursor nodes
@@ -228,7 +229,7 @@ export class SVGRenderer {
         indicator.style.display = "";
     }
 
-    private reconcileNode(id: string, node: RenderNode, transform: ViewTransform): void {
+    private reconcileNode(id: string, node: RenderNode, transform: ViewTransform, backgroundColor: Color): void {
         const [x, y] = worldToScreen(node.position, transform);
         let elements = this.nodeElements.get(id);
 
@@ -238,11 +239,12 @@ export class SVGRenderer {
             this.svg.appendChild(elements.group);
         }
 
-        const { group, selectorRing, rect, text, shortcutKeyText } = elements;
+        const { group, selectorRing, shape, text, shortcutKeyText } = elements;
         const brightness = node.brightnessMultiplier;
 
         // Minimal style: square node with text below
-        const squareSize = NODE_SQUARE_SIZE;
+        const size = NODE_SQUARE_SIZE;
+        const halfSize = size / 2;
         const textGap = NODE_TEXT_GAP;
 
         // Selector ring: outer breathing ring
@@ -251,7 +253,7 @@ export class SVGRenderer {
             const time = performance.now() / 1000;
             const breathBrightness = BREATH_MIN_BRIGHTNESS + (BREATH_MAX_BRIGHTNESS - BREATH_MIN_BRIGHTNESS) * (0.5 + 0.5 * Math.sin(time * BREATH_RATE * Math.PI * 2));
 
-            const ringSize = squareSize + SELECTOR_RING_GAP * 2 + SELECTOR_RING_STROKE_WIDTH;
+            const ringSize = size + SELECTOR_RING_GAP * 2 + SELECTOR_RING_STROKE_WIDTH;
 
             selectorRing.setAttribute("x", (x - ringSize / 2).toString());
             selectorRing.setAttribute("y", (y - ringSize / 2).toString());
@@ -264,26 +266,56 @@ export class SVGRenderer {
             selectorRing.style.display = "none";
         }
 
-        // Update rect as a square centered at position
-        rect.setAttribute("x", (x - squareSize / 2).toString());
-        rect.setAttribute("y", (y - squareSize / 2).toString());
-        rect.setAttribute("width", squareSize.toString());
-        rect.setAttribute("height", squareSize.toString());
-        rect.setAttribute("fill", colorToCSSWithBrightness(node.color, brightness));
-        rect.setAttribute("stroke", colorToCSS(node.borderColor));
-        rect.setAttribute("stroke-width", (node.outlineWidth * NODE_OUTLINE_WIDTH_SCALE).toString());
+        // Generate path based on shape
+        let pathD: string;
+        if (node.shape === 'upTriangle') {
+            // Upright equilateral triangle (AND gate)
+            // Height of equilateral triangle: h = side * sqrt(3) / 2
+            // We want it to fit in the same bounding box as the square
+            const side = size;
+            const h = side * Math.sqrt(3) / 2;
+            // Center the triangle vertically
+            const topY = y - h / 2;
+            const bottomY = y + h / 2;
+            const leftX = x - side / 2;
+            const rightX = x + side / 2;
+            pathD = `M ${x} ${topY} L ${rightX} ${bottomY} L ${leftX} ${bottomY} Z`;
+        } else {
+            // Square
+            const left = x - halfSize;
+            const right = x + halfSize;
+            const top = y - halfSize;
+            const bottom = y + halfSize;
+            pathD = `M ${left} ${top} L ${right} ${top} L ${right} ${bottom} L ${left} ${bottom} Z`;
+        }
 
-        // Update text below the square (offset extra if selector ring is present)
+        shape.setAttribute("d", pathD);
+
+        // Fill and stroke based on hollow state
+        const strokeColor = colorToCSSWithBrightness(node.color, brightness);
+        if (node.hollow) {
+            // Hollow: fill with background color (to cover edges), stroke with node color
+            shape.setAttribute("fill", colorToCSS(backgroundColor));
+            shape.setAttribute("stroke", strokeColor);
+            shape.setAttribute("stroke-width", (STROKE_WIDTH * 0.5).toString());
+        } else {
+            // Solid: fill with node color
+            shape.setAttribute("fill", strokeColor);
+            shape.setAttribute("stroke", "none");
+            shape.setAttribute("stroke-width", "0");
+        }
+
+        // Update text below the shape (offset extra if selector ring is present)
         const selectorOffset = node.selectorOutline ? SELECTOR_TEXT_OFFSET : 0;
         text.setAttribute("x", x.toString());
-        text.setAttribute("y", (y + squareSize / 2 + textGap + selectorOffset + FONT_SIZE / 2).toString());
+        text.setAttribute("y", (y + halfSize + textGap + selectorOffset + FONT_SIZE / 2).toString());
         text.setAttribute("fill", colorToCSSWithBrightness(node.labelColor, brightness));
         text.textContent = node.text;
 
-        // Shortcut key overlay: top-left of node square (fixed white color, not affected by node styling)
+        // Shortcut key overlay: top-left of node (fixed white color, not affected by node styling)
         if (node.shortcutKeyOverlay) {
-            shortcutKeyText.setAttribute("x", (x - squareSize / 2 - SHORTCUT_KEY_MARGIN).toString());
-            shortcutKeyText.setAttribute("y", (y - squareSize / 2).toString());
+            shortcutKeyText.setAttribute("x", (x - halfSize - SHORTCUT_KEY_MARGIN).toString());
+            shortcutKeyText.setAttribute("y", (y - halfSize).toString());
             shortcutKeyText.setAttribute("fill", "#ffffff");
             shortcutKeyText.textContent = node.shortcutKeyOverlay;
             shortcutKeyText.style.display = "";
@@ -305,8 +337,9 @@ export class SVGRenderer {
         selectorRing.setAttribute("fill", "none");
         selectorRing.style.display = "none";
 
-        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        rect.style.pointerEvents = "all";
+        // Shape path: can render square or D-shape
+        const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        shape.style.pointerEvents = "all";
 
         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
         text.setAttribute("text-anchor", "middle");
@@ -325,11 +358,11 @@ export class SVGRenderer {
         shortcutKeyText.style.display = "none";
 
         group.appendChild(selectorRing);
-        group.appendChild(rect);
+        group.appendChild(shape);
         group.appendChild(text);
         group.appendChild(shortcutKeyText);
 
-        return { group, selectorRing, rect, text, shortcutKeyText };
+        return { group, selectorRing, shape, text, shortcutKeyText };
     }
 
     private reconcileEdge(id: string, edge: RenderEdge, from: Vec2, to: Vec2, transform: ViewTransform): void {

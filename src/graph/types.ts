@@ -10,6 +10,9 @@ import { NavDirectionMapping, DEFAULT_NAV_MAPPING } from "./graphNavigation/type
 export { NavDirectionMapping, DEFAULT_NAV_MAPPING };
 export type { NavTarget } from "./graphNavigation/types";
 
+/** RGB color in 0-1 range */
+export type Color = [number, number, number];
+
 /**
  * Application state that drives UI behavior in the graph viewer.
  * This is the secondary reactive source (alongside graph data).
@@ -31,6 +34,12 @@ export interface AppState {
      * Allows customization for different layout orientations.
      */
     navDirectionMapping: NavDirectionMapping;
+
+    /**
+     * Background color of the graph viewer.
+     * Used for "hollow" nodes to cover edges behind them.
+     */
+    backgroundColor: Color;
 }
 
 /**
@@ -39,4 +48,5 @@ export interface AppState {
 export const INITIAL_APP_STATE: AppState = {
     cursor: null,
     navDirectionMapping: DEFAULT_NAV_MAPPING,
+    backgroundColor: [0, 0, 0],  // Black
 };

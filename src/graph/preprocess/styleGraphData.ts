@@ -150,6 +150,8 @@ function computeNodeColors<G extends NestedGraphData>(graphData: G): Map<string,
     return colors;
 }
 
+export type NodeShape = 'square' | 'upTriangle';
+
 export type StyledGraphData<G extends NestedGraphData> = ExtendNestedGraphData<
     // Node extra properties
     {
@@ -162,6 +164,8 @@ export type StyledGraphData<G extends NestedGraphData> = ExtendNestedGraphData<
         brightnessMultiplier: number;
         selectorOutline: Color | null;  // Outer breathing ring, null = not shown
         shortcutKeyOverlay: string | null;  // Text overlay on top-left of node, null = not shown
+        shape: NodeShape;  // Node shape: square or D-shape (for inferred/AND nodes)
+        hollow: boolean;   // If true, fill with background color (incomplete), else fill with node color (complete)
     },
     // Edge extra properties
     {
@@ -180,7 +184,7 @@ export function baseStyleGraphData<G extends NestedGraphData>(graphData: G): Sty
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, taskWrapper]) => [
                 taskId,
-                { ...taskWrapper, text: taskId, color: nodeColors.get(taskId) || [1, 1, 1] as Color, borderColor: [0.5, 0.5, 0.5] as Color, labelColor: [1, 1, 1] as Color, outlineWidth: 0, opacity: 1.0, brightnessMultiplier: 1.0, selectorOutline: null, shortcutKeyOverlay: null },
+                { ...taskWrapper, text: taskId, color: nodeColors.get(taskId) || [1, 1, 1] as Color, borderColor: [0.5, 0.5, 0.5] as Color, labelColor: [1, 1, 1] as Color, outlineWidth: 0, opacity: 1.0, brightnessMultiplier: 1.0, selectorOutline: null, shortcutKeyOverlay: null, shape: 'square' as NodeShape, hollow: true },
             ])
         ),
         dependencies: Object.fromEntries(
@@ -192,24 +196,32 @@ export function baseStyleGraphData<G extends NestedGraphData>(graphData: G): Sty
     } as StyledGraphData<G>;
 }
 
-/** Apply conditional styling based on node state (e.g., completed, actionable). */
+/** Apply conditional styling based on node state (e.g., completed, actionable, inferred). */
 export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphData>>(graphData: G): G {
     return {
         ...graphData,
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, task]) => {
-                const data = task.data as { calculatedCompleted?: boolean; depsClear?: boolean };
+                const data = task.data as { calculatedCompleted?: boolean; depsClear?: boolean; inferred?: boolean };
                 const isCompleted = data.calculatedCompleted;
                 const isActionable = data.depsClear && !isCompleted;
+                const isInferred = data.inferred;
+
+                // Shape: upward triangle for inferred (AND gate), square for regular
+                const shape: NodeShape = isInferred ? 'upTriangle' : 'square';
+                // Hollow: incomplete = hollow (background fill), complete = solid (color fill)
+                const hollow = !isCompleted;
+
+                let styledTask = { ...task, shape, hollow };
 
                 if (isCompleted) {
-                    return [taskId, { ...task, text: `✔ ${task.text}`, brightnessMultiplier: 0.1, labelColor: [0, 1, 0] as Color }];
+                    return [taskId, { ...styledTask, text: `✔ ${styledTask.text}`, brightnessMultiplier: 0.1, labelColor: [0, 1, 0] as Color }];
                 }
                 if (isActionable) {
-                    return [taskId, task];
+                    return [taskId, styledTask];
                 }
                 // Blocked: not completed and not actionable
-                return [taskId, { ...task, brightnessMultiplier: 0.1 }];
+                return [taskId, { ...styledTask, brightnessMultiplier: 0.1 }];
             })
         ),
     } as G;

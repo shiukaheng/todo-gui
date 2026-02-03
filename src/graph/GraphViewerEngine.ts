@@ -576,7 +576,7 @@ export class GraphViewerEngine {
             //
             // Uses reconciliation to minimize DOM operations.
             // ─────────────────────────────────────────────────────────────
-            this.renderer.render(styledData, this.navigationState.transform);
+            this.renderer.render(styledData, this.navigationState.transform, this.appState.backgroundColor);
 
             this.performanceMonitor?.end();
             this.animationFrameId = requestAnimationFrame(tick);

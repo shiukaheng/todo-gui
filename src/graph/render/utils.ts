@@ -19,6 +19,8 @@ export interface ViewTransform {
 export type Color = [number, number, number];
 export type Vec2 = [number, number];
 
+export type NodeShape = 'square' | 'upTriangle';
+
 export interface RenderNode {
     data: { id: string };
     text: string;
@@ -30,6 +32,8 @@ export interface RenderNode {
     brightnessMultiplier: number;
     selectorOutline: Color | null;  // Outer breathing ring, null = not shown
     shortcutKeyOverlay: string | null;  // Text overlay on top-left of node, null = not shown
+    shape: NodeShape;  // Node shape: square or D-shape (for inferred/AND nodes)
+    hollow: boolean;   // If true, fill with background color, else fill with node color
     position: Vec2;
 }
 
