@@ -179,7 +179,7 @@ export interface ScreenPoint {
  * Extended navigator interface for manual pan/zoom/rotate control.
  * Used by InteractionController for handling user gestures.
  */
-export interface ManualNavigator extends Navigator {
+export interface IManualNavigator extends Navigator {
     /**
      * Apply incremental pan in screen pixels.
      */
@@ -221,7 +221,7 @@ export interface ManualNavigator extends Navigator {
 /**
  * Type guard to check if a navigator supports manual control.
  */
-export function isManualNavigator(nav: Navigator): nav is ManualNavigator {
+export function isManualNavigator(nav: Navigator): nav is IManualNavigator {
     return (
         "pan" in nav &&
         "zoom" in nav &&

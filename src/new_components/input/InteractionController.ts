@@ -19,20 +19,21 @@ import { UIEvent, ScreenPoint, InteractionTarget } from "./InputHandler";
 
 /**
  * Dependencies for the InteractionController.
- * Uses getters because engines can be swapped at runtime.
+ * Provides getters and setters for engines, allowing the controller
+ * to both read current state and request engine changes (e.g., switch
+ * to manual navigation when user starts dragging).
  */
 export interface InteractionControllerDeps {
     getSimulationEngine: () => SimulationEngine;
+    setSimulationEngine: (engine: SimulationEngine) => void;
     getNavigator: () => Navigator;
+    setNavigator: (navigator: Navigator) => void;
     getNavigationState: () => NavigationState;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
-
-/** Friction coefficient for momentum decay (per second) */
-const MOMENTUM_FRICTION = 5;
 
 /** Minimum velocity before momentum stops (pixels per second) */
 const MOMENTUM_MIN_VELOCITY = 10;
@@ -64,30 +65,9 @@ export class InteractionController {
 
     // ─── Touch transform state ───
     private touchTransformActive = false;
-    private touchStartTransform: { tx: number; ty: number; scale: number; rotation: number } | null = null;
 
     constructor(deps: InteractionControllerDeps) {
         this.deps = deps;
-    }
-
-    /**
-     * Update the simulation engine reference.
-     * Called when the engine is swapped at runtime.
-     */
-    setSimulationEngine(_engine: SimulationEngine): void {
-        // Currently unused - deps.getSimulationEngine() is called on each use.
-        // This method exists for future use if we need to react to engine changes
-        // (e.g., cancel ongoing drags, transfer pin state, etc.)
-    }
-
-    /**
-     * Update the navigator reference.
-     * Called when the navigator is swapped at runtime.
-     */
-    setNavigator(_navigator: Navigator): void {
-        // Currently unused - deps.getNavigator() is called on each use.
-        // This method exists for future use if we need to react to navigator changes
-        // (e.g., stop momentum, transfer state, etc.)
     }
 
     /**
@@ -156,7 +136,6 @@ export class InteractionController {
         this.lastDragScreenPos = null;
         this.velocitySamples = [];
         this.touchTransformActive = false;
-        this.touchStartTransform = null;
         this.deps = null;
         this.destroyed = true;
     }

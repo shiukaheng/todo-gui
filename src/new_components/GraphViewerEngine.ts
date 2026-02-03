@@ -20,9 +20,10 @@ import {
     INITIAL_NAVIGATION_STATE,
     ViewportInfo,
 } from "./navigation";
-import { FitNavigator } from "./navigation/navigators/fitNavigator";
+import { ManualNavigator } from "./navigation/navigators/manualNavigator";
 import { SVGRenderer } from "./SVGRenderer";
 import { PerformanceMonitor } from "./PerformanceMonitor";
+import { InputHandler, InteractionController } from "./input";
 
 /**
  * Callback type for pushing state updates back to React.
@@ -61,6 +62,10 @@ export class GraphViewerEngine {
     // Rendering: draws to SVG with reconciliation
     private renderer: SVGRenderer;
 
+    // Input handling
+    private inputHandler: InputHandler;
+    private interactionController: InteractionController;
+
     // Performance monitoring (optional)
     private performanceMonitor: PerformanceMonitor | null = null;
 
@@ -89,8 +94,21 @@ export class GraphViewerEngine {
             // componentPadding: 10,
         });
 
-        // Default navigation: auto-fit content in viewport
-        this.navigator = new FitNavigator({ padding: 40, animationDuration: 300 });
+        // Default navigation: manual pan/zoom/rotate
+        this.navigator = new ManualNavigator();
+
+        // Set up input handling
+        this.inputHandler = new InputHandler(this.svg);
+        this.interactionController = new InteractionController({
+            getSimulationEngine: () => this.simulationEngine,
+            setSimulationEngine: (engine) => this.setSimulationEngine(engine),
+            getNavigator: () => this.navigator,
+            setNavigator: (navigator) => this.setNavigator(navigator),
+            getNavigationState: () => this.navigationState,
+        });
+        this.inputHandler.setCallback((event) => {
+            this.interactionController.handleEvent(event);
+        });
 
         this.lastFrameTime = performance.now();
         this.startLoop();
@@ -250,6 +268,10 @@ export class GraphViewerEngine {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
         }
+
+        // Clean up input handling
+        this.inputHandler.destroy();
+        this.interactionController.destroy();
 
         // Clean up compositional objects
         this.simulationEngine.destroy?.();

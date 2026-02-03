@@ -1,5 +1,5 @@
 /**
- * PanZoomNavigator - User-controlled pan/zoom/rotate navigation.
+ * ManualNavigator - User-controlled pan/zoom/rotate navigation.
  *
  * Supports:
  * - Direct pan/zoom/rotate via method calls
@@ -9,7 +9,7 @@
 
 import {
     Navigator,
-    ManualNavigator,
+    IManualNavigator,
     NavigatorInput,
     NavigationState,
     ViewTransform,
@@ -26,7 +26,7 @@ import {
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-export interface PanZoomNavigatorConfig {
+export interface ManualNavigatorConfig {
     /** Initial transform. Default: identity centered in viewport */
     initialTransform?: ViewTransform;
 
@@ -43,7 +43,7 @@ export interface PanZoomNavigatorConfig {
     maxScale?: number;
 }
 
-const DEFAULT_CONFIG: Required<PanZoomNavigatorConfig> = {
+const DEFAULT_CONFIG: Required<ManualNavigatorConfig> = {
     initialTransform: IDENTITY_TRANSFORM,
     friction: 5,
     minVelocity: 10,
@@ -55,8 +55,8 @@ const DEFAULT_CONFIG: Required<PanZoomNavigatorConfig> = {
 // MANUAL NAVIGATOR
 // ═══════════════════════════════════════════════════════════════════════════
 
-export class PanZoomNavigator implements ManualNavigator {
-    private config: Required<PanZoomNavigatorConfig>;
+export class ManualNavigator implements IManualNavigator {
+    private config: Required<ManualNavigatorConfig>;
 
     // Current transform (mutable for incremental updates)
     private transform: ViewTransform;
@@ -69,7 +69,7 @@ export class PanZoomNavigator implements ManualNavigator {
     private initialized = false;
     private hasExplicitInitialTransform: boolean;
 
-    constructor(config: PanZoomNavigatorConfig = {}) {
+    constructor(config: ManualNavigatorConfig = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
         this.transform = { ...this.config.initialTransform };
         this.hasExplicitInitialTransform = !!config.initialTransform;
