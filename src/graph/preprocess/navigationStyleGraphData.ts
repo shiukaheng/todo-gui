@@ -40,13 +40,18 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
     const prevPeerArrow = getArrowForTarget('prevPeer');
     const nextPeerArrow = getArrowForTarget('nextPeer');
 
+    // Check if we're in disambiguation mode
+    const isConfirmingParents = navState.type === 'confirmingTarget' && navState.targetType === 'parents';
+    const isConfirmingChildren = navState.type === 'confirmingTarget' && navState.targetType === 'children';
+
     // Parents overlay
     if (parents.length === 1) {
         overlays.set(parents[0], parentArrow);
     } else {
         parents.forEach((parentId, index) => {
             if (index < selectors.length) {
-                overlays.set(parentId, `${parentArrow}${selectors[index]}`);
+                // When disambiguating, show just the number
+                overlays.set(parentId, isConfirmingParents ? selectors[index] : `${parentArrow}${selectors[index]}`);
             }
         });
     }
@@ -57,7 +62,8 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
     } else {
         children.forEach((childId, index) => {
             if (index < selectors.length) {
-                overlays.set(childId, `${childArrow}${selectors[index]}`);
+                // When disambiguating, show just the number
+                overlays.set(childId, isConfirmingChildren ? selectors[index] : `${childArrow}${selectors[index]}`);
             }
         });
     }
@@ -79,11 +85,10 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
         // Multiple parents: show ?-suffixed arrows to indicate disambiguation needed
         // When in selectingParentForPeers mode, show numbered parent hints
         if (navState.type === 'selectingParentForPeers') {
-            // Show numbered hints on parents during selection
+            // Show just numbers on parents during selection
             parentIds.forEach((parentId, index) => {
                 if (index < selectors.length) {
-                    const arrow = navState.peerDirection === 'prev' ? prevPeerArrow : nextPeerArrow;
-                    overlays.set(parentId, `${arrow}${selectors[index]}`);
+                    overlays.set(parentId, selectors[index]);
                 }
             });
         } else {
