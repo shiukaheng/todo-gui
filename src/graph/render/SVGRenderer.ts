@@ -6,10 +6,8 @@ import {
     Vec2,
     FONT_SIZE,
     STROKE_WIDTH,
-    PADDING,
     colorToCSS,
     colorToCSSWithBrightness,
-    getTextColor,
     worldToScreen,
 } from "./utils";
 
@@ -132,25 +130,24 @@ export class SVGRenderer {
         const { group, rect, text } = elements;
         const brightness = node.brightnessMultiplier;
 
-        // Update text
-        text.setAttribute("x", x.toString());
-        text.setAttribute("y", y.toString());
-        text.setAttribute("fill", colorToCSSWithBrightness(getTextColor(node.color) === "white" ? [1, 1, 1] : [0, 0, 0], brightness));
-        text.textContent = node.text;
+        // Minimal style: square node with text below (half size)
+        const squareSize = FONT_SIZE * 0.6;
+        const textGap = 4;
 
-        // Measure and update rect
-        // Note: getBBox() on empty text returns x=0,y=0, so we calculate position manually
-        const bbox = text.getBBox();
-        const rectWidth = Math.max(bbox.width, FONT_SIZE) + 2 * PADDING;
-        const rectHeight = Math.max(bbox.height, FONT_SIZE) + 2 * PADDING;
-        rect.setAttribute("x", (x - rectWidth / 2).toString());
-        rect.setAttribute("y", (y - rectHeight / 2).toString());
-        rect.setAttribute("width", rectWidth.toString());
-        rect.setAttribute("height", rectHeight.toString());
-        rect.setAttribute("rx", (rectHeight / 2).toString());
+        // Update rect as a square centered at position
+        rect.setAttribute("x", (x - squareSize / 2).toString());
+        rect.setAttribute("y", (y - squareSize / 2).toString());
+        rect.setAttribute("width", squareSize.toString());
+        rect.setAttribute("height", squareSize.toString());
         rect.setAttribute("fill", colorToCSSWithBrightness(node.color, brightness));
         rect.setAttribute("stroke", colorToCSS(node.borderColor));
-        rect.setAttribute("stroke-width", node.outlineWidth.toString());
+        rect.setAttribute("stroke-width", (node.outlineWidth * 0.5).toString());
+
+        // Update text below the square (white with brightness)
+        text.setAttribute("x", x.toString());
+        text.setAttribute("y", (y + squareSize / 2 + textGap + FONT_SIZE / 2).toString());
+        text.setAttribute("fill", colorToCSSWithBrightness([1, 1, 1], brightness));
+        text.textContent = node.text;
 
         // Apply glow filter if intensity > 0
         if (node.glowIntensity > 0 && node.glowRadius > 0) {
@@ -175,6 +172,7 @@ export class SVGRenderer {
         text.setAttribute("text-anchor", "middle");
         text.setAttribute("dominant-baseline", "central");
         text.setAttribute("font-size", FONT_SIZE.toString());
+        text.setAttribute("font-family", "monospace");
         text.style.pointerEvents = "none";
 
         group.appendChild(rect);
@@ -208,7 +206,7 @@ export class SVGRenderer {
 
     private createEdgeElements(id: string): EdgeElements {
         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("stroke-width", STROKE_WIDTH.toString());
+        line.setAttribute("stroke-width", (STROKE_WIDTH * 0.5).toString());
         line.dataset.edgeId = id;
         line.style.pointerEvents = "stroke";
         return { line };

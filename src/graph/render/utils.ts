@@ -45,7 +45,7 @@ export interface RenderGraphData {
     dependencies: { [key: string]: RenderEdge };
 }
 
-export const FONT_SIZE = 20;
+export const FONT_SIZE = 14;
 export const STROKE_WIDTH = 4;
 export const PADDING = 8;
 

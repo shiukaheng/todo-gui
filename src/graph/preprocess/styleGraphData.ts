@@ -204,10 +204,10 @@ export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphD
                 const isActionable = data.depsClear && !isCompleted;
 
                 if (isCompleted) {
-                    return [taskId, { ...task, brightnessMultiplier: 0.1, borderColor: [0, 1, 0] as Color, outlineWidth: 4, glowIntensity: 0.8, glowRadius: 8 }];
+                    return [taskId, { ...task, brightnessMultiplier: 0.1, borderColor: [0, 1, 0] as Color, outlineWidth: 4, glowIntensity: 0, glowRadius: 0 }];
                 }
                 if (isActionable) {
-                    return [taskId, { ...task, borderColor: [1, 0.9, 0.2] as Color, outlineWidth: 4, glowIntensity: 1, glowRadius: 8 }];
+                    return [taskId, { ...task, borderColor: [1, 0.9, 0.2] as Color, outlineWidth: 4, glowIntensity: 0, glowRadius: 0 }];
                 }
                 // Blocked: not completed and not actionable
                 return [taskId, { ...task, brightnessMultiplier: 0.1 }];
@@ -237,13 +237,13 @@ export function cursorStyleGraphData<G extends StyledGraphData<NestedGraphData>>
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, task]) => {
                 if (taskId === cursor) {
-                    // Cursor node: cyan border with strong glow
+                    // Cursor node: cyan border
                     return [taskId, {
                         ...task,
                         borderColor: [0, 1, 1] as Color,  // Cyan
                         outlineWidth: 6,
-                        glowIntensity: 1.5,
-                        glowRadius: 12,
+                        glowIntensity: 0,
+                        glowRadius: 0,
                         brightnessMultiplier: Math.max(task.brightnessMultiplier, 1.0), // Ensure visible
                     }];
                 }
