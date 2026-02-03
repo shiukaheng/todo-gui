@@ -66,34 +66,12 @@ export const EMPTY_CURSOR_NEIGHBORS: CursorNeighbors = {
 };
 
 export interface GraphViewerEngineState {
-    /** Whether the physics simulation is currently running */
-    isSimulating: boolean;
-
-    /** Current cursor neighbors for navigation */
-    cursorNeighbors: CursorNeighbors;
-
     /** Info text for navigation state (e.g., "Select parent (1-3)"), null when idle */
     navInfoText: string | null;
-
-    // FUTURE IDEAS - uncomment and implement as needed:
-    //
-    // /** ID of the currently selected node, or null */
-    // selectedNodeId: string | null;
-    //
-    // /** ID of the node currently under the cursor, or null */
-    // hoveredNodeId: string | null;
-    //
-    // /** Current viewport bounds for positioning React overlays */
-    // viewport: { x: number; y: number; zoom: number };
-    //
-    // /** Number of visible nodes (for status display) */
-    // visibleNodeCount: number;
 }
 
 /** Initial state before the engine starts */
 export const INITIAL_ENGINE_STATE: GraphViewerEngineState = {
-    isSimulating: false,
-    cursorNeighbors: EMPTY_CURSOR_NEIGHBORS,
     navInfoText: null,
 };
 

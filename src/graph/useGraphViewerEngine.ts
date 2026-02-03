@@ -1,17 +1,9 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TaskListOut } from "todo-client";
-import { GraphViewerEngine, EngineStateCallback, GraphViewerEngineOptions } from "./GraphViewerEngine";
+import { GraphViewerEngine } from "./GraphViewerEngine";
 import { GraphViewerEngineState, INITIAL_ENGINE_STATE } from "./GraphViewerEngineState";
 import { AppState } from "./types";
 import { GraphNavigationHandle } from "./graphNavigation/types";
-
-export interface UseGraphViewerEngineOptions extends GraphViewerEngineOptions {
-}
-
-export interface UseGraphViewerEngineResult {
-    engineState: GraphViewerEngineState;
-    navigationHandle: GraphNavigationHandle;
-}
 
 // No-op navigation handle for when engine isn't ready
 const NOOP_NAVIGATION_HANDLE: GraphNavigationHandle = {
@@ -24,78 +16,53 @@ const NOOP_NAVIGATION_HANDLE: GraphNavigationHandle = {
     get state() { return { type: 'idle' as const }; },
 };
 
+export interface UseGraphViewerEngineResult {
+    engineState: GraphViewerEngineState;
+    navigationHandle: GraphNavigationHandle;
+}
+
 /**
- * useGraphViewerEngine - React hook that manages the engine lifecycle and data flow.
- *
- * Data flow:
- *   React props (taskList, appState) → engine.setGraph/setAppState() → engine animation loop → setEngineState() → React
- *
- * @param taskList - The task data from React props
- * @param appState - The app state (cursor, selection, etc.) from React props
- * @param viewportContainerRef - Ref to the DOM container where the engine renders
- * @param options - Engine options (callbacks like onNodeClick, onCursorChange)
- * @returns The current engine state and navigation handle
+ * useGraphViewerEngine - React hook that manages the engine lifecycle.
  */
 export function useGraphViewerEngine(
     taskList: TaskListOut,
     appState: AppState,
     viewportContainerRef: React.RefObject<HTMLDivElement>,
-    options?: UseGraphViewerEngineOptions
+    setCursor: (nodeId: string) => void
 ): UseGraphViewerEngineResult {
     const [engineState, setEngineState] = useState<GraphViewerEngineState>(INITIAL_ENGINE_STATE);
-    const [engineReady, setEngineReady] = useState(false);
-
-    // Stable callback pattern: engine holds this for its lifetime
-    const onStateChangeRef = useRef<EngineStateCallback>(setEngineState);
-    onStateChangeRef.current = setEngineState;
-
-    const stableCallback = useCallback<EngineStateCallback>((state) => {
-        onStateChangeRef.current(state);
-    }, []);
-
-    // Stable ref for options callbacks
-    const optionsRef = useRef(options);
-    optionsRef.current = options;
-
-    const stableOptions = useMemo<GraphViewerEngineOptions>(() => ({
-        onNodeClick: (nodeId) => optionsRef.current?.onNodeClick?.(nodeId),
-        onCursorChange: (nodeId) => optionsRef.current?.onCursorChange?.(nodeId),
-    }), []);
-
     const engineRef = useRef<GraphViewerEngine | null>(null);
+    const setCursorRef = useRef(setCursor);
+    setCursorRef.current = setCursor;
 
-    // Engine lifecycle (create on mount, destroy on unmount)
+    // Create engine on mount
     useEffect(() => {
         const container = viewportContainerRef.current;
-        if (!container) {
-            console.warn("[useGraphViewerEngine] Container not ready");
-            return;
-        }
+        if (!container) return;
 
-        engineRef.current = new GraphViewerEngine(container, stableCallback, stableOptions);
-        setEngineReady(true);
+        engineRef.current = new GraphViewerEngine(
+            container,
+            setEngineState,
+            (nodeId) => setCursorRef.current(nodeId)
+        );
 
         return () => {
             engineRef.current?.destroy();
             engineRef.current = null;
-            setEngineReady(false);
         };
-    }, [stableCallback, stableOptions]);
+    }, []);
 
-    // Push data updates when taskList changes
+    // Push data when taskList changes
     useEffect(() => {
         engineRef.current?.setGraph(taskList);
     }, [taskList]);
 
-    // Push app state updates when appState changes
+    // Push app state when it changes
     useEffect(() => {
         engineRef.current?.setAppState(appState);
     }, [appState]);
 
-    // Get navigation handle from engine (or no-op if not ready)
-    const navigationHandle = engineReady && engineRef.current
-        ? engineRef.current.getNavigationHandle()
-        : NOOP_NAVIGATION_HANDLE;
+    const navigationHandle = engineRef.current?.getNavigationHandle() ?? NOOP_NAVIGATION_HANDLE;
 
     return { engineState, navigationHandle };
 }

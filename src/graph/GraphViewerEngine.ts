@@ -59,7 +59,7 @@
  *                            │  UI-relevant state changes.          │
  *                            │                                      │
  *                            │  Current fields:                     │
- *                            │  - isSimulating: boolean             │
+ *                            │  - navInfoText: string | null        │
  *                            │                                      │
  *                            │  Future fields (add as needed):      │
  *                            │  - hoveredNodeId: string | null      │
@@ -150,7 +150,7 @@
 
 import { TaskListOut } from "todo-client";
 import { CursorNeighbors, GraphViewerEngineState, computeCursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
-import { NavState, IDLE_STATE, getNavInfoText, GraphNavigationHandle } from "./graphNavigation/types";
+import { getNavInfoText, GraphNavigationHandle } from "./graphNavigation/types";
 import { GraphNavigationController } from "./graphNavigation/GraphNavigationController";
 import { navigationStyleGraphData } from "./preprocess/navigationStyleGraphData";
 import { AppState, INITIAL_APP_STATE } from "./types";
@@ -232,14 +232,6 @@ function computeFitTransform(
  */
 export type EngineStateCallback = (state: GraphViewerEngineState) => void;
 
-/**
- * Options for GraphViewerEngine.
- */
-export interface GraphViewerEngineOptions {
-    onNodeClick?: (nodeId: string) => void;
-    onCursorChange?: (nodeId: string) => void;
-}
-
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
 /**
@@ -250,7 +242,6 @@ export class GraphViewerEngine {
     private animationFrameId: number | null = null;
     private frameCount = 0;
     private lastFrameTime = 0;
-    private isSimulating = true;
     private svg: SVGSVGElement;
 
     // Graph data: processed and ready for simulation (set via setGraph())
@@ -288,7 +279,7 @@ export class GraphViewerEngine {
     constructor(
         private container: HTMLDivElement,
         private onStateChange: EngineStateCallback,
-        options?: GraphViewerEngineOptions
+        private setCursor: (nodeId: string) => void
     ) {
         console.log("[GraphViewerEngine] Created, starting animation loop");
 
@@ -296,7 +287,7 @@ export class GraphViewerEngine {
         this.navigationController = new GraphNavigationController(
             INITIAL_APP_STATE.navDirectionMapping,
             DEFAULT_SELECTORS,
-            (nodeId) => options?.onCursorChange?.(nodeId),
+            setCursor,
             () => this.emitState()
         );
 
@@ -316,7 +307,6 @@ export class GraphViewerEngine {
             symmetricDiffLinkLengths: true,
             flowReversed: true,
             componentGrouping: true,
-            // componentPadding: 10,
         });
 
         // Default navigation: manual pan/zoom/rotate
@@ -331,7 +321,7 @@ export class GraphViewerEngine {
             setNavigationEngine: (engine) => this.setNavigationEngine(engine),
             getNavigationState: () => this.navigationState,
             getSimulationState: () => this.simulationState,
-            onNodeClick: options?.onNodeClick,
+            onNodeClick: setCursor,
         });
         this.inputHandler.setCallback((event) => {
             this.interactionController.handleEvent(event);
@@ -426,7 +416,6 @@ export class GraphViewerEngine {
 
     /**
      * Push current state to React.
-     * Call this when something UI-relevant changes (selection, hover, etc.)
      */
     private emitState(): void {
         const navState = this.navigationController.state;
@@ -443,8 +432,6 @@ export class GraphViewerEngine {
         }
 
         this.onStateChange({
-            isSimulating: this.isSimulating,
-            cursorNeighbors: this.currentCursorNeighbors,
             navInfoText: getNavInfoText(navState, candidateCount),
         });
     }
@@ -588,9 +575,6 @@ export class GraphViewerEngine {
      * Called when the React component unmounts.
      */
     destroy(): void {
-        this.isSimulating = false;
-        this.emitState();
-
         console.log(`[GraphViewerEngine] Destroyed after ${this.frameCount} frames`);
 
         if (this.animationFrameId !== null) {

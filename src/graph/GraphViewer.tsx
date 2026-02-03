@@ -21,10 +21,12 @@ export function GraphViewer() {
 
     // Hook manages engine lifecycle, navigation, and data flow
     // Note: taskList is guaranteed non-null because App guards before rendering GraphViewer
-    const { engineState, navigationHandle } = useGraphViewerEngine(taskList!, appState, viewportContainerRef, {
-        onNodeClick: setCursor,
-        onCursorChange: setCursor,
-    });
+    const { engineState, navigationHandle } = useGraphViewerEngine(
+        taskList!,
+        appState,
+        viewportContainerRef,
+        setCursor
+    );
 
     // Keyboard navigation
     useEffect(() => {
