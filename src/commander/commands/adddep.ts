@@ -66,6 +66,7 @@ export const adddepCommand: CommandDefinition = {
                     blocks: [cursor],
                 },
             });
+            useTodoStore.getState().setCursor(taskId);
             output.success(`created task: ${taskId} (${cursor} depends on it)`);
         } catch (err) {
             output.error(`failed to create task: ${err instanceof Error ? err.message : String(err)}`);
