@@ -111,13 +111,16 @@ export function NodeDetailOverlay() {
 
     if (!task) return null;
 
-    const formatDate = (ts: number | null) => {
+    const formatDateRelative = (ts: number | null) => {
         if (!ts) return "-";
         const date = new Date(ts * 1000);
-        const now = new Date();
-        const isPast = date < now;
-        const relative = formatDistanceToNow(date, { addSuffix: true });
-        return relative;
+        return formatDistanceToNow(date, { addSuffix: true });
+    };
+
+    const formatDateAbsolute = (ts: number | null) => {
+        if (!ts) return "";
+        const date = new Date(ts * 1000);
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
     const formatDueForInput = (ts: number | null) => {
@@ -220,7 +223,9 @@ export function NodeDetailOverlay() {
                         className="cursor-pointer hover:opacity-80"
                         style={task.calculatedDue && !task.calculatedCompleted ? { color: getUrgencyColorCSSFromTimestamp(task.calculatedDue) } : undefined}
                     >
-                        due: {task.calculatedDue ? formatDate(task.calculatedDue) : "-"}
+                        due: {task.calculatedDue 
+                            ? `${formatDateRelative(task.calculatedDue)} (${formatDateAbsolute(task.calculatedDue)})`
+                            : "-"}
                     </span>
                 )}
             </div>
