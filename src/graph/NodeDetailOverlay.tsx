@@ -200,7 +200,7 @@ export function NodeDetailOverlay() {
                     </span>
                 )}
 
-                {/* Due */}
+                {/* Due - displays calculatedDue (inferred), edits task.due (own) */}
                 {isEditing('due') ? (
                     <div className="flex items-center gap-2">
                         <input
@@ -218,9 +218,9 @@ export function NodeDetailOverlay() {
                     <span
                         onClick={() => startEdit('due', formatDueForInput(task.due))}
                         className="cursor-pointer hover:opacity-80"
-                        style={task.due && !task.calculatedCompleted ? { color: getUrgencyColorCSSFromTimestamp(task.due) } : undefined}
+                        style={task.calculatedDue && !task.calculatedCompleted ? { color: getUrgencyColorCSSFromTimestamp(task.calculatedDue) } : undefined}
                     >
-                        due: {task.due ? formatDate(task.due) : "-"}
+                        due: {task.calculatedDue ? formatDate(task.calculatedDue) : "-"}
                     </span>
                 )}
             </div>
