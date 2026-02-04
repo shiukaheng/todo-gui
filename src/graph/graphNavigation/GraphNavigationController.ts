@@ -1,11 +1,10 @@
 /**
- * GraphNavigationController - State machine for keyboard-driven graph navigation
- *
- * Owned by GraphViewerEngine. Exposes a handle for navigation actions and
- * notifies on state changes for styling updates.
+ * GraphNavigationController - State machine for keyboard-driven graph navigation.
+ * Uses Zustand store directly for cursor changes and navInfoText updates.
  */
 
 import { CursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "../GraphViewerEngineState";
+import { useTodoStore } from "../../stores/todoStore";
 import {
     NavState,
     NavDirection,
@@ -13,6 +12,7 @@ import {
     NavDirectionMapping,
     GraphNavigationHandle,
     IDLE_STATE,
+    getNavInfoText,
 } from "./types";
 
 function getPeerDirection(target: NavTarget): 'prev' | 'next' | null {
@@ -36,12 +36,9 @@ export class GraphNavigationController {
 
     constructor(
         private readonly navDirectionMapping: NavDirectionMapping,
-        private readonly selectors: string[],
-        private readonly onCursorChange: (nodeId: string) => void,
-        private readonly onStateChange: (state: NavState) => void
+        private readonly selectors: string[]
     ) {
         const self = this;
-        // Create the handle that exposes navigation actions
         this.handle = {
             up: () => self.handleDirection('up'),
             down: () => self.handleDirection('down'),
@@ -63,9 +60,26 @@ export class GraphNavigationController {
         this.pendingDirection = null;
     }
 
+    private setCursor(nodeId: string): void {
+        useTodoStore.getState().setCursor(nodeId);
+    }
+
     private setNavState(newState: NavState): void {
         this.navState = newState;
-        this.onStateChange(newState);
+        this.emitNavInfoText();
+    }
+
+    private emitNavInfoText(): void {
+        let candidateCount = 0;
+        if (this.navState.type === 'confirmingTarget') {
+            const { topological } = this.cursorNeighbors;
+            candidateCount = this.navState.targetType === 'parents'
+                ? topological.parents.length
+                : topological.children.length;
+        } else if (this.navState.type === 'selectingParentForPeers') {
+            candidateCount = Object.keys(this.cursorNeighbors.topological.peers).length;
+        }
+        useTodoStore.getState().setNavInfoText(getNavInfoText(this.navState, candidateCount));
     }
 
     private getCandidates(target: NavTarget): string[] {
@@ -96,7 +110,7 @@ export class GraphNavigationController {
         if (this.navState.type === 'confirmingTarget' && this.pendingDirection === direction) {
             const candidates = this.getCandidates(this.navState.targetType);
             if (candidates.length > 0) {
-                this.onCursorChange(candidates[0]);
+                this.setCursor(candidates[0]);
                 this.setNavState(IDLE_STATE);
                 this.pendingDirection = null;
             }
@@ -116,7 +130,7 @@ export class GraphNavigationController {
                 const peerInfo = this.cursorNeighbors.topological.peers[parentIds[0]];
                 const targetPeer = peerDir === 'prev' ? peerInfo.prevPeer : peerInfo.nextPeer;
                 if (targetPeer) {
-                    this.onCursorChange(targetPeer);
+                    this.setCursor(targetPeer);
                     this.setNavState(IDLE_STATE);
                 }
                 return;
@@ -138,7 +152,7 @@ export class GraphNavigationController {
         if (candidates.length === 0) return;
 
         if (candidates.length === 1) {
-            this.onCursorChange(candidates[0]);
+            this.setCursor(candidates[0]);
             this.setNavState(IDLE_STATE);
             this.pendingDirection = null;
             return;
@@ -159,7 +173,7 @@ export class GraphNavigationController {
         if (this.navState.type === 'confirmingTarget') {
             const candidates = this.getCandidates(this.navState.targetType);
             if (selectorIndex < candidates.length) {
-                this.onCursorChange(candidates[selectorIndex]);
+                this.setCursor(candidates[selectorIndex]);
                 this.setNavState(IDLE_STATE);
                 this.pendingDirection = null;
                 return true;
@@ -176,7 +190,7 @@ export class GraphNavigationController {
                     ? peerInfo.prevPeer
                     : peerInfo.nextPeer;
                 if (targetPeer) {
-                    this.onCursorChange(targetPeer);
+                    this.setCursor(targetPeer);
                     this.setNavState(IDLE_STATE);
                     this.pendingDirection = null;
                     return true;
