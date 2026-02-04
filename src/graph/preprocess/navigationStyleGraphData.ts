@@ -78,12 +78,12 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
     }
 
     // Peers overlay
-    const parentIds = Object.keys(peers);
+    const parentIds = [...peers.keys()];
     const hasMultipleParents = parentIds.length > 1;
 
     if (parentIds.length === 1) {
-        // Single parent: show up/down arrows on closest peers
-        const peerInfo = peers[parentIds[0]];
+        // Single parent (or root peers): show up/down arrows on closest peers
+        const peerInfo = peers.get(parentIds[0])!;
         if (peerInfo.prevPeer) {
             overlays.set(peerInfo.prevPeer, prevPeerArrow);
         }
@@ -94,16 +94,16 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
         // Multiple parents: show ?-suffixed arrows to indicate disambiguation needed
         // When in selectingParentForPeers mode, show numbered parent hints
         if (navState.type === 'selectingParentForPeers') {
-            // Show just numbers on parents during selection
+            // Show just numbers on parents during selection (skip null key for root peers)
             parentIds.forEach((parentId, index) => {
-                if (index < selectors.length) {
+                if (index < selectors.length && parentId !== null) {
                     overlays.set(parentId, selectors[index]);
                 }
             });
         } else {
             // Show ? hints on peers to indicate disambiguation needed
             for (const parentId of parentIds) {
-                const peerInfo = peers[parentId];
+                const peerInfo = peers.get(parentId)!;
                 // Show ? on whichever peers exist for this parent
                 if (peerInfo.prevPeer && !overlays.has(peerInfo.prevPeer)) {
                     overlays.set(peerInfo.prevPeer, `${prevPeerArrow}?`);

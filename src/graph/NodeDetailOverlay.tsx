@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { TaskOut } from "todo-client";
 import { useTodoStore } from "../stores/todoStore";
 
 interface EditState {

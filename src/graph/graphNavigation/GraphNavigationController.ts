@@ -77,7 +77,7 @@ export class GraphNavigationController {
                 ? topological.parents.length
                 : topological.children.length;
         } else if (this.navState.type === 'selectingParentForPeers') {
-            candidateCount = Object.keys(this.cursorNeighbors.topological.peers).length;
+            candidateCount = this.cursorNeighbors.topological.peers.size;
         }
         this.onNavInfoTextChange(getNavInfoText(this.navState, candidateCount));
     }
@@ -92,9 +92,9 @@ export class GraphNavigationController {
                 return topological.children;
             case 'prevPeer':
             case 'nextPeer': {
-                const parentIds = Object.keys(topological.peers);
+                const parentIds = [...topological.peers.keys()];
                 if (parentIds.length === 1) {
-                    const peerInfo = topological.peers[parentIds[0]];
+                    const peerInfo = topological.peers.get(parentIds[0])!;
                     const peer = target === 'prevPeer' ? peerInfo.prevPeer : peerInfo.nextPeer;
                     return peer ? [peer] : [];
                 }
@@ -120,14 +120,14 @@ export class GraphNavigationController {
         // Check if this is a peer navigation
         const peerDir = getPeerDirection(target);
         if (peerDir) {
-            const parentIds = Object.keys(this.cursorNeighbors.topological.peers);
+            const parentIds = [...this.cursorNeighbors.topological.peers.keys()];
 
             if (parentIds.length === 0) {
                 return;
             }
 
             if (parentIds.length === 1) {
-                const peerInfo = this.cursorNeighbors.topological.peers[parentIds[0]];
+                const peerInfo = this.cursorNeighbors.topological.peers.get(parentIds[0])!;
                 const targetPeer = peerDir === 'prev' ? peerInfo.prevPeer : peerInfo.nextPeer;
                 if (targetPeer) {
                     this.setCursor(targetPeer);
@@ -182,10 +182,10 @@ export class GraphNavigationController {
         }
 
         if (this.navState.type === 'selectingParentForPeers') {
-            const parentIds = Object.keys(this.cursorNeighbors.topological.peers);
+            const parentIds = [...this.cursorNeighbors.topological.peers.keys()];
             if (selectorIndex < parentIds.length) {
                 const parentId = parentIds[selectorIndex];
-                const peerInfo = this.cursorNeighbors.topological.peers[parentId];
+                const peerInfo = this.cursorNeighbors.topological.peers.get(parentId)!
                 const targetPeer = this.navState.peerDirection === 'prev'
                     ? peerInfo.prevPeer
                     : peerInfo.nextPeer;
