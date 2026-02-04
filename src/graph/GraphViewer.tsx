@@ -33,7 +33,11 @@ export function GraphViewer() {
                     navigationHandle.right();
                     break;
                 case 'Escape':
-                    navigationHandle.escape();
+                    if (navigationHandle.state.type !== 'idle') {
+                        navigationHandle.escape();
+                    } else {
+                        useTodoStore.getState().setCursor(null);
+                    }
                     break;
                 default:
                     if (SELECTORS.includes(e.key)) {
