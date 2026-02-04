@@ -46,19 +46,11 @@ export function CommandPlane({ controller }: CommandPlaneProps) {
                 break;
             case 'ArrowUp':
                 e.preventDefault();
-                if (state.completions.length > 0) {
-                    prevCompletion();
-                } else {
-                    historyUp();
-                }
+                historyUp();
                 break;
             case 'ArrowDown':
                 e.preventDefault();
-                if (state.completions.length > 0) {
-                    nextCompletion();
-                } else {
-                    historyDown();
-                }
+                historyDown();
                 break;
         }
     };
