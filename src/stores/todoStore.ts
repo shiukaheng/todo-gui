@@ -86,9 +86,17 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
                 baseUrl,
                 onError: (err) => {
                     console.error('SSE connection error:', err);
+                    // Extract useful error message
+                    let errorMessage = 'Connection failed';
+                    if (err instanceof Error) {
+                        errorMessage = err.message;
+                    } else if (err instanceof Event) {
+                        // SSE error events don't have useful info, just indicate failure
+                        errorMessage = 'Unable to connect to server';
+                    }
                     set({
                         connectionStatus: 'error',
-                        lastError: err instanceof Error ? err.message : String(err),
+                        lastError: errorMessage,
                     });
                 },
             }
