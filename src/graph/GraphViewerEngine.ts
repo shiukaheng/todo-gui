@@ -28,27 +28,7 @@
  * │                                                                         │
  * │   Also handles: user input (drag, pan, zoom), initial fit              │
  * │                                                                         │
- * └─────────────────────────────────────────────────┬───────────────────────┘
- *                                                   │
- *                                                   ▼
- *                            ┌──────────────────────────────────────┐
- *                            │  onStateChange(engineState)          │
- *                            │  ──────────────────────────          │
- *                            │  Callback to push state to React.    │
- *                            │  Called via emitState() when         │
- *                            │  UI-relevant state changes.          │
- *                            │                                      │
- *                            │  Current fields:                     │
- *                            │  - navInfoText: string | null        │
- *                            │                                      │
- *                            │  Future fields (add as needed):      │
- *                            │  - hoveredNodeId: string | null      │
- *                            │  - selectedNodeId: string | null     │
- *                            │  - viewport bounds for overlays      │
- *                            │                                      │
- *                            │  ⚠️  THROTTLE: Don't emit every      │
- *                            │  frame or you'll get 60 re-renders/s │
- *                            └──────────────────────────────────────┘
+ * └─────────────────────────────────────────────────────────────────────────┘
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * SUMMARY
@@ -60,7 +40,7 @@
  *
  * OUTPUTS:
  *   - cursor changes via useTodoStore.getState().setCursor()
- *   - engineState    via onStateChange()            → navInfoText for React
+ *   - navInfoText    via useTodoStore.getState().setNavInfoText()
  *
  * INTERNAL:
  *   - simulationState  (node positions, physics)
@@ -130,7 +110,7 @@
  */
 
 import { TaskListOut } from "todo-client";
-import { CursorNeighbors, GraphViewerEngineState, computeCursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
+import { CursorNeighbors, computeCursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
 import { getNavInfoText, GraphNavigationHandle, DEFAULT_NAV_MAPPING } from "./graphNavigation/types";
 import { useTodoStore } from "../stores/todoStore";
 import { GraphNavigationController } from "./graphNavigation/GraphNavigationController";
@@ -208,11 +188,6 @@ function computeFitTransform(
     return createPanZoomTransform(scale, panX, panY);
 }
 
-/**
- * Callback type for pushing state updates back to React.
- */
-export type EngineStateCallback = (state: GraphViewerEngineState) => void;
-
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
 /**
@@ -254,19 +229,14 @@ export class GraphViewerEngine {
     private currentCursorNeighbors: CursorNeighbors = EMPTY_CURSOR_NEIGHBORS;
     private selectors: string[] = DEFAULT_SELECTORS;
 
-    constructor(
-        private container: HTMLDivElement,
-        private onStateChange: EngineStateCallback
-    ) {
+    constructor(private container: HTMLDivElement) {
         console.log("[GraphViewerEngine] Created, starting animation loop");
-
-        const setCursor = (nodeId: string) => useTodoStore.getState().setCursor(nodeId);
 
         // Create navigation controller for keyboard-driven cursor movement
         this.navigationController = new GraphNavigationController(
             DEFAULT_NAV_MAPPING,
             DEFAULT_SELECTORS,
-            setCursor,
+            (nodeId: string) => useTodoStore.getState().setCursor(nodeId),
             () => this.emitState()
         );
 
@@ -300,7 +270,7 @@ export class GraphViewerEngine {
             setNavigationEngine: (engine) => this.setNavigationEngine(engine),
             getNavigationState: () => this.navigationState,
             getSimulationState: () => this.simulationState,
-            onNodeClick: setCursor,
+            onNodeClick: (nodeId: string) => useTodoStore.getState().setCursor(nodeId),
         });
         this.inputHandler.setCallback((event) => {
             this.interactionController.handleEvent(event);
@@ -384,7 +354,7 @@ export class GraphViewerEngine {
     }
 
     /**
-     * Push current state to React.
+     * Push current state to the store.
      */
     private emitState(): void {
         const navState = this.navigationController.state;
@@ -400,9 +370,7 @@ export class GraphViewerEngine {
             candidateCount = Object.keys(this.currentCursorNeighbors.topological.peers).length;
         }
 
-        this.onStateChange({
-            navInfoText: getNavInfoText(navState, candidateCount),
-        });
+        useTodoStore.getState().setNavInfoText(getNavInfoText(navState, candidateCount));
     }
 
     /**

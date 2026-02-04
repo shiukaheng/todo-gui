@@ -10,6 +10,7 @@ interface TodoStore {
     // State
     graphData: TaskListOut | null;
     cursor: string | null;
+    navInfoText: string | null;
 
     // API client (set after subscribe)
     api: DefaultApi | null;
@@ -17,16 +18,19 @@ interface TodoStore {
 
     // Actions
     setCursor: (nodeId: string | null) => void;
+    setNavInfoText: (text: string | null) => void;
     subscribe: (baseUrl: string) => () => void;
 }
 
 export const useTodoStore = create<TodoStore>((set, get) => ({
     graphData: null,
     cursor: null,
+    navInfoText: null,
     api: null,
     unsubscribe: null,
 
     setCursor: (nodeId) => set({ cursor: nodeId }),
+    setNavInfoText: (text) => set({ navInfoText: text }),
 
     subscribe: (baseUrl: string) => {
         // Clean up existing subscription

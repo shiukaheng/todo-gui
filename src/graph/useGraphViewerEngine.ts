@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { GraphViewerEngine } from "./GraphViewerEngine";
-import { GraphViewerEngineState, INITIAL_ENGINE_STATE } from "./GraphViewerEngineState";
 import { GraphNavigationHandle } from "./graphNavigation/types";
 import { useTodoStore } from "../stores/todoStore";
 
@@ -15,19 +14,13 @@ const NOOP_NAVIGATION_HANDLE: GraphNavigationHandle = {
     get state() { return { type: 'idle' as const }; },
 };
 
-export interface UseGraphViewerEngineResult {
-    engineState: GraphViewerEngineState;
-    navigationHandle: GraphNavigationHandle;
-}
-
 /**
  * useGraphViewerEngine - React hook that manages the engine lifecycle.
  */
 export function useGraphViewerEngine(
     viewportContainerRef: React.RefObject<HTMLDivElement>
-): UseGraphViewerEngineResult {
+): GraphNavigationHandle {
     const graphData = useTodoStore((s) => s.graphData);
-    const [engineState, setEngineState] = useState<GraphViewerEngineState>(INITIAL_ENGINE_STATE);
     const engineRef = useRef<GraphViewerEngine | null>(null);
 
     // Create engine on mount
@@ -35,7 +28,7 @@ export function useGraphViewerEngine(
         const container = viewportContainerRef.current;
         if (!container) return;
 
-        engineRef.current = new GraphViewerEngine(container, setEngineState);
+        engineRef.current = new GraphViewerEngine(container);
 
         return () => {
             engineRef.current?.destroy();
@@ -50,7 +43,5 @@ export function useGraphViewerEngine(
         }
     }, [graphData]);
 
-    const navigationHandle = engineRef.current?.getNavigationHandle() ?? NOOP_NAVIGATION_HANDLE;
-
-    return { engineState, navigationHandle };
+    return engineRef.current?.getNavigationHandle() ?? NOOP_NAVIGATION_HANDLE;
 }
