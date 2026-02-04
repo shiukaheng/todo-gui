@@ -1,10 +1,8 @@
 /**
  * GraphNavigationController - State machine for keyboard-driven graph navigation.
- * Uses Zustand store directly for cursor changes and navInfoText updates.
  */
 
 import { CursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "../GraphViewerEngineState";
-import { useTodoStore } from "../../stores/todoStore";
 import {
     NavState,
     NavDirection,
@@ -36,7 +34,9 @@ export class GraphNavigationController {
 
     constructor(
         private readonly navDirectionMapping: NavDirectionMapping,
-        private readonly selectors: string[]
+        private readonly selectors: string[],
+        private readonly onCursorChange: (nodeId: string) => void,
+        private readonly onNavInfoTextChange: (text: string | null) => void
     ) {
         const self = this;
         this.handle = {
@@ -61,7 +61,7 @@ export class GraphNavigationController {
     }
 
     private setCursor(nodeId: string): void {
-        useTodoStore.getState().setCursor(nodeId);
+        this.onCursorChange(nodeId);
     }
 
     private setNavState(newState: NavState): void {
@@ -79,7 +79,7 @@ export class GraphNavigationController {
         } else if (this.navState.type === 'selectingParentForPeers') {
             candidateCount = Object.keys(this.cursorNeighbors.topological.peers).length;
         }
-        useTodoStore.getState().setNavInfoText(getNavInfoText(this.navState, candidateCount));
+        this.onNavInfoTextChange(getNavInfoText(this.navState, candidateCount));
     }
 
     private getCandidates(target: NavTarget): string[] {

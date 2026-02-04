@@ -1,12 +1,11 @@
 /**
  * GraphViewerEngine - Imperative animation loop for graph visualization.
- * Reads/writes state via Zustand store. Owns simulation, navigation, and rendering.
+ * Owns simulation, navigation, and rendering.
  */
 
 import { TaskListOut } from "todo-client";
 import { CursorNeighbors, computeCursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
 import { GraphNavigationHandle, DEFAULT_NAV_MAPPING } from "./graphNavigation/types";
-import { useTodoStore } from "../stores/todoStore";
 import { GraphNavigationController } from "./graphNavigation/GraphNavigationController";
 import { navigationStyleGraphData } from "./preprocess/navigationStyleGraphData";
 import { cursorStyleGraphData } from "./preprocess/styleGraphData";
@@ -33,7 +32,14 @@ import { PositionedGraphData } from "./simulation/utils";
 
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
-export class GraphViewerEngine {
+/** Public interface for the graph viewer engine. */
+export interface IGraphViewerEngine {
+    setGraph(taskList: TaskListOut): void;
+    getNavigationHandle(): GraphNavigationHandle;
+    destroy(): void;
+}
+
+export class GraphViewerEngine implements IGraphViewerEngine {
     private animationFrameId: number | null = null;
     private frameCount = 0;
     private lastFrameTime = 0;
@@ -53,11 +59,18 @@ export class GraphViewerEngine {
     private navigationController: GraphNavigationController;
     private currentCursorNeighbors: CursorNeighbors = EMPTY_CURSOR_NEIGHBORS;
 
-    constructor(private container: HTMLDivElement) {
-        // Navigation controller (uses store directly for cursor/navInfoText)
+    constructor(
+        private container: HTMLDivElement,
+        private getCursor: () => string | null,
+        private setCursor: (nodeId: string | null) => void,
+        private setNavInfoText: (text: string | null) => void
+    ) {
+        // Navigation controller
         this.navigationController = new GraphNavigationController(
             DEFAULT_NAV_MAPPING,
-            DEFAULT_SELECTORS
+            DEFAULT_SELECTORS,
+            setCursor,
+            setNavInfoText
         );
 
         // SVG setup
@@ -86,7 +99,7 @@ export class GraphViewerEngine {
             setNavigationEngine: (engine) => this.setNavigationEngine(engine),
             getNavigationState: () => this.navigationState,
             getSimulationState: () => this.simulationState,
-            onNodeClick: (nodeId) => useTodoStore.getState().setCursor(nodeId),
+            onNodeClick: (nodeId) => setCursor(nodeId),
         });
         this.inputHandler.setCallback((event) => this.interactionController.handleEvent(event));
 
@@ -131,7 +144,7 @@ export class GraphViewerEngine {
     }
 
     private updateCursorNeighbors(positionedData: PositionedGraphData<any>): void {
-        const cursor = useTodoStore.getState().cursor;
+        const cursor = this.getCursor();
 
         // Build positions map
         const positions: { [key: string]: [number, number] } = {};
@@ -182,7 +195,7 @@ export class GraphViewerEngine {
             }
 
             // 4. Apply styling
-            const cursor = useTodoStore.getState().cursor;
+            const cursor = this.getCursor();
             let styledData = cursorStyleGraphData(positionedData, cursor);
             styledData = navigationStyleGraphData(
                 styledData,
