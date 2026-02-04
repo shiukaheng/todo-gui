@@ -232,9 +232,9 @@ export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphD
                 // Hollow: incomplete/blocked = hollow (background fill), complete = solid (color fill)
                 const hollow = !isCompleted;
 
-                // Label color: urgency-based if has due date and not completed, else white
+                // Label color: urgency-based if has due date and not calculatedCompleted, else white
                 let labelColor: Color = [1, 1, 1];
-                if (data.calculatedDue && !isCompleted) {
+                if (data.calculatedDue && !data.calculatedCompleted) {
                     labelColor = getUrgencyColorFromTimestamp(data.calculatedDue);
                 }
 
