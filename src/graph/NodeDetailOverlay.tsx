@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTodoStore } from "../stores/todoStore";
+import { formatDistanceToNow } from "date-fns";
 
 interface EditState {
     field: 'id' | 'text' | 'due' | null;
@@ -111,7 +112,11 @@ export function NodeDetailOverlay() {
 
     const formatDate = (ts: number | null) => {
         if (!ts) return "-";
-        return new Date(ts * 1000).toLocaleString();
+        const date = new Date(ts * 1000);
+        const now = new Date();
+        const isPast = date < now;
+        const relative = formatDistanceToNow(date, { addSuffix: true });
+        return relative;
     };
 
     const formatDueForInput = (ts: number | null) => {

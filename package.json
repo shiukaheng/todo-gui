@@ -36,6 +36,7 @@
     "@blocknote/core": "^0.16.0",
     "@blocknote/mantine": "^0.16.0",
     "@blocknote/react": "^0.16.0",
+    "date-fns": "^3.6.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "stats.js": "^0.17.0",
