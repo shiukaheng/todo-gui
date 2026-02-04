@@ -2,6 +2,7 @@
  * AutoNavigationEngine - Composite engine that switches between manual and follow modes.
  *
  * Behavior:
+ * - Starts in follow mode by default (auto-fits all nodes when no cursor)
  * - When cursor transitions to a non-null node, switches to follow mode
  * - When user interacts (zoom, pan, drag), switches to manual mode
  * - Delegates to the appropriate engine based on current mode
