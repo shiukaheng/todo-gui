@@ -18,6 +18,32 @@ export type CursorNeighbors = {
     }
 }
 
+/** Compare two CursorNeighbors for equality */
+export function cursorNeighborsEqual(a: CursorNeighbors, b: CursorNeighbors): boolean {
+    const ta = a.topological;
+    const tb = b.topological;
+
+    // Compare arrays
+    if (ta.children.length !== tb.children.length) return false;
+    if (ta.parents.length !== tb.parents.length) return false;
+    for (let i = 0; i < ta.children.length; i++) {
+        if (ta.children[i] !== tb.children[i]) return false;
+    }
+    for (let i = 0; i < ta.parents.length; i++) {
+        if (ta.parents[i] !== tb.parents[i]) return false;
+    }
+
+    // Compare Maps
+    if (ta.peers.size !== tb.peers.size) return false;
+    for (const [key, valA] of ta.peers) {
+        const valB = tb.peers.get(key);
+        if (!valB) return false;
+        if (valA.prevPeer !== valB.prevPeer || valA.nextPeer !== valB.nextPeer) return false;
+    }
+
+    return true;
+}
+
 /** Initial empty cursor neighbors */
 export const EMPTY_CURSOR_NEIGHBORS: CursorNeighbors = {
     topological: {

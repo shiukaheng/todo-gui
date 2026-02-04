@@ -4,7 +4,7 @@
  */
 
 import { TaskListOut } from "todo-client";
-import { CursorNeighbors, computeCursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
+import { CursorNeighbors, computeCursorNeighbors, cursorNeighborsEqual, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
 import { GraphNavigationHandle, DEFAULT_NAV_MAPPING } from "./graphNavigation/types";
 import { GraphNavigationController } from "./graphNavigation/GraphNavigationController";
 import { navigationStyleGraphData } from "./preprocess/navigationStyleGraphData";
@@ -161,8 +161,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
         const newNeighbors = computeCursorNeighbors(cursor, positionedData.dependencies, positions);
 
-        // Only update if changed
-        if (JSON.stringify(this.currentCursorNeighbors) !== JSON.stringify(newNeighbors)) {
+        if (!cursorNeighborsEqual(this.currentCursorNeighbors, newNeighbors)) {
             this.currentCursorNeighbors = newNeighbors;
             this.navigationController.setCursorNeighbors(newNeighbors);
         }
