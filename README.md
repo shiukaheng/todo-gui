@@ -35,7 +35,7 @@ Output in `dist/`
 
 ## Commands
 
-Open command palette with `:` or `/`, then type:
+Open command palette with [Enter] and you can manipulate the graph with the following:
 
 | Command | Aliases | Description |
 |---------|---------|-------------|
