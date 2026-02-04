@@ -4,13 +4,24 @@ import "./index.css";
 import { GraphViewer } from "./graph/GraphViewer";
 import { useTodoStore } from "./stores/todoStore";
 
-const BASE_URL = 'http://workstation.local:8000';
+// Runtime config injected via index.html (can be set by docker/server)
+declare global {
+    interface Window {
+        __CONFIG__?: {
+            defaultApiUrl?: string | null;
+        };
+    }
+}
 
 function App() {
-    
     const subscribe = useTodoStore((s) => s.subscribe);
+
     useEffect(() => {
-        return subscribe(BASE_URL);
+        // Only auto-connect if a default URL is configured
+        const defaultUrl = window.__CONFIG__?.defaultApiUrl;
+        if (defaultUrl) {
+            return subscribe(defaultUrl);
+        }
     }, [subscribe]);
 
     return <GraphViewer />;

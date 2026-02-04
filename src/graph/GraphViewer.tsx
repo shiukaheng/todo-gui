@@ -3,6 +3,7 @@ import { useGraphViewerEngine } from "./useGraphViewerEngine";
 import { useTodoStore } from "../stores/todoStore";
 import { NodeDetailOverlay } from "./NodeDetailOverlay";
 import { CommandPlane, OutputPanel, useCommandPlane, registerBuiltinCommands } from "../commander";
+import { ConnectionStatusPanel } from "../components/ConnectionStatusPanel";
 
 // Register commands once on module load
 registerBuiltinCommands();
@@ -73,6 +74,7 @@ export function GraphViewer() {
         <div className="absolute w-full h-full bg-black">
             <div className="absolute w-full h-full" ref={viewportContainerRef} />
             <div className="absolute top-8 left-8 flex flex-col">
+                <ConnectionStatusPanel />
                 <NodeDetailOverlay />
                 <OutputPanel />
             </div>

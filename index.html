@@ -11,6 +11,14 @@
     For production, consider tightening these rules or configuring CSP via server headers.
   -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' ws: wss: bolt: bolt+s: bolt+ssc: neo4j: neo4j+s: neo4j+ssc: http: https:; img-src 'self' data: blob:; font-src 'self' data:;">
+
+  <!-- Runtime configuration - can be injected by server/docker -->
+  <script>
+    window.__CONFIG__ = {
+      // Set to API URL to auto-connect on load, or leave empty/null for manual connection
+      defaultApiUrl: null
+    };
+  </script>
 </head>
 
 <body>
