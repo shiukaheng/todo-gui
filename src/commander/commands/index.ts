@@ -15,6 +15,7 @@ import { statusCommand } from './status';
 import { connectCommand, disconnectCommand } from './connect';
 import { linkCommand } from './link';
 import { unlinkCommand } from './unlink';
+import { flipCommand } from './flip';
 
 /** Register all built-in commands */
 export function registerBuiltinCommands(): void {
@@ -30,4 +31,5 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(disconnectCommand);
     commandRegistry.register(linkCommand);
     commandRegistry.register(unlinkCommand);
+    commandRegistry.register(flipCommand);
 }
