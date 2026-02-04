@@ -201,26 +201,31 @@ export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphD
         ...graphData,
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, task]) => {
-                const data = task.data as { calculatedCompleted?: boolean; depsClear?: boolean; inferred?: boolean };
-                const isCompleted = data.calculatedCompleted;
-                const isActionable = data.depsClear && !isCompleted;
+                const data = task.data as { calculatedCompleted?: boolean; depsClear?: boolean; inferred?: boolean; completed?: boolean };
+                const isBlocked = !data.depsClear;
                 const isInferred = data.inferred;
+                
+                // If blocked, ignore completed status - just show as blocked
+                // Only check completion when deps are clear
+                const isCompleted = !isBlocked && data.calculatedCompleted;
+                const isActionable = !isBlocked && !isCompleted;
 
                 // Shape: upward triangle for inferred (AND gate), square for regular
                 const shape: NodeShape = isInferred ? 'upTriangle' : 'square';
-                // Hollow: incomplete = hollow (background fill), complete = solid (color fill)
+                // Hollow: incomplete/blocked = hollow (background fill), complete = solid (color fill)
                 const hollow = !isCompleted;
 
                 let styledTask = { ...task, shape, hollow };
 
+                if (isBlocked) {
+                    // Blocked: dim the node, ignore its own completed status
+                    return [taskId, { ...styledTask, brightnessMultiplier: 0.1 }];
+                }
                 if (isCompleted) {
                     return [taskId, { ...styledTask, text: styledTask.text }];
                 }
-                if (isActionable) {
-                    return [taskId, styledTask];
-                }
-                // Blocked: not completed and not actionable
-                return [taskId, { ...styledTask, brightnessMultiplier: 0.1 }];
+                // Actionable: deps clear, not completed
+                return [taskId, styledTask];
             })
         ),
     } as G;
