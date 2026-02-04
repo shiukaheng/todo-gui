@@ -13,6 +13,21 @@ export function NodeDetailOverlay() {
 
     const task = cursor && graphData?.tasks[cursor] ? graphData.tasks[cursor] : null;
 
+    // Compute if task is blocked (any dependency not calculatedCompleted)
+    const isBlocked = (() => {
+        if (!task || !graphData) return false;
+        const childDepIds = task.children || [];
+        const deps = graphData.dependencies || {};
+        const tasks = graphData.tasks || {};
+        for (const depId of childDepIds) {
+            const dep = deps[depId];
+            if (!dep) continue;
+            const depTask = tasks[dep.toId];
+            if (depTask && !depTask.calculatedCompleted) return true;
+        }
+        return false;
+    })();
+
     const [edit, setEdit] = useState<EditState>({ field: null, value: '' });
 
     // Reset edit state when cursor changes
@@ -64,9 +79,11 @@ export function NodeDetailOverlay() {
         }
     };
 
-    // Space to toggle completion
+    // Space to toggle completion (disabled for inferred or blocked nodes)
+    const canToggle = task && !task.inferred && !isBlocked;
+    
     const toggleCompletion = useCallback(async () => {
-        if (!task || !api || task.inferred) return;
+        if (!task || !api || task.inferred || isBlocked) return;
         try {
             await api.setTaskApiTasksTaskIdPatch({
                 taskId: task.id,
@@ -75,20 +92,20 @@ export function NodeDetailOverlay() {
         } catch (err) {
             console.error("Failed to toggle completion:", err);
         }
-    }, [task, api]);
+    }, [task, api, isBlocked]);
 
     // Global keyboard handler for space
     useEffect(() => {
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-            if (e.key === ' ' && task && !task.inferred) {
+            if (e.key === ' ' && canToggle) {
                 e.preventDefault();
                 toggleCompletion();
             }
         };
         window.addEventListener('keydown', handleGlobalKeyDown);
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-    }, [task, toggleCompletion]);
+    }, [canToggle, toggleCompletion]);
 
     if (!task) return null;
 
@@ -158,12 +175,12 @@ export function NodeDetailOverlay() {
 
             {/* Status line */}
             <div className="flex gap-4 text-xs">
-                {/* Status: blocked > completed > incomplete */}
-                {task.depsClear === false ? (
+                {/* Status: blocked > completed > actionable */}
+                {isBlocked ? (
                     <span className="text-yellow-500/70">blocked</span>
                 ) : (
                     <span
-                        onClick={() => !task.inferred && toggleCompletion()}
+                        onClick={() => canToggle && toggleCompletion()}
                         className={
                             task.inferred
                                 ? "text-white/30"
