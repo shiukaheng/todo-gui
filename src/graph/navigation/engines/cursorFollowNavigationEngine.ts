@@ -44,8 +44,9 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
     private smoothedCenterY: number | null = null;
     private smoothedScale: number | null = null;
 
-    // Track previous neighbor count to detect 0 -> >0 transition
+    // Track previous state to detect transitions
     private prevNeighborCount = 0;
+    private hadCursor = false;
 
     private initialized = false;
 
@@ -70,17 +71,20 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
             }
         }
 
-        // No cursor, return previous state
+        // No cursor: fit entire graph
         if (!cursorId || !cursorPos) {
-            return prevState;
+            this.hadCursor = false;
+            return this.fitAllNodes(graph, viewport, prevState, dt);
         }
 
         // Compute average direct neighbor distance and count
         const { avgDistance, neighborCount } = this.computeNeighborInfo(cursorId, cursorPos, graph);
 
-        // Detect transition from 0 -> >0 neighbors (skip interpolation)
-        const jumpToTarget = this.prevNeighborCount === 0 && neighborCount > 0;
+        // Detect transition from 0 -> >0 neighbors (skip interpolation for scale only)
+        // But only if we already had a cursor - don't jump on first cursor selection
+        const jumpScale = this.hadCursor && this.prevNeighborCount === 0 && neighborCount > 0;
         this.prevNeighborCount = neighborCount;
+        this.hadCursor = true;
 
         // Compute target scale: viewport should show distanceMultiplier * avgDistance
         const worldSize = this.config.distanceMultiplier * avgDistance;
@@ -110,12 +114,12 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
             this.initialized = true;
         }
 
-        // Jump directly to target when transitioning from 0 -> >0 neighbors
-        if (jumpToTarget) {
-            this.smoothedCenterX = targetCenterX;
-            this.smoothedCenterY = targetCenterY;
+        // Jump scale when transitioning from 0 -> >0 neighbors (but still animate position)
+        if (jumpScale) {
             this.smoothedScale = targetScale;
-        } else {
+        }
+
+        {
             // Apply exponential smoothing
             // Formula: smoothed += (target - smoothed) * (1 - e^(-rate * dt))
             const posAlpha = 1 - Math.exp(-this.config.positionSmoothingRate * dt);
@@ -127,6 +131,68 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
         }
 
         // Compute translation to center the smoothed position
+        const panX = viewport.width / 2 - this.smoothedCenterX * this.smoothedScale;
+        const panY = viewport.height / 2 - this.smoothedCenterY * this.smoothedScale;
+
+        return {
+            transform: createPanZoomTransform(this.smoothedScale, panX, panY),
+        };
+    }
+
+    private fitAllNodes(
+        graph: NavigationEngineInput['graph'],
+        viewport: { width: number; height: number },
+        prevState: NavigationState,
+        dt: number
+    ): NavigationState {
+        // Collect all positions
+        const positions: [number, number][] = [];
+        for (const task of Object.values(graph.tasks)) {
+            const pos = (task as any).position;
+            if (pos) positions.push(pos);
+        }
+
+        if (positions.length === 0) {
+            return prevState;
+        }
+
+        // Compute bounding box
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const [x, y] of positions) {
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x);
+            maxY = Math.max(maxY, y);
+        }
+
+        const boundsWidth = maxX - minX || 1;
+        const boundsHeight = maxY - minY || 1;
+        const targetCenterX = (minX + maxX) / 2;
+        const targetCenterY = (minY + maxY) / 2;
+
+        // Compute scale to fit bounds with padding
+        const padding = 50;
+        const availableWidth = viewport.width - padding * 2;
+        const availableHeight = viewport.height - padding * 2;
+        const targetScale = Math.min(
+            availableWidth / boundsWidth,
+            availableHeight / boundsHeight
+        );
+
+        // Initialize or interpolate
+        if (!this.initialized || this.smoothedCenterX === null || this.smoothedCenterY === null || this.smoothedScale === null) {
+            this.smoothedCenterX = targetCenterX;
+            this.smoothedCenterY = targetCenterY;
+            this.smoothedScale = targetScale;
+            this.initialized = true;
+        } else {
+            const posAlpha = 1 - Math.exp(-this.config.positionSmoothingRate * dt);
+            const scaleAlpha = 1 - Math.exp(-this.config.scaleSmoothingRate * dt);
+            this.smoothedCenterX += (targetCenterX - this.smoothedCenterX) * posAlpha;
+            this.smoothedCenterY += (targetCenterY - this.smoothedCenterY) * posAlpha;
+            this.smoothedScale += (targetScale - this.smoothedScale) * scaleAlpha;
+        }
+
         const panX = viewport.width / 2 - this.smoothedCenterX * this.smoothedScale;
         const panY = viewport.height / 2 - this.smoothedCenterY * this.smoothedScale;
 
@@ -185,6 +251,7 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
         this.smoothedCenterY = null;
         this.smoothedScale = null;
         this.prevNeighborCount = 0;
+        this.hadCursor = false;
         this.initialized = false;
     }
 }
