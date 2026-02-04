@@ -117,6 +117,10 @@ export function CommandPlane({ controller }: CommandPlaneProps) {
                     value={state.input}
                     onChange={handleChange}
                     onKeyDown={handleKeyDown}
+                    onBlur={() => {
+                        // Keep focus on input while command plane is visible
+                        setTimeout(() => inputRef.current?.focus(), 0);
+                    }}
                     className="flex-1 bg-transparent ml-1 text-white outline-none"
                     placeholder=""
                     autoComplete="off"
