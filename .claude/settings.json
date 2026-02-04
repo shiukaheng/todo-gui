@@ -1,0 +1,14 @@
+{
+  "skills": [
+    {
+      "name": "codebase",
+      "path": ".claude/skills/codebase-overview.md",
+      "description": "Understand the todo-gui codebase architecture and module structure"
+    },
+    {
+      "name": "create-command",
+      "path": ".claude/skills/create-command.md",
+      "description": "Create a new command for the commander module"
+    }
+  ]
+}
