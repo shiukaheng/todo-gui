@@ -6,6 +6,7 @@ import { getUrgencyColorCSSFromTimestamp } from "../utils/urgencyColor";
 interface EditState {
     field: 'id' | 'text' | 'due' | null;
     value: string;
+    timeValue?: string; // Optional time for due date editing
 }
 
 export function NodeDetailOverlay() {
@@ -37,8 +38,8 @@ export function NodeDetailOverlay() {
         setEdit({ field: null, value: '' });
     }, [cursor]);
 
-    const startEdit = (field: EditState['field'], currentValue: string) => {
-        setEdit({ field, value: currentValue });
+    const startEdit = (field: EditState['field'], currentValue: string, timeValue?: string) => {
+        setEdit({ field, value: currentValue, timeValue });
     };
 
     const cancelEdit = () => {
@@ -61,7 +62,14 @@ export function NodeDetailOverlay() {
                 if (edit.field === 'text') {
                     update.text = edit.value;
                 } else if (edit.field === 'due') {
-                    update.due = edit.value ? Math.floor(new Date(edit.value).getTime() / 1000) : null;
+                    if (edit.value) {
+                        // Combine date + time (default to 23:59 if no time)
+                        const time = edit.timeValue || '23:59';
+                        const dateStr = `${edit.value}T${time}`;
+                        update.due = Math.floor(new Date(dateStr).getTime() / 1000);
+                    } else {
+                        update.due = null;
+                    }
                 }
                 await api.setTaskApiTasksTaskIdPatch({ taskId: task.id, taskUpdate: update });
             }
@@ -135,9 +143,24 @@ export function NodeDetailOverlay() {
         return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase();
     };
 
-    const formatDueForInput = (ts: number | null) => {
+    const formatDueDateForInput = (ts: number | null) => {
         if (!ts) return "";
-        return new Date(ts * 1000).toISOString().slice(0, 16);
+        return new Date(ts * 1000).toISOString().slice(0, 10); // YYYY-MM-DD
+    };
+
+    const formatDueTimeForInput = (ts: number | null) => {
+        if (!ts) return "";
+        return new Date(ts * 1000).toISOString().slice(11, 16); // HH:MM
+    };
+
+    const clearDue = async () => {
+        if (!api || !task) return;
+        try {
+            await api.setTaskApiTasksTaskIdPatch({ taskId: task.id, taskUpdate: { due: null } });
+            setEdit({ field: null, value: '' });
+        } catch (err) {
+            console.error("Failed to clear due date:", err);
+        }
     };
 
     const isEditing = (field: EditState['field']) => edit.field === field;
@@ -226,19 +249,28 @@ export function NodeDetailOverlay() {
                 {isEditing('due') ? (
                     <div className="flex items-center gap-2">
                         <input
-                            type="datetime-local"
+                            type="date"
                             value={edit.value as string}
                             onChange={(e) => setEdit({ ...edit, value: e.target.value })}
                             onKeyDown={handleKeyDown}
                             autoFocus
                             className="bg-white/10 border border-white/30 rounded px-1 py-0.5 text-white text-xs outline-none"
                         />
+                        <input
+                            type="time"
+                            value={edit.timeValue || ''}
+                            onChange={(e) => setEdit({ ...edit, timeValue: e.target.value })}
+                            onKeyDown={handleKeyDown}
+                            placeholder="23:59"
+                            className="bg-white/10 border border-white/30 rounded px-1 py-0.5 text-white text-xs outline-none w-20"
+                        />
                         <button onClick={saveEdit} className="text-green-400 hover:text-green-300">save</button>
+                        <button onClick={clearDue} className="text-red-400 hover:text-red-300">clear</button>
                         <button onClick={cancelEdit} className="text-white/40 hover:text-white/60">cancel</button>
                     </div>
                 ) : (
                     <span
-                        onClick={() => startEdit('due', formatDueForInput(task.due))}
+                        onClick={() => startEdit('due', formatDueDateForInput(task.due), formatDueTimeForInput(task.due))}
                         className="cursor-pointer hover:opacity-80"
                         style={task.calculatedDue && !task.calculatedCompleted ? { color: getUrgencyColorCSSFromTimestamp(task.calculatedDue) } : undefined}
                     >
