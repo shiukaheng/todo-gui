@@ -23,11 +23,16 @@ import {
     INITIAL_NAVIGATION_STATE,
     ViewportInfo,
 } from "./navigation";
-import { CursorFollowNavigationEngine } from "./navigation/engines";
+import {
+    ManualNavigationEngine,
+    CursorFollowNavigationEngine,
+    AutoNavigationEngine,
+} from "./navigation/engines";
 import { SVGRenderer } from "./render/SVGRenderer";
 import { PerformanceMonitor } from "./render/PerformanceMonitor";
 import { InputHandler, InteractionController } from "./input";
 import { PositionedGraphData } from "./simulation/utils";
+import { useTodoStore, NavigationMode } from "../stores/todoStore";
 
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
@@ -64,6 +69,9 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private navigationController: GraphNavigationController;
     private currentCursorNeighbors: CursorNeighbors = EMPTY_CURSOR_NEIGHBORS;
 
+    private currentNavigationMode: NavigationMode;
+    private storeUnsubscribe: (() => void) | null = null;
+
     constructor(
         container: HTMLDivElement,
         getCursor: () => string | null,
@@ -94,7 +102,20 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             flowReversed: true,
             componentGrouping: true,
         });
-        this.navigationEngine = new CursorFollowNavigationEngine();
+
+        // Initialize navigation engine based on store mode
+        this.currentNavigationMode = useTodoStore.getState().navigationMode;
+        this.navigationEngine = this.createNavigationEngine(this.currentNavigationMode);
+
+        // Subscribe to navigation mode changes
+        this.storeUnsubscribe = useTodoStore.subscribe(
+            (state) => {
+                if (state.navigationMode !== this.currentNavigationMode) {
+                    this.currentNavigationMode = state.navigationMode;
+                    this.setNavigationEngine(this.createNavigationEngine(state.navigationMode));
+                }
+            }
+        );
 
         // Input handling
         this.inputHandler = new InputHandler(this.svg);
@@ -129,6 +150,18 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private setNavigationEngine(engine: NavigationEngine): void {
         this.navigationEngine.destroy?.();
         this.navigationEngine = engine;
+    }
+
+    private createNavigationEngine(mode: NavigationMode): NavigationEngine {
+        switch (mode) {
+            case 'manual':
+                return new ManualNavigationEngine();
+            case 'follow':
+                return new CursorFollowNavigationEngine();
+            case 'auto':
+            default:
+                return new AutoNavigationEngine();
+        }
     }
 
     private setPerformanceMonitor(enabled: boolean, panel: 0 | 1 | 2 = 0): void {
@@ -222,6 +255,8 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
         }
+        this.storeUnsubscribe?.();
+        this.storeUnsubscribe = null;
         this.inputHandler.destroy();
         this.interactionController.destroy();
         this.simulationEngine.destroy?.();

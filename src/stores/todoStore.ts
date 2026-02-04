@@ -6,11 +6,15 @@ import {
     Configuration,
 } from 'todo-client';
 
+/** Navigation mode for the graph viewer */
+export type NavigationMode = 'auto' | 'manual' | 'follow';
+
 interface TodoStore {
     // State
     graphData: TaskListOut | null;
     cursor: string | null;
     navInfoText: string | null;
+    navigationMode: NavigationMode;
 
     // API client (set after subscribe)
     api: DefaultApi | null;
@@ -19,6 +23,7 @@ interface TodoStore {
     // Actions
     setCursor: (nodeId: string | null) => void;
     setNavInfoText: (text: string | null) => void;
+    setNavigationMode: (mode: NavigationMode) => void;
     subscribe: (baseUrl: string) => () => void;
 }
 
@@ -26,11 +31,13 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     graphData: null,
     cursor: null,
     navInfoText: null,
+    navigationMode: 'auto',
     api: null,
     unsubscribe: null,
 
     setCursor: (nodeId) => set({ cursor: nodeId }),
     setNavInfoText: (text) => set({ navInfoText: text }),
+    setNavigationMode: (mode) => set({ navigationMode: mode }),
 
     subscribe: (baseUrl: string) => {
         // Clean up existing subscription
