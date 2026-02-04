@@ -4,7 +4,7 @@ import {
     DefaultApi,
     Configuration,
     subscribeToTasks,
-} from 'todo-client/dist/client';
+} from 'todo-client';
 
 /** Navigation mode for the graph viewer */
 export type NavigationMode = 'auto' | 'manual' | 'follow';

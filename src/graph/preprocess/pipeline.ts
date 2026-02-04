@@ -2,7 +2,7 @@
  * Graph preprocessing pipeline: raw API data → styled graph ready for rendering.
  */
 
-import { TaskListOut } from "todo-client/dist/client";
+import { TaskListOut } from "todo-client";
 import { nestGraphData, NestedGraphData } from "./nestGraphData";
 import { computeConnectedComponents, ComponentGraphData } from "./connectedComponents";
 import { baseStyleGraphData, conditionalStyleGraphData, StyledGraphData } from "./styleGraphData";

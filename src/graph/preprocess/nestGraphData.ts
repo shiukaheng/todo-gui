@@ -1,6 +1,6 @@
 // Receives TaskOut from API, and nests the node / edge data by one level, so we can add additional metadata later.
 
-import { TaskListOut } from "todo-client/dist/client";
+import { TaskListOut } from "todo-client";
 
 export interface NestedGraphData {
     tasks: {
