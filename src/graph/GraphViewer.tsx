@@ -4,6 +4,7 @@ import { useTodoStore } from "../stores/todoStore";
 import { NodeDetailOverlay } from "./NodeDetailOverlay";
 import { CommandPlane, OutputPanel, useCommandPlane, registerBuiltinCommands } from "../commander";
 import { ConnectionStatusPanel } from "../components/ConnectionStatusPanel";
+import { DeadlinePanel } from "../components/DeadlinePanel";
 
 // Register commands once on module load
 registerBuiltinCommands();
@@ -77,6 +78,9 @@ export function GraphViewer() {
                 <ConnectionStatusPanel />
                 <NodeDetailOverlay />
                 <OutputPanel />
+            </div>
+            <div className="absolute top-8 right-8">
+                <DeadlinePanel />
             </div>
             {navInfoText && !commandPlane.state.visible && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white font-mono text-sm">
