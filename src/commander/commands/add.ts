@@ -80,6 +80,7 @@ export const addCommand: CommandDefinition = {
                     blocks,
                 },
             });
+            useTodoStore.getState().setCursor(taskId);
             output.success(`created task: ${taskId}`);
         } catch (err) {
             output.error(`failed to create task: ${err instanceof Error ? err.message : String(err)}`);
