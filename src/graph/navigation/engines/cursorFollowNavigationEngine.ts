@@ -3,8 +3,8 @@
  *
  * Features:
  * - Centers viewport on the cursor node
- * - Computes average direct neighbor distance to determine zoom level
- * - Viewport shows a configurable multiple of the average neighbor distance
+ * - Computes max direct neighbor distance to determine zoom level
+ * - Viewport shows max neighbor distance * margin multiplier
  * - Uses exponential smoothing for smooth transitions
  */
 
@@ -16,8 +16,8 @@ import {
 } from "../types";
 
 export interface CursorFollowNavigationEngineConfig {
-    /** Multiple of average neighbor distance to show in viewport. Default: 3 */
-    distanceMultiplier?: number;
+    /** Margin multiplier applied to max neighbor distance. Default: 2.5 */
+    marginMultiplier?: number;
 
     /** Smoothing rate for position (higher = faster). Default: 5 */
     positionSmoothingRate?: number;
@@ -30,7 +30,7 @@ export interface CursorFollowNavigationEngineConfig {
 }
 
 const DEFAULT_CONFIG: Required<CursorFollowNavigationEngineConfig> = {
-    distanceMultiplier: 3,
+    marginMultiplier: 2.5,
     positionSmoothingRate: 5,
     scaleSmoothingRate: 3,
     defaultDistance: 100,
@@ -77,8 +77,8 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
             return this.fitAllNodes(graph, viewport, prevState, dt);
         }
 
-        // Compute average direct neighbor distance and count
-        const { avgDistance, neighborCount } = this.computeNeighborInfo(cursorId, cursorPos, graph);
+        // Compute max direct neighbor distance and count
+        const { maxDistance, neighborCount } = this.computeNeighborInfo(cursorId, cursorPos, graph);
 
         // Detect transition from 0 -> >0 neighbors (skip interpolation for scale only)
         // But only if we already had a cursor - don't jump on first cursor selection
@@ -86,8 +86,8 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
         this.prevNeighborCount = neighborCount;
         this.hadCursor = true;
 
-        // Compute target scale: viewport should show distanceMultiplier * avgDistance
-        const worldSize = this.config.distanceMultiplier * avgDistance;
+        // Compute target scale: viewport should show maxDistance * marginMultiplier
+        const worldSize = this.config.marginMultiplier * maxDistance;
         const viewportMinDim = Math.min(viewport.width, viewport.height);
         const targetScale = viewportMinDim / worldSize;
 
@@ -205,7 +205,7 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
         cursorId: string,
         cursorPos: [number, number],
         graph: NavigationEngineInput['graph']
-    ): { avgDistance: number; neighborCount: number } {
+    ): { maxDistance: number; neighborCount: number } {
         const distances: number[] = [];
 
         // Find direct neighbors through dependencies
@@ -232,11 +232,11 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
         }
 
         if (distances.length === 0) {
-            return { avgDistance: this.config.defaultDistance, neighborCount: 0 };
+            return { maxDistance: this.config.defaultDistance, neighborCount: 0 };
         }
 
-        const avgDistance = distances.reduce((a, b) => a + b, 0) / distances.length;
-        return { avgDistance, neighborCount: distances.length };
+        const maxDistance = Math.max(...distances);
+        return { maxDistance, neighborCount: distances.length };
     }
 
     destroy(): void {
