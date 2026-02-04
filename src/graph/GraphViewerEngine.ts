@@ -23,8 +23,7 @@ import {
     INITIAL_NAVIGATION_STATE,
     ViewportInfo,
 } from "./navigation";
-import { computeFitTransform } from "./navigation/fitTransform";
-import { ManualNavigationEngine } from "./navigation/engines";
+import { CursorFollowNavigationEngine } from "./navigation/engines";
 import { SVGRenderer } from "./render/SVGRenderer";
 import { PerformanceMonitor } from "./render/PerformanceMonitor";
 import { InputHandler, InteractionController } from "./input";
@@ -61,7 +60,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private inputHandler: InputHandler;
     private interactionController: InteractionController;
     private performanceMonitor: PerformanceMonitor | null = null;
-    private initialFitDone = false;
 
     private navigationController: GraphNavigationController;
     private currentCursorNeighbors: CursorNeighbors = EMPTY_CURSOR_NEIGHBORS;
@@ -96,7 +94,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             flowReversed: true,
             componentGrouping: true,
         });
-        this.navigationEngine = new ManualNavigationEngine();
+        this.navigationEngine = new CursorFollowNavigationEngine();
 
         // Input handling
         this.inputHandler = new InputHandler(this.svg);
@@ -193,16 +191,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             // 2. Update cursor neighbors (for navigation)
             this.updateCursorNeighbors(positionedData);
 
-            // 3. Initial fit
-            if (!this.initialFitDone) {
-                const fitTransform = computeFitTransform(positionedData, this.getViewport());
-                if (fitTransform) {
-                    this.navigationState = { transform: fitTransform };
-                    this.initialFitDone = true;
-                }
-            }
-
-            // 4. Apply styling
+            // 3. Apply styling
             const cursor = this.getCursor();
             let styledData = cursorStyleGraphData(positionedData, cursor);
             styledData = navigationStyleGraphData(
@@ -213,13 +202,13 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
                 DEFAULT_NAV_MAPPING
             );
 
-            // 5. Navigate (pan/zoom)
+            // 4. Navigate (pan/zoom)
             this.navigationState = this.navigationEngine.step(
                 { graph: styledData, viewport: this.getViewport(), deltaTime },
                 this.navigationState
             );
 
-            // 6. Render
+            // 5. Render
             this.renderer.render(styledData, this.navigationState.transform);
 
             this.performanceMonitor?.end();
