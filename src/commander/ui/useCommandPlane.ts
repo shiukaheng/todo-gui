@@ -89,10 +89,33 @@ export function useCommandPlane(): UseCommandPlaneReturn {
             }
 
             const completion = s.completions[s.selectedCompletionIndex];
-            const tokens = s.input.slice(0, s.cursorPosition).split(' ');
-            tokens[tokens.length - 1] = completion.value;
-            const newInput = tokens.join(' ') + ' ';
-            const newPos = newInput.length;
+            const inputUpToCursor = s.input.slice(0, s.cursorPosition);
+
+            // Find the start of the current token (respecting quotes)
+            let tokenStart = inputUpToCursor.length;
+            let inQuote: string | null = null;
+            for (let i = 0; i < inputUpToCursor.length; i++) {
+                const char = inputUpToCursor[i];
+                if (inQuote) {
+                    if (char === inQuote) inQuote = null;
+                } else if (char === '"' || char === "'") {
+                    inQuote = char;
+                    tokenStart = i;
+                } else if (char === ' ') {
+                    tokenStart = i + 1;
+                }
+            }
+
+            // Build the completion value (quote if contains spaces)
+            let completionValue = completion.value;
+            if (completionValue.includes(' ') && !completionValue.startsWith('"') && !completionValue.startsWith("'")) {
+                completionValue = `"${completionValue}"`;
+            }
+
+            const beforeToken = s.input.slice(0, tokenStart);
+            const afterCursor = s.input.slice(s.cursorPosition);
+            const newInput = beforeToken + completionValue + ' ' + afterCursor.trimStart();
+            const newPos = beforeToken.length + completionValue.length + 1;
 
             // Get new completions
             const newCompletions = commandRegistry.complete(newInput, newPos);
