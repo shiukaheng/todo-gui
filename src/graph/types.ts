@@ -4,10 +4,11 @@
  * Shared types for the graph visualization system.
  */
 
-import { NavDirectionMapping, DEFAULT_NAV_MAPPING } from "./graphNavigation/types";
+import { type NavDirectionMapping, DEFAULT_NAV_MAPPING } from "./graphNavigation/types";
 
 // Re-export for convenience
-export { NavDirectionMapping, DEFAULT_NAV_MAPPING };
+export type { NavDirectionMapping };
+export { DEFAULT_NAV_MAPPING };
 export type { NavTarget } from "./graphNavigation/types";
 
 /** RGB color in 0-1 range */

@@ -11,6 +11,8 @@ import { addCommand } from './add';
 import { adddepCommand } from './adddep';
 import { addblockCommand } from './addblock';
 import { removeCommand } from './remove';
+import { statusCommand } from './status';
+import { connectCommand, disconnectCommand } from './connect';
 
 /** Register all built-in commands */
 export function registerBuiltinCommands(): void {
@@ -21,4 +23,7 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(adddepCommand);
     commandRegistry.register(addblockCommand);
     commandRegistry.register(removeCommand);
+    commandRegistry.register(statusCommand);
+    commandRegistry.register(connectCommand);
+    commandRegistry.register(disconnectCommand);
 }

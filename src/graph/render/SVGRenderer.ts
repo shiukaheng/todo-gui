@@ -12,7 +12,7 @@ import {
     worldToScreen,
 } from "./utils";
 
-export { ViewTransform, RenderGraphData, RenderNode, RenderEdge };
+export type { ViewTransform, RenderGraphData, RenderNode, RenderEdge };
 
 // Master scale coefficient - multiplies all size constants
 const SCALE = 2.0;

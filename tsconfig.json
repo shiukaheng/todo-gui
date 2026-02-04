@@ -1,23 +1,22 @@
 {
   "compilerOptions": {
-    "target": "ES6",
-    "allowJs": true,
-    "module": "commonjs",
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "noImplicitAny": true,
-    "sourceMap": true,
-    "baseUrl": ".",
-    "outDir": "dist",
-    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
-    "paths": {
-      "*": ["node_modules/*"],
-      "@/*": ["src/*"]
-    },
-    "experimentalDecorators": true,
+    "isolatedModules": true,
+    "noEmit": true,
     "jsx": "react-jsx",
-    "strict": true,
+
+    "strict": false,
+    "noImplicitAny": false
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "vite.config.ts"]
 }

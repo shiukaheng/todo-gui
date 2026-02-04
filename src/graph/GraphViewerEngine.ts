@@ -3,7 +3,7 @@
  * Owns simulation, navigation, and rendering.
  */
 
-import { TaskListOut } from "todo-client";
+import { TaskListOut } from "todo-client/dist/client";
 import { CursorNeighbors, computeCursorNeighbors, cursorNeighborsEqual, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
 import { GraphNavigationHandle, DEFAULT_NAV_MAPPING } from "./graphNavigation/types";
 import { GraphNavigationController } from "./graphNavigation/GraphNavigationController";

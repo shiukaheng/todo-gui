@@ -19,7 +19,7 @@ import { Position } from "../simulation/types";
 import { PositionedGraphData } from "../simulation/utils";
 
 // Re-export for convenience
-export { Position };
+export type { Position };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // VIEW TRANSFORM

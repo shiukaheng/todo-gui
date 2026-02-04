@@ -1,0 +1,25 @@
+- this tool is nice-ish for now
+- features
+    - refactoring
+        - needs to follow simple data flow, draw it out! manual scaffolding! full understanding of flow before involvement of ai.
+        - no more old shit and compatibility stuff.
+    - features
+        - syntax highlighting
+            - irrelevant nodes given current selected ndoe (50% bright)
+            - remaining nodes that are currently not actionable (75% bright)
+            - actionable nodes (shimmer)
+        - write functionality!
+            - edit tasks using UI (inspector like UI?)
+        - plan feature
+            - in graph: plan node, links up different tasks and execute on it
+        - commands
+            - goto command (specialized)
+            - cli passthrough with tab completion
+            - perhaps expose this as a virtual environment of a REAL shell (very insecure.. better alternatives to unify UI and commands? OH! actually just importing the cli lib..)
+        - structural
+            - better way to model nested UI keyboard shortcuts etc, reconfigurable like vscode would be amazing
+        - backend mcp
+        - better view interpolation
+        - better graph plotting:
+            - right now relationships arent super clear, and the radial nature is a bit disorienting. 
+            - webcola plotting.

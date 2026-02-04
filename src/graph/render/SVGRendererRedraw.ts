@@ -12,7 +12,7 @@ import {
     worldToScreen,
 } from "./utils";
 
-export { ViewTransform, RenderGraphData, RenderNode, RenderEdge };
+export type { ViewTransform, RenderGraphData, RenderNode, RenderEdge };
 
 // Simpler / naive implementation of the graph renderer that clears and redraws everything on each render call.
 

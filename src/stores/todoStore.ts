@@ -1,13 +1,16 @@
 import { create } from 'zustand';
 import {
-    subscribeToTasks,
-    TaskListOut,
+    type TaskListOut,
     DefaultApi,
     Configuration,
-} from 'todo-client';
+    subscribeToTasks,
+} from 'todo-client/dist/client';
 
 /** Navigation mode for the graph viewer */
 export type NavigationMode = 'auto' | 'manual' | 'follow';
+
+/** Connection status */
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 interface TodoStore {
     // State
@@ -15,6 +18,12 @@ interface TodoStore {
     cursor: string | null;
     navInfoText: string | null;
     navigationMode: NavigationMode;
+
+    // Connection state
+    connectionStatus: ConnectionStatus;
+    baseUrl: string | null;
+    lastError: string | null;
+    lastDataReceived: number | null;
 
     // API client (set after subscribe)
     api: DefaultApi | null;
@@ -25,6 +34,7 @@ interface TodoStore {
     setNavInfoText: (text: string | null) => void;
     setNavigationMode: (mode: NavigationMode) => void;
     subscribe: (baseUrl: string) => () => void;
+    disconnect: () => void;
 }
 
 export const useTodoStore = create<TodoStore>((set, get) => ({
@@ -32,6 +42,10 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     cursor: null,
     navInfoText: null,
     navigationMode: 'auto',
+    connectionStatus: 'disconnected',
+    baseUrl: null,
+    lastError: null,
+    lastDataReceived: null,
     api: null,
     unsubscribe: null,
 
@@ -39,17 +53,44 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     setNavInfoText: (text) => set({ navInfoText: text }),
     setNavigationMode: (mode) => set({ navigationMode: mode }),
 
+    disconnect: () => {
+        get().unsubscribe?.();
+        set({
+            unsubscribe: null,
+            api: null,
+            connectionStatus: 'disconnected',
+            graphData: null,
+        });
+    },
+
     subscribe: (baseUrl: string) => {
         // Clean up existing subscription
         get().unsubscribe?.();
 
+        set({
+            connectionStatus: 'connecting',
+            baseUrl,
+            lastError: null,
+        });
+
         const api = new DefaultApi(new Configuration({ basePath: baseUrl }));
 
         const unsubscribe = subscribeToTasks(
-            (data) => set({ graphData: data }),
+            (data) => set({
+                graphData: data,
+                connectionStatus: 'connected',
+                lastDataReceived: Date.now(),
+                lastError: null,
+            }),
             {
                 baseUrl,
-                onError: (err) => console.error('SSE connection error:', err),
+                onError: (err) => {
+                    console.error('SSE connection error:', err);
+                    set({
+                        connectionStatus: 'error',
+                        lastError: err instanceof Error ? err.message : String(err),
+                    });
+                },
             }
         );
 
@@ -57,7 +98,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
 
         return () => {
             get().unsubscribe?.();
-            set({ unsubscribe: null });
+            set({ unsubscribe: null, connectionStatus: 'disconnected' });
         };
     },
 }));

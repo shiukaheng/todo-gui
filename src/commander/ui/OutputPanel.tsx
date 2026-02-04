@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { useOutputStore, OutputLine } from '../output';
+import { useOutputStore, type OutputLine } from '../output';
 
 /** How long lines stay visible before fading (ms) */
 const VISIBLE_DURATION = 5000;
@@ -21,7 +21,7 @@ function getLineColor(type: OutputLine['type']): string {
 }
 
 /** Single output line with dynamic height collapse */
-function OutputLine({ line, visibleEnd }: {
+function OutputLineItem({ line, visibleEnd }: {
     line: OutputLine;
     visibleEnd: number;
 }) {
@@ -98,7 +98,7 @@ export function OutputPanel() {
                 className="flex flex-col"
             >
                 {lines.map((line) => (
-                    <OutputLine
+                    <OutputLineItem
                         key={line.id}
                         line={line}
                         visibleEnd={visibleEnd}

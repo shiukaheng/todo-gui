@@ -3,7 +3,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { CommandPlaneState, CompletionSuggestion } from '../types';
+import { type CommandPlaneState, type CompletionSuggestion } from '../types';
 import { commandRegistry } from '../CommandRegistry';
 
 const INITIAL_STATE: CommandPlaneState = {
