@@ -5,12 +5,18 @@
  * - Parents: →1, →2, →3 (or just → if single)
  * - Children: ←1, ←2 (or just ← if single)
  * - Peers: ↑/↓ on adjacent peers (or ↑?/↓? if multi-parent)
+ *
+ * Also adds dark "navigation edges" from cursor to all navigable neighbors.
  */
 
 import { NestedGraphData } from "./nestGraphData";
-import { StyledGraphData } from "./styleGraphData";
+import { StyledGraphData, Color } from "./styleGraphData";
 import { CursorNeighbors } from "../GraphViewerEngineState";
 import { NavState, NavDirectionMapping, NavTarget } from "../graphNavigation/types";
+
+/** Very dark color for navigation edges */
+const NAV_EDGE_COLOR: Color = [1, 1, 1];
+const NAV_EDGE_OPACITY = 0.08;
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 
@@ -115,10 +121,40 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
         }
     }
 
-    // When in confirmingTarget mode, highlight the active direction's targets more prominently
-    // (The overlays are already showing numbers, this is mainly for potential future styling)
+    // Find cursor node (has selectorOutline set)
+    let cursorId: string | null = null;
+    for (const [taskId, task] of Object.entries(graphData.tasks)) {
+        if ((task as any).selectorOutline) {
+            cursorId = taskId;
+            break;
+        }
+    }
 
-    // Apply overlays to graph data
+    // Collect all navigable neighbor IDs for navigation edges
+    const navigableNeighbors = new Set<string>();
+    parents.forEach(id => navigableNeighbors.add(id));
+    children.forEach(id => navigableNeighbors.add(id));
+    for (const peerInfo of peers.values()) {
+        if (peerInfo.prevPeer) navigableNeighbors.add(peerInfo.prevPeer);
+        if (peerInfo.nextPeer) navigableNeighbors.add(peerInfo.nextPeer);
+    }
+
+    // Build navigation edges from cursor to navigable neighbors
+    const navEdges: Record<string, any> = {};
+    if (cursorId) {
+        for (const neighborId of navigableNeighbors) {
+            const edgeId = `__nav__${cursorId}__${neighborId}`;
+            navEdges[edgeId] = {
+                data: { fromId: cursorId, toId: neighborId },
+                text: '',
+                color: NAV_EDGE_COLOR,
+                opacity: NAV_EDGE_OPACITY,
+                dotted: true,
+            };
+        }
+    }
+
+    // Apply overlays to graph data and add navigation edges
     return {
         ...graphData,
         tasks: Object.fromEntries(
@@ -130,5 +166,9 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
                 return [taskId, task];
             })
         ),
+        dependencies: {
+            ...graphData.dependencies,
+            ...navEdges,
+        },
     } as G;
 }
