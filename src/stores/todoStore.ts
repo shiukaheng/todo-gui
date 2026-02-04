@@ -9,6 +9,9 @@ import {
 /** Navigation mode for the graph viewer */
 export type NavigationMode = 'auto' | 'manual' | 'follow';
 
+/** Simulation mode for the graph layout */
+export type SimulationMode = 'cola' | 'force';
+
 /** Connection status */
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -18,6 +21,7 @@ interface TodoStore {
     cursor: string | null;
     navInfoText: string | null;
     navigationMode: NavigationMode;
+    simulationMode: SimulationMode;
 
     // Connection state
     connectionStatus: ConnectionStatus;
@@ -33,6 +37,7 @@ interface TodoStore {
     setCursor: (nodeId: string | null) => void;
     setNavInfoText: (text: string | null) => void;
     setNavigationMode: (mode: NavigationMode) => void;
+    setSimulationMode: (mode: SimulationMode) => void;
     subscribe: (baseUrl: string) => () => void;
     disconnect: () => void;
 }
@@ -42,6 +47,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     cursor: null,
     navInfoText: null,
     navigationMode: 'auto',
+    simulationMode: 'cola',
     connectionStatus: 'disconnected',
     baseUrl: null,
     lastError: null,
@@ -52,6 +58,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     setCursor: (nodeId) => set({ cursor: nodeId }),
     setNavInfoText: (text) => set({ navInfoText: text }),
     setNavigationMode: (mode) => set({ navigationMode: mode }),
+    setSimulationMode: (mode) => set({ simulationMode: mode }),
 
     disconnect: () => {
         get().unsubscribe?.();

@@ -16,6 +16,7 @@ import {
     EMPTY_SIMULATION_STATE,
     mergePositions,
     WebColaEngine,
+    ForceDirectedEngine,
 } from "./simulation";
 import {
     NavigationEngine,
@@ -32,7 +33,7 @@ import { SVGRenderer } from "./render/SVGRenderer";
 import { PerformanceMonitor } from "./render/PerformanceMonitor";
 import { InputHandler, InteractionController } from "./input";
 import { PositionedGraphData } from "./simulation/utils";
-import { useTodoStore, NavigationMode } from "../stores/todoStore";
+import { useTodoStore, NavigationMode, SimulationMode } from "../stores/todoStore";
 
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
@@ -70,6 +71,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private currentCursorNeighbors: CursorNeighbors = EMPTY_CURSOR_NEIGHBORS;
 
     private currentNavigationMode: NavigationMode;
+    private currentSimulationMode: SimulationMode;
     private storeUnsubscribe: (() => void) | null = null;
 
     constructor(
@@ -95,24 +97,25 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
         // Subsystems
         this.renderer = new SVGRenderer(this.svg);
-        this.simulationEngine = new WebColaEngine({
-            flowDirection: "x",
-            flowSeparation: 100,
-            symmetricDiffLinkLengths: true,
-            flowReversed: true,
-            componentGrouping: true,
-        });
+        
+        // Initialize simulation engine based on store mode
+        this.currentSimulationMode = useTodoStore.getState().simulationMode;
+        this.simulationEngine = this.createSimulationEngine(this.currentSimulationMode);
 
         // Initialize navigation engine based on store mode
         this.currentNavigationMode = useTodoStore.getState().navigationMode;
         this.navigationEngine = this.createNavigationEngine(this.currentNavigationMode);
 
-        // Subscribe to navigation mode changes
+        // Subscribe to mode changes
         this.storeUnsubscribe = useTodoStore.subscribe(
             (state) => {
                 if (state.navigationMode !== this.currentNavigationMode) {
                     this.currentNavigationMode = state.navigationMode;
                     this.setNavigationEngine(this.createNavigationEngine(state.navigationMode));
+                }
+                if (state.simulationMode !== this.currentSimulationMode) {
+                    this.currentSimulationMode = state.simulationMode;
+                    this.setSimulationEngine(this.createSimulationEngine(state.simulationMode));
                 }
             }
         );
@@ -161,6 +164,26 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             case 'auto':
             default:
                 return new AutoNavigationEngine();
+        }
+    }
+
+    private createSimulationEngine(mode: SimulationMode): SimulationEngine {
+        switch (mode) {
+            case 'force':
+                return new ForceDirectedEngine({
+                    linkDistance: 100,
+                    linkStrength: 0.5,
+                    chargeStrength: -300,
+                });
+            case 'cola':
+            default:
+                return new WebColaEngine({
+                    flowDirection: "x",
+                    flowSeparation: 100,
+                    symmetricDiffLinkLengths: true,
+                    flowReversed: true,
+                    componentGrouping: true,
+                });
         }
     }
 

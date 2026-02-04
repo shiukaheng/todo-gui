@@ -1,5 +1,5 @@
 /**
- * Navmode command - switch navigation mode (auto, manual, follow).
+ * Setnavmode command - switch navigation mode (auto, manual, follow).
  */
 
 import { CommandDefinition } from '../types';
@@ -8,10 +8,10 @@ import { output } from '../output';
 
 const VALID_MODES: NavigationMode[] = ['auto', 'manual', 'follow'];
 
-export const navmodeCommand: CommandDefinition = {
-    name: 'navmode',
+export const setnavmodeCommand: CommandDefinition = {
+    name: 'setnavmode',
     description: 'Switch navigation mode (auto, manual, follow)',
-    aliases: ['nm', 'nav'],
+    aliases: ['snm', 'nav'],
     positionals: [
         {
             name: 'mode',
