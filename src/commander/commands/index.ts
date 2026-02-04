@@ -13,6 +13,8 @@ import { addblockCommand } from './addblock';
 import { removeCommand } from './remove';
 import { statusCommand } from './status';
 import { connectCommand, disconnectCommand } from './connect';
+import { linkCommand } from './link';
+import { unlinkCommand } from './unlink';
 
 /** Register all built-in commands */
 export function registerBuiltinCommands(): void {
@@ -26,4 +28,6 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(statusCommand);
     commandRegistry.register(connectCommand);
     commandRegistry.register(disconnectCommand);
+    commandRegistry.register(linkCommand);
+    commandRegistry.register(unlinkCommand);
 }
