@@ -1,4 +1,5 @@
 import { NestedGraphData, ExtendNestedGraphData } from "./nestGraphData";
+import { getUrgencyColorFromTimestamp } from "../../utils/urgencyColor";
 
 export type Color = [number, number, number]; // RGB color representation
 
@@ -208,7 +209,7 @@ export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphD
         ...graphData,
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, task]) => {
-                const data = task.data as { calculatedCompleted?: boolean; depsClear?: boolean; inferred?: boolean; completed?: boolean; children?: string[] };
+                const data = task.data as { calculatedCompleted?: boolean; depsClear?: boolean; inferred?: boolean; completed?: boolean; children?: string[]; calculatedDue?: number | null };
                 const isInferred = data.inferred;
 
                 // Check if blocked: any direct dependency not calculatedCompleted
@@ -231,7 +232,13 @@ export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphD
                 // Hollow: incomplete/blocked = hollow (background fill), complete = solid (color fill)
                 const hollow = !isCompleted;
 
-                let styledTask = { ...task, shape, hollow };
+                // Label color: urgency-based if has due date and not completed, else white
+                let labelColor: Color = [1, 1, 1];
+                if (data.calculatedDue && !isCompleted) {
+                    labelColor = getUrgencyColorFromTimestamp(data.calculatedDue);
+                }
+
+                let styledTask = { ...task, shape, hollow, labelColor };
 
                 if (isBlocked) {
                     // Blocked: dim the node, ignore its own completed status

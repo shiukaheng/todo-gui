@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTodoStore } from "../stores/todoStore";
 import { formatDistanceToNow } from "date-fns";
+import { getUrgencyColorCSSFromTimestamp } from "../utils/urgencyColor";
 
 interface EditState {
     field: 'id' | 'text' | 'due' | null;
@@ -216,7 +217,8 @@ export function NodeDetailOverlay() {
                 ) : (
                     <span
                         onClick={() => startEdit('due', formatDueForInput(task.due))}
-                        className="cursor-pointer hover:text-white"
+                        className="cursor-pointer hover:opacity-80"
+                        style={task.due ? { color: getUrgencyColorCSSFromTimestamp(task.due) } : undefined}
                     >
                         due: {task.due ? formatDate(task.due) : "-"}
                     </span>
