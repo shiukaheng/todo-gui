@@ -120,7 +120,7 @@ export function NodeDetailOverlay() {
     const formatDateAbsolute = (ts: number | null) => {
         if (!ts) return "";
         const date = new Date(ts * 1000);
-        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase();
     };
 
     const formatDueForInput = (ts: number | null) => {
@@ -224,7 +224,7 @@ export function NodeDetailOverlay() {
                         style={task.calculatedDue && !task.calculatedCompleted ? { color: getUrgencyColorCSSFromTimestamp(task.calculatedDue) } : undefined}
                     >
                         due: {task.calculatedDue 
-                            ? `${formatDateRelative(task.calculatedDue)} (${formatDateAbsolute(task.calculatedDue)})`
+                            ? `${formatDateRelative(task.calculatedDue)} / ${formatDateAbsolute(task.calculatedDue)}`
                             : "-"}
                     </span>
                 )}
