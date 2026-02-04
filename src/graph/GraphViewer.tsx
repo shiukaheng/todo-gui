@@ -79,9 +79,9 @@ export function GraphViewer() {
                 <NodeDetailOverlay />
                 <OutputPanel />
             </div>
-            <div className="absolute top-8 right-8">
+            {/* <div className="absolute top-8 right-8">
                 <DeadlinePanel />
-            </div>
+            </div> */}
             {navInfoText && !commandPlane.state.visible && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white font-mono text-sm">
                     {navInfoText}
