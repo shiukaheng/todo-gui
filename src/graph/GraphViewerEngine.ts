@@ -32,14 +32,21 @@ import { PositionedGraphData } from "./simulation/utils";
 
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
-/** Public interface for the graph viewer engine. */
-export interface IGraphViewerEngine {
-    setGraph(taskList: TaskListOut): void;
-    getNavigationHandle(): GraphNavigationHandle;
-    destroy(): void;
+/** Abstract base for graph viewer engines. Defines constructor contract and public API. */
+export abstract class AbstractGraphViewerEngine {
+    constructor(
+        protected container: HTMLDivElement,
+        protected getCursor: () => string | null,
+        protected setCursor: (nodeId: string | null) => void,
+        protected setNavInfoText: (text: string | null) => void
+    ) {}
+
+    abstract setGraph(taskList: TaskListOut): void;
+    abstract getNavigationHandle(): GraphNavigationHandle;
+    abstract destroy(): void;
 }
 
-export class GraphViewerEngine implements IGraphViewerEngine {
+export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private animationFrameId: number | null = null;
     private frameCount = 0;
     private lastFrameTime = 0;
@@ -60,11 +67,12 @@ export class GraphViewerEngine implements IGraphViewerEngine {
     private currentCursorNeighbors: CursorNeighbors = EMPTY_CURSOR_NEIGHBORS;
 
     constructor(
-        private container: HTMLDivElement,
-        private getCursor: () => string | null,
-        private setCursor: (nodeId: string | null) => void,
-        private setNavInfoText: (text: string | null) => void
+        container: HTMLDivElement,
+        getCursor: () => string | null,
+        setCursor: (nodeId: string | null) => void,
+        setNavInfoText: (text: string | null) => void
     ) {
+        super(container, getCursor, setCursor, setNavInfoText);
         // Navigation controller
         this.navigationController = new GraphNavigationController(
             DEFAULT_NAV_MAPPING,
@@ -115,17 +123,17 @@ export class GraphViewerEngine implements IGraphViewerEngine {
         return this.navigationController.handle;
     }
 
-    setSimulationEngine(engine: SimulationEngine): void {
+    private setSimulationEngine(engine: SimulationEngine): void {
         this.simulationEngine.destroy?.();
         this.simulationEngine = engine;
     }
 
-    setNavigationEngine(engine: NavigationEngine): void {
+    private setNavigationEngine(engine: NavigationEngine): void {
         this.navigationEngine.destroy?.();
         this.navigationEngine = engine;
     }
 
-    setPerformanceMonitor(enabled: boolean, panel: 0 | 1 | 2 = 0): void {
+    private setPerformanceMonitor(enabled: boolean, panel: 0 | 1 | 2 = 0): void {
         if (enabled && !this.performanceMonitor) {
             this.performanceMonitor = new PerformanceMonitor(this.container, panel);
         } else if (!enabled && this.performanceMonitor) {

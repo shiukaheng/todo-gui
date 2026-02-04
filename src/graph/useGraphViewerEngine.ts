@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { GraphViewerEngine, IGraphViewerEngine } from "./GraphViewerEngine";
+import { GraphViewerEngine, AbstractGraphViewerEngine } from "./GraphViewerEngine";
 import { GraphNavigationHandle } from "./graphNavigation/types";
 import { useTodoStore } from "../stores/todoStore";
 
@@ -21,7 +21,7 @@ export function useGraphViewerEngine(
     viewportContainerRef: React.RefObject<HTMLDivElement>
 ): GraphNavigationHandle {
     const graphData = useTodoStore((s) => s.graphData);
-    const engineRef = useRef<IGraphViewerEngine | null>(null);
+    const engineRef = useRef<AbstractGraphViewerEngine | null>(null);
 
     // Create engine on mount
     useEffect(() => {
