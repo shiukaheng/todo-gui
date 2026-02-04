@@ -1,5 +1,4 @@
 import { NestedGraphData, ExtendNestedGraphData } from "./nestGraphData";
-import { AppState } from "../types";
 
 export type Color = [number, number, number]; // RGB color representation
 
@@ -228,15 +227,13 @@ export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphD
 }
 
 /**
- * Apply cursor styling based on AppState.
+ * Apply cursor styling.
  * The cursored node gets a distinctive highlight.
  */
 export function cursorStyleGraphData<G extends StyledGraphData<NestedGraphData>>(
     graphData: G,
-    appState: AppState
+    cursor: string | null
 ): G {
-    const { cursor } = appState;
-
     // No cursor, return unchanged
     if (!cursor) return graphData;
 

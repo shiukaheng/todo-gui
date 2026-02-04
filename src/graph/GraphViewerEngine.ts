@@ -150,10 +150,11 @@
 
 import { TaskListOut } from "todo-client";
 import { CursorNeighbors, GraphViewerEngineState, computeCursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
-import { getNavInfoText, GraphNavigationHandle } from "./graphNavigation/types";
+import { getNavInfoText, GraphNavigationHandle, DEFAULT_NAV_MAPPING } from "./graphNavigation/types";
+import { useTodoStore } from "../stores/todoStore";
+import { Color } from "./types";
 import { GraphNavigationController } from "./graphNavigation/GraphNavigationController";
 import { navigationStyleGraphData } from "./preprocess/navigationStyleGraphData";
-import { AppState, INITIAL_APP_STATE } from "./types";
 import { nestGraphData, NestedGraphData } from "./preprocess/nestGraphData";
 import { baseStyleGraphData, conditionalStyleGraphData, cursorStyleGraphData, StyledGraphData } from "./preprocess/styleGraphData";
 import { computeConnectedComponents, ComponentGraphData } from "./preprocess/connectedComponents";
@@ -233,6 +234,7 @@ function computeFitTransform(
 export type EngineStateCallback = (state: GraphViewerEngineState) => void;
 
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+const BACKGROUND_COLOR: Color = [0, 0, 0];
 
 /**
  * GraphViewerEngine - Imperative class that owns the animation loop.
@@ -246,9 +248,6 @@ export class GraphViewerEngine {
 
     // Graph data: processed and ready for simulation (set via setGraph())
     private graphData: ProcessedGraphData | null = null;
-
-    // App state: UI state like cursor, selection, etc. (set via setAppState())
-    private appState: AppState = INITIAL_APP_STATE;
 
     // Simulation: computes node positions in world space
     private simulationEngine: SimulationEngine;
@@ -278,14 +277,15 @@ export class GraphViewerEngine {
 
     constructor(
         private container: HTMLDivElement,
-        private onStateChange: EngineStateCallback,
-        private setCursor: (nodeId: string) => void
+        private onStateChange: EngineStateCallback
     ) {
         console.log("[GraphViewerEngine] Created, starting animation loop");
 
+        const setCursor = (nodeId: string) => useTodoStore.getState().setCursor(nodeId);
+
         // Create navigation controller for keyboard-driven cursor movement
         this.navigationController = new GraphNavigationController(
-            INITIAL_APP_STATE.navDirectionMapping,
+            DEFAULT_NAV_MAPPING,
             DEFAULT_SELECTORS,
             setCursor,
             () => this.emitState()
@@ -349,16 +349,6 @@ export class GraphViewerEngine {
         let styled = baseStyleGraphData(withComponents);
         styled = conditionalStyleGraphData(styled);
         this.graphData = styled;
-    }
-
-    /**
-     * Update the app state. This is the secondary reactive source.
-     * Call this when UI state changes (cursor, selection, etc.)
-     *
-     * @param appState - New app state from React
-     */
-    setAppState(appState: AppState): void {
-        this.appState = appState;
     }
 
     /**
@@ -440,7 +430,7 @@ export class GraphViewerEngine {
      * Computes and emits cursor neighbors if changed.
      */
     private updateRelevantNeighbors(positionedData: PositionedGraphData<any>): void {
-        const { cursor } = this.appState;
+        const cursor = useTodoStore.getState().cursor;
 
         // Build positions map from positioned data
         const positions: { [key: string]: [number, number] } = {};
@@ -520,24 +510,20 @@ export class GraphViewerEngine {
             }
 
             // ─────────────────────────────────────────────────────────────
-            // STEP 1.6: Apply AppState styling (cursor, selection, etc.)
-            //
-            // AppState is the secondary reactive source. Apply styling
-            // based on current UI state (cursor highlight, etc.)
+            // STEP 1.6: Apply cursor styling
             // ─────────────────────────────────────────────────────────────
-            let styledData = cursorStyleGraphData(positionedData, this.appState);
+            const cursor = useTodoStore.getState().cursor;
+            let styledData = cursorStyleGraphData(positionedData, cursor);
 
             // ─────────────────────────────────────────────────────────────
             // STEP 1.7: Apply navigation styling (shortcut key overlays)
-            //
-            // Shows navigation hints on reachable nodes.
             // ─────────────────────────────────────────────────────────────
             styledData = navigationStyleGraphData(
                 styledData,
                 this.currentCursorNeighbors,
                 this.navigationController.state,
                 this.selectors,
-                this.appState.navDirectionMapping
+                DEFAULT_NAV_MAPPING
             );
 
             // ─────────────────────────────────────────────────────────────
@@ -561,7 +547,7 @@ export class GraphViewerEngine {
             //
             // Uses reconciliation to minimize DOM operations.
             // ─────────────────────────────────────────────────────────────
-            this.renderer.render(styledData, this.navigationState.transform, this.appState.backgroundColor);
+            this.renderer.render(styledData, this.navigationState.transform, BACKGROUND_COLOR);
 
             this.performanceMonitor?.end();
             this.animationFrameId = requestAnimationFrame(tick);

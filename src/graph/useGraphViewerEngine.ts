@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { TaskListOut } from "todo-client";
 import { GraphViewerEngine } from "./GraphViewerEngine";
 import { GraphViewerEngineState, INITIAL_ENGINE_STATE } from "./GraphViewerEngineState";
-import { AppState } from "./types";
 import { GraphNavigationHandle } from "./graphNavigation/types";
 
 // No-op navigation handle for when engine isn't ready
@@ -26,25 +25,17 @@ export interface UseGraphViewerEngineResult {
  */
 export function useGraphViewerEngine(
     taskList: TaskListOut,
-    appState: AppState,
-    viewportContainerRef: React.RefObject<HTMLDivElement>,
-    setCursor: (nodeId: string) => void
+    viewportContainerRef: React.RefObject<HTMLDivElement>
 ): UseGraphViewerEngineResult {
     const [engineState, setEngineState] = useState<GraphViewerEngineState>(INITIAL_ENGINE_STATE);
     const engineRef = useRef<GraphViewerEngine | null>(null);
-    const setCursorRef = useRef(setCursor);
-    setCursorRef.current = setCursor;
 
     // Create engine on mount
     useEffect(() => {
         const container = viewportContainerRef.current;
         if (!container) return;
 
-        engineRef.current = new GraphViewerEngine(
-            container,
-            setEngineState,
-            (nodeId) => setCursorRef.current(nodeId)
-        );
+        engineRef.current = new GraphViewerEngine(container, setEngineState);
 
         return () => {
             engineRef.current?.destroy();
@@ -56,11 +47,6 @@ export function useGraphViewerEngine(
     useEffect(() => {
         engineRef.current?.setGraph(taskList);
     }, [taskList]);
-
-    // Push app state when it changes
-    useEffect(() => {
-        engineRef.current?.setAppState(appState);
-    }, [appState]);
 
     const navigationHandle = engineRef.current?.getNavigationHandle() ?? NOOP_NAVIGATION_HANDLE;
 
