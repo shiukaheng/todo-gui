@@ -71,13 +71,11 @@ export const flipCommand: CommandDefinition = {
             return;
         }
 
-        // Check which direction the edge exists
-        // parents = tasks this task depends on (blockers)
-        // children = tasks that depend on this task
-        const taskAData = graphData.tasks[taskA];
-        const taskBData = graphData.tasks[taskB];
-        const aBlocksB = taskBData.parents?.includes(taskA);
-        const bBlocksA = taskAData.parents?.includes(taskB);
+        // Check which direction the edge exists in graphData.dependencies
+        // Dependencies have fromId (blocker) and toId (dependent)
+        const deps = Object.values(graphData.dependencies || {});
+        const aBlocksB = deps.some(d => d.fromId === taskA && d.toId === taskB);
+        const bBlocksA = deps.some(d => d.fromId === taskB && d.toId === taskA);
 
         if (!aBlocksB && !bBlocksA) {
             output.error(`no dependency exists between ${taskA} and ${taskB}`);
