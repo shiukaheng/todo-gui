@@ -4,6 +4,7 @@
 
 import { CommandDefinition } from '../types';
 import { commandRegistry } from '../CommandRegistry';
+import { output } from '../output';
 
 export const helpCommand: CommandDefinition = {
     name: 'help',
@@ -27,32 +28,32 @@ export const helpCommand: CommandDefinition = {
         if (cmdName) {
             const cmd = commandRegistry.get(cmdName);
             if (!cmd) {
-                console.log(`Unknown command: ${cmdName}`);
+                output.error(`unknown command: ${cmdName}`);
                 return;
             }
 
-            console.log(`${cmd.name} - ${cmd.description}`);
+            output.print(`${cmd.name} - ${cmd.description}`);
             if (cmd.aliases?.length) {
-                console.log(`  Aliases: ${cmd.aliases.join(', ')}`);
+                output.print(`  aliases: ${cmd.aliases.join(', ')}`);
             }
             if (cmd.positionals?.length) {
-                console.log('  Arguments:');
+                output.print('  arguments:');
                 for (const pos of cmd.positionals) {
                     const req = pos.required ? ' (required)' : '';
-                    console.log(`    <${pos.name}>${req} - ${pos.description}`);
+                    output.print(`    <${pos.name}>${req} - ${pos.description}`);
                 }
             }
             if (cmd.options?.length) {
-                console.log('  Options:');
+                output.print('  options:');
                 for (const opt of cmd.options) {
                     const alias = opt.alias ? `, -${opt.alias}` : '';
-                    console.log(`    --${opt.name}${alias} - ${opt.description}`);
+                    output.print(`    --${opt.name}${alias} - ${opt.description}`);
                 }
             }
         } else {
-            console.log('Available commands:');
+            output.print('available commands:');
             for (const cmd of commandRegistry.getAll()) {
-                console.log(`  ${cmd.name} - ${cmd.description}`);
+                output.print(`  ${cmd.name} - ${cmd.description}`);
             }
         }
     },

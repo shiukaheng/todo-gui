@@ -105,7 +105,7 @@ export function NodeDetailOverlay() {
     const isEditing = (field: EditState['field']) => edit.field === field;
 
     return (
-        <div className="absolute top-4 left-4 text-white/80 font-mono text-sm select-none">
+        <div className="text-white/80 font-mono text-sm select-none">
             {/* ID - prominent and editable */}
             <div className="mb-1">
                 {isEditing('id') ? (

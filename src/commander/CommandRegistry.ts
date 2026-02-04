@@ -10,6 +10,7 @@ import {
     CommandResult,
     ParsedArgs,
 } from './types';
+import { output } from './output';
 
 /** Tokenize input string, respecting quotes */
 function tokenize(input: string): string[] {
@@ -276,10 +277,9 @@ export class CommandRegistry implements ICommandRegistry {
         const command = this.get(commandName);
 
         if (!command) {
-            return {
-                success: false,
-                error: `Unknown command: ${commandName}`,
-            };
+            const error = `unknown command: ${commandName}`;
+            output.error(error);
+            return { success: false, error };
         }
 
         try {
@@ -287,10 +287,9 @@ export class CommandRegistry implements ICommandRegistry {
             await command.handler(args);
             return { success: true };
         } catch (err) {
-            return {
-                success: false,
-                error: err instanceof Error ? err.message : String(err),
-            };
+            const error = err instanceof Error ? err.message : String(err);
+            output.error(error);
+            return { success: false, error };
         }
     }
 }

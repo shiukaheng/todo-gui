@@ -2,7 +2,7 @@ import { useRef, useEffect } from "react";
 import { useGraphViewerEngine } from "./useGraphViewerEngine";
 import { useTodoStore } from "../stores/todoStore";
 import { NodeDetailOverlay } from "./NodeDetailOverlay";
-import { CommandPlane, useCommandPlane, registerBuiltinCommands } from "../commander";
+import { CommandPlane, OutputPanel, useCommandPlane, registerBuiltinCommands } from "../commander";
 
 // Register commands once on module load
 registerBuiltinCommands();
@@ -72,7 +72,10 @@ export function GraphViewer() {
     return (
         <div className="absolute w-full h-full bg-black">
             <div className="absolute w-full h-full" ref={viewportContainerRef} />
-            <NodeDetailOverlay />
+            <div className="absolute top-4 left-4 flex flex-col">
+                <NodeDetailOverlay />
+                <OutputPanel />
+            </div>
             {navInfoText && !commandPlane.state.visible && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white font-mono text-sm">
                     {navInfoText}

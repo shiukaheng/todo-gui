@@ -4,6 +4,7 @@
 
 import { CommandDefinition } from '../types';
 import { useTodoStore } from '../../stores/todoStore';
+import { output } from '../output';
 
 export const gotoCommand: CommandDefinition = {
     name: 'goto',
@@ -28,17 +29,17 @@ export const gotoCommand: CommandDefinition = {
     handler: (args) => {
         const taskId = args._[0] as string | undefined;
         if (!taskId) {
-            console.log('Usage: goto <taskId>');
+            output.error('usage: goto <taskId>');
             return;
         }
 
         const graphData = useTodoStore.getState().graphData;
         if (!graphData?.tasks?.[taskId]) {
-            console.log(`Task not found: ${taskId}`);
+            output.error(`task not found: ${taskId}`);
             return;
         }
 
         useTodoStore.getState().setCursor(taskId);
-        console.log(`Navigated to: ${taskId}`);
+        output.success(`navigated to: ${taskId}`);
     },
 };

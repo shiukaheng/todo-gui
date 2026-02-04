@@ -5,5 +5,7 @@
 export * from './types';
 export { CommandRegistry, commandRegistry } from './CommandRegistry';
 export { registerBuiltinCommands } from './commands';
-export { CommandPlane, useCommandPlane } from './ui';
+export { output, useOutputStore } from './output';
+export type { OutputLine } from './output';
+export { CommandPlane, OutputPanel, useCommandPlane } from './ui';
 export type { UseCommandPlaneReturn } from './ui';

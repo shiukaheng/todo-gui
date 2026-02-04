@@ -118,14 +118,14 @@ export function CommandPlane({ controller }: CommandPlaneProps) {
                     onChange={handleChange}
                     onKeyDown={handleKeyDown}
                     className="flex-1 bg-transparent px-2 py-2 text-white font-mono outline-none"
-                    placeholder="Type a command..."
+                    placeholder="type a command..."
                     autoComplete="off"
                     spellCheck={false}
                 />
                 <button
                     onClick={hide}
                     className="px-3 py-2 text-white/50 hover:text-white/80"
-                    title="Close (Esc)"
+                    title="close (esc)"
                 >
                     &times;
                 </button>

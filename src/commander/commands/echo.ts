@@ -3,6 +3,7 @@
  */
 
 import { CommandDefinition } from '../types';
+import { output } from '../output';
 
 export const echoCommand: CommandDefinition = {
     name: 'echo',
@@ -38,7 +39,7 @@ export const echoCommand: CommandDefinition = {
         }
         const count = typeof args.repeat === 'number' ? args.repeat : 1;
         for (let i = 0; i < count; i++) {
-            console.log(message);
+            output.print(message);
         }
     },
 };
