@@ -16,6 +16,7 @@ import { connectCommand, disconnectCommand } from './connect';
 import { linkCommand } from './link';
 import { unlinkCommand } from './unlink';
 import { flipCommand } from './flip';
+import { navmodeCommand } from './navmode';
 
 /** Register all built-in commands */
 export function registerBuiltinCommands(): void {
@@ -32,4 +33,5 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(linkCommand);
     commandRegistry.register(unlinkCommand);
     commandRegistry.register(flipCommand);
+    commandRegistry.register(navmodeCommand);
 }
