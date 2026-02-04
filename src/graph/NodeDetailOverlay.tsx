@@ -3,8 +3,8 @@ import { TaskOut } from "todo-client";
 import { useTodoStore } from "../stores/todoStore";
 
 interface EditState {
-    field: 'text' | 'completed' | 'due' | null;
-    value: string | boolean;
+    field: 'id' | 'text' | 'due' | null;
+    value: string;
 }
 
 export function NodeDetailOverlay() {
@@ -21,8 +21,7 @@ export function NodeDetailOverlay() {
         setEdit({ field: null, value: '' });
     }, [cursor]);
 
-    const startEdit = (field: EditState['field'], currentValue: string | boolean) => {
-        if (field === 'completed' && task?.inferred) return;
+    const startEdit = (field: EditState['field'], currentValue: string) => {
         setEdit({ field, value: currentValue });
     };
 
@@ -34,17 +33,22 @@ export function NodeDetailOverlay() {
         if (!api || !task || !edit.field) return;
 
         try {
-            const update: Record<string, any> = {};
-            if (edit.field === 'text') {
-                update.text = edit.value as string;
-            } else if (edit.field === 'completed') {
-                update.completed = edit.value as boolean;
-            } else if (edit.field === 'due') {
-                const dateStr = edit.value as string;
-                update.due = dateStr ? Math.floor(new Date(dateStr).getTime() / 1000) : null;
+            if (edit.field === 'id') {
+                await api.renameTaskApiTasksTaskIdRenamePost({
+                    taskId: task.id,
+                    renameRequest: { newId: edit.value },
+                });
+                // Update cursor to new ID
+                useTodoStore.getState().setCursor(edit.value);
+            } else {
+                const update: Record<string, any> = {};
+                if (edit.field === 'text') {
+                    update.text = edit.value;
+                } else if (edit.field === 'due') {
+                    update.due = edit.value ? Math.floor(new Date(edit.value).getTime() / 1000) : null;
+                }
+                await api.setTaskApiTasksTaskIdPatch({ taskId: task.id, taskUpdate: update });
             }
-
-            await api.setTaskApiTasksTaskIdPatch({ taskId: task.id, taskUpdate: update });
             setEdit({ field: null, value: '' });
         } catch (err) {
             console.error("Failed to update task:", err);
@@ -103,8 +107,30 @@ export function NodeDetailOverlay() {
 
     return (
         <div className="absolute top-4 left-4 text-white/80 font-mono text-sm select-none">
-            {/* ID */}
-            <div className="text-white/40 text-xs mb-1">{task.id}</div>
+            {/* ID - prominent and editable */}
+            <div className="mb-1">
+                {isEditing('id') ? (
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            value={edit.value}
+                            onChange={(e) => setEdit({ ...edit, value: e.target.value })}
+                            onKeyDown={handleKeyDown}
+                            autoFocus
+                            className="bg-white/10 border border-white/30 rounded px-2 py-0.5 text-white outline-none"
+                        />
+                        <button onClick={saveEdit} className="text-green-400 hover:text-green-300 text-xs">save</button>
+                        <button onClick={cancelEdit} className="text-white/40 hover:text-white/60 text-xs">cancel</button>
+                    </div>
+                ) : (
+                    <span
+                        onClick={() => startEdit('id', task.id)}
+                        className="cursor-pointer hover:text-white text-white/90"
+                    >
+                        {task.id}
+                    </span>
+                )}
+            </div>
 
             {/* Text */}
             <div className="mb-1">
@@ -132,28 +158,21 @@ export function NodeDetailOverlay() {
             </div>
 
             {/* Status line */}
-            <div className="flex gap-4 text-xs text-white/50">
-                {/* Completed */}
-                {isEditing('completed') ? (
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            checked={edit.value as boolean}
-                            onChange={(e) => setEdit({ ...edit, value: e.target.checked })}
-                            className="w-3 h-3"
-                        />
-                        <button onClick={saveEdit} className="text-green-400 hover:text-green-300">save</button>
-                        <button onClick={cancelEdit} className="text-white/40 hover:text-white/60">cancel</button>
-                    </div>
-                ) : (
-                    <span
-                        onClick={() => !task.inferred && startEdit('completed', task.completed)}
-                        className={task.inferred ? "text-white/30" : "cursor-pointer hover:text-white"}
-                    >
-                        {task.completed ? "completed" : "incomplete"}
-                        {task.inferred && " (inferred)"}
-                    </span>
-                )}
+            <div className="flex gap-4 text-xs">
+                {/* Completed - click to toggle */}
+                <span
+                    onClick={() => !task.inferred && toggleCompletion()}
+                    className={
+                        task.inferred
+                            ? "text-white/30"
+                            : task.completed
+                                ? "text-green-400 cursor-pointer hover:text-green-300"
+                                : "text-orange-400 cursor-pointer hover:text-orange-300"
+                    }
+                >
+                    {task.completed ? "completed" : "incomplete"}
+                    {task.inferred && " (inferred)"}
+                </span>
 
                 {/* Due */}
                 {isEditing('due') ? (
@@ -180,10 +199,9 @@ export function NodeDetailOverlay() {
             </div>
 
             {/* Read-only info */}
-            <div className="mt-2 text-xs text-white/30">
-                {task.depsClear === false && <span className="text-yellow-500/70">blocked</span>}
-                {task.calculatedCompleted && <span className="text-green-500/70 ml-2">done</span>}
-            </div>
+            {task.depsClear === false && (
+                <div className="mt-2 text-xs text-yellow-500/70">blocked</div>
+            )}
         </div>
     );
 }
