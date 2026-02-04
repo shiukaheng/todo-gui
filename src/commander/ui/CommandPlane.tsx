@@ -77,17 +77,17 @@ export function CommandPlane({ controller }: CommandPlaneProps) {
     };
 
     return (
-        <div className="absolute bottom-4 left-4 right-4 max-w-xl">
-            {/* Completions dropdown (above input) */}
+        <div className="absolute bottom-8 left-8 w-96 font-mono text-sm select-none">
+            {/* Completions */}
             {state.completions.length > 0 && (
-                <div className="mb-1 bg-gray-900/95 border border-white/20 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                <div className="mb-1 max-h-40 overflow-y-auto">
                     {state.completions.map((completion, index) => (
                         <div
                             key={`${completion.value}-${index}`}
-                            className={`px-3 py-1.5 flex items-center gap-3 cursor-pointer ${
+                            className={`cursor-pointer ${
                                 index === state.selectedCompletionIndex
-                                    ? 'bg-white/20'
-                                    : 'hover:bg-white/10'
+                                    ? 'text-white'
+                                    : 'text-white/40 hover:text-white/60'
                             }`}
                             onClick={() => {
                                 controller.selectCompletion(index);
@@ -95,11 +95,11 @@ export function CommandPlane({ controller }: CommandPlaneProps) {
                                 inputRef.current?.focus();
                             }}
                         >
-                            <span className={`font-mono ${getCompletionTypeColor(completion.type)}`}>
+                            <span className={getCompletionTypeColor(completion.type)}>
                                 {completion.value}
                             </span>
                             {completion.description && (
-                                <span className="text-white/50 text-sm truncate">
+                                <span className="text-white/30 ml-2">
                                     {completion.description}
                                 </span>
                             )}
@@ -109,31 +109,19 @@ export function CommandPlane({ controller }: CommandPlaneProps) {
             )}
 
             {/* Input */}
-            <div className="flex items-center bg-gray-900/95 border border-white/20 rounded-lg">
-                <span className="pl-3 text-white/50 font-mono">&gt;</span>
+            <div className="flex items-center text-white/80">
+                <span className="text-white/50">&gt;</span>
                 <input
                     ref={inputRef}
                     type="text"
                     value={state.input}
                     onChange={handleChange}
                     onKeyDown={handleKeyDown}
-                    className="flex-1 bg-transparent px-2 py-2 text-white font-mono outline-none"
-                    placeholder="type a command..."
+                    className="flex-1 bg-transparent ml-1 text-white outline-none"
+                    placeholder=""
                     autoComplete="off"
                     spellCheck={false}
                 />
-                <button
-                    onClick={hide}
-                    className="px-3 py-2 text-white/50 hover:text-white/80"
-                    title="close (esc)"
-                >
-                    &times;
-                </button>
-            </div>
-
-            {/* Hint */}
-            <div className="mt-1 text-xs text-white/30 font-mono">
-                Tab: complete | Enter: execute | Esc: close | Up/Down: history
             </div>
         </div>
     );

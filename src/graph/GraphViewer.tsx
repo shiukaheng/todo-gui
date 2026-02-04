@@ -72,7 +72,7 @@ export function GraphViewer() {
     return (
         <div className="absolute w-full h-full bg-black">
             <div className="absolute w-full h-full" ref={viewportContainerRef} />
-            <div className="absolute top-4 left-4 flex flex-col">
+            <div className="absolute top-8 left-8 flex flex-col">
                 <NodeDetailOverlay />
                 <OutputPanel />
             </div>
