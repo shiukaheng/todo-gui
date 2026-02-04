@@ -206,37 +206,42 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
         cursorPos: [number, number],
         graph: NavigationEngineInput['graph']
     ): { maxDistance: number; neighborCount: number } {
-        const distances: number[] = [];
+        const neighbors: { id: string; type: 'parent' | 'child'; distance: number }[] = [];
 
-        // Find direct neighbors through dependencies
-        for (const dep of Object.values(graph.dependencies)) {
+        // Find direct neighbors through dependencies (skip virtual nav edges)
+        for (const [depId, dep] of Object.entries(graph.dependencies)) {
+            // Skip virtual navigation edges added by navigationStyleGraphData
+            if (depId.startsWith('__nav__')) continue;
             const { fromId, toId } = dep.data;
             let neighborId: string | null = null;
+            let neighborType: 'parent' | 'child' | null = null;
 
             if (fromId === cursorId) {
-                neighborId = toId; // Child
+                neighborId = toId;
+                neighborType = 'child';
             } else if (toId === cursorId) {
-                neighborId = fromId; // Parent
+                neighborId = fromId;
+                neighborType = 'parent';
             }
 
-            if (neighborId) {
+            if (neighborId && neighborType) {
                 const neighborTask = graph.tasks[neighborId] as any;
                 if (neighborTask?.position) {
                     const [nx, ny] = neighborTask.position;
                     const dx = nx - cursorPos[0];
                     const dy = ny - cursorPos[1];
                     const distance = Math.sqrt(dx * dx + dy * dy);
-                    distances.push(distance);
+                    neighbors.push({ id: neighborId, type: neighborType, distance });
                 }
             }
         }
 
-        if (distances.length === 0) {
+        if (neighbors.length === 0) {
             return { maxDistance: this.config.defaultDistance, neighborCount: 0 };
         }
 
-        const maxDistance = Math.max(...distances);
-        return { maxDistance, neighborCount: distances.length };
+        const maxDistance = Math.max(...neighbors.map(n => n.distance));
+        return { maxDistance, neighborCount: neighbors.length };
     }
 
     destroy(): void {
