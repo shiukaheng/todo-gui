@@ -2,11 +2,6 @@ import { create } from 'zustand';
 import {
     subscribeToTasks,
     TaskListOut,
-    TaskCreate,
-    TaskUpdate,
-    TaskOut,
-    DependencyOut,
-    OperationResult,
     DefaultApi,
     Configuration,
 } from 'todo-client';
@@ -16,31 +11,28 @@ interface TodoStore {
     graphData: TaskListOut | null;
     cursor: string | null;
 
-    // Setters
+    // API client (set after subscribe)
+    api: DefaultApi | null;
+    unsubscribe: (() => void) | null;
+
+    // Actions
     setCursor: (nodeId: string | null) => void;
-
-    // Subscription
     subscribe: (baseUrl: string) => () => void;
-
-    // Mutations
-    addTask: (task: TaskCreate) => Promise<TaskOut>;
-    updateTask: (taskId: string, update: TaskUpdate) => Promise<OperationResult>;
-    removeTask: (taskId: string) => Promise<OperationResult>;
-    renameTask: (taskId: string, newId: string) => Promise<OperationResult>;
-    linkTasks: (fromId: string, toId: string) => Promise<DependencyOut>;
-    unlinkTasks: (fromId: string, toId: string) => Promise<OperationResult>;
 }
-
-let api: DefaultApi | null = null;
 
 export const useTodoStore = create<TodoStore>((set, get) => ({
     graphData: null,
     cursor: null,
+    api: null,
+    unsubscribe: null,
 
     setCursor: (nodeId) => set({ cursor: nodeId }),
 
     subscribe: (baseUrl: string) => {
-        api = new DefaultApi(new Configuration({ basePath: baseUrl }));
+        // Clean up existing subscription
+        get().unsubscribe?.();
+
+        const api = new DefaultApi(new Configuration({ basePath: baseUrl }));
 
         const unsubscribe = subscribeToTasks(
             (data) => set({ graphData: data }),
@@ -50,36 +42,11 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
             }
         );
 
-        return unsubscribe;
-    },
+        set({ api, unsubscribe });
 
-    addTask: async (task) => {
-        if (!api) throw new Error('Not connected');
-        return api.addTaskApiTasksPost({ taskCreate: task });
-    },
-
-    updateTask: async (taskId, update) => {
-        if (!api) throw new Error('Not connected');
-        return api.setTaskApiTasksTaskIdPatch({ taskId, taskUpdate: update });
-    },
-
-    removeTask: async (taskId) => {
-        if (!api) throw new Error('Not connected');
-        return api.removeTaskApiTasksTaskIdDelete({ taskId });
-    },
-
-    renameTask: async (taskId, newId) => {
-        if (!api) throw new Error('Not connected');
-        return api.renameTaskApiTasksTaskIdRenamePost({ taskId, renameRequest: { newId } });
-    },
-
-    linkTasks: async (fromId, toId) => {
-        if (!api) throw new Error('Not connected');
-        return api.linkTasksApiLinksPost({ linkRequest: { fromId, toId } });
-    },
-
-    unlinkTasks: async (fromId, toId) => {
-        if (!api) throw new Error('Not connected');
-        return api.unlinkTasksApiLinksDelete({ linkRequest: { fromId, toId } });
+        return () => {
+            get().unsubscribe?.();
+            set({ unsubscribe: null });
+        };
     },
 }));

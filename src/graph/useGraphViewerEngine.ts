@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { TaskListOut } from "todo-client";
 import { GraphViewerEngine } from "./GraphViewerEngine";
 import { GraphViewerEngineState, INITIAL_ENGINE_STATE } from "./GraphViewerEngineState";
 import { GraphNavigationHandle } from "./graphNavigation/types";
+import { useTodoStore } from "../stores/todoStore";
 
 // No-op navigation handle for when engine isn't ready
 const NOOP_NAVIGATION_HANDLE: GraphNavigationHandle = {
@@ -24,9 +24,9 @@ export interface UseGraphViewerEngineResult {
  * useGraphViewerEngine - React hook that manages the engine lifecycle.
  */
 export function useGraphViewerEngine(
-    taskList: TaskListOut,
     viewportContainerRef: React.RefObject<HTMLDivElement>
 ): UseGraphViewerEngineResult {
+    const graphData = useTodoStore((s) => s.graphData);
     const [engineState, setEngineState] = useState<GraphViewerEngineState>(INITIAL_ENGINE_STATE);
     const engineRef = useRef<GraphViewerEngine | null>(null);
 
@@ -43,10 +43,12 @@ export function useGraphViewerEngine(
         };
     }, []);
 
-    // Push data when taskList changes
+    // Push data when graphData changes
     useEffect(() => {
-        engineRef.current?.setGraph(taskList);
-    }, [taskList]);
+        if (graphData) {
+            engineRef.current?.setGraph(graphData);
+        }
+    }, [graphData]);
 
     const navigationHandle = engineRef.current?.getNavigationHandle() ?? NOOP_NAVIGATION_HANDLE;
 

@@ -1,18 +1,11 @@
 import { useRef, useEffect } from "react";
 import { useGraphViewerEngine } from "./useGraphViewerEngine";
-import { useTodoStore } from "../stores/todoStore";
 
 const SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
 export function GraphViewer() {
-    const graphData = useTodoStore((s) => s.graphData);
     const viewportContainerRef = useRef<HTMLDivElement>(null);
-
-    // Note: graphData is guaranteed non-null because App guards before rendering GraphViewer
-    const { engineState, navigationHandle } = useGraphViewerEngine(
-        graphData!,
-        viewportContainerRef
-    );
+    const { engineState, navigationHandle } = useGraphViewerEngine(viewportContainerRef);
 
     // Keyboard navigation
     useEffect(() => {

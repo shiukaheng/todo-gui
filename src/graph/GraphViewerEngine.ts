@@ -4,45 +4,25 @@
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * This engine bridges React's declarative world with an imperative animation
- * loop. Data flows bidirectionally between React and the engine.
+ * loop. The engine reads/writes cursor state directly from the Zustand store.
  *
  * ┌─────────────────────────────────────────────────────────────────────────┐
- * │                              REACT                                      │
+ * │                         ZUSTAND STORE                                   │
  * │                                                                         │
- * │   const [appState, setAppState] = useState({ cursor: null });          │
- * │   const engineState = useGraphViewerEngine(taskList, appState, ref);   │
+ * │   useTodoStore: { graphData, cursor, api, setCursor, subscribe }       │
  * │                                                                         │
- * └──────────────────────────┬──────────────────────┬───────────────────────┘
- *                            │                      │
- *              INPUTS (React → Engine)    OUTPUTS (Engine → React)
- *                            │                      │
- *                            ▼                      │
- * ┌──────────────────────────────────────┐          │
- * │  setGraph(taskList)                  │          │
- * │  ─────────────────                   │          │
- * │  Primary data source. Graph topology │          │
- * │  and node properties from the API.   │          │
- * │  Processed: nest → components →      │          │
- * │             baseStyle → conditional  │          │
- * └──────────────────────────────────────┘          │
- *                            │                      │
- *                            ▼                      │
- * ┌──────────────────────────────────────┐          │
- * │  setAppState(appState)               │          │
- * │  ─────────────────────               │          │
- * │  Secondary reactive source. UI state │          │
- * │  owned by React (cursor, selection). │          │
- * │  Applied per-frame in the loop.      │          │
- * └──────────────────────────────────────┘          │
- *                            │                      │
- *                            ▼                      │
- * ┌─────────────────────────────────────────────────┴───────────────────────┐
+ * └──────────────────────────┬──────────────────────────────────────────────┘
+ *                            │
+ *              Engine reads/writes via useTodoStore.getState()
+ *                            │
+ *                            ▼
+ * ┌─────────────────────────────────────────────────────────────────────────┐
  * │                         ANIMATION LOOP                                  │
  * │                                                                         │
  * │   tick() runs every frame via requestAnimationFrame:                   │
  * │                                                                         │
  * │   1. SIMULATE  - Compute node positions (world space)                  │
- * │   2. STYLE     - Apply cursor/selection styling from appState          │
+ * │   2. STYLE     - Apply cursor styling (reads cursor from store)        │
  * │   3. NAVIGATE  - Compute view transform (pan/zoom)                     │
  * │   4. RENDER    - Draw to SVG                                           │
  * │                                                                         │
@@ -74,14 +54,15 @@
  * SUMMARY
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * INPUTS (React → Engine):
- *   - taskList    via setGraph()     → Graph data from API
- *   - appState    via setAppState()  → UI state (cursor, selection)
+ * INPUTS:
+ *   - taskList       via setGraph()                  → Graph data from API
+ *   - cursor         via useTodoStore.getState()    → Current cursor node
  *
- * OUTPUTS (Engine → React):
- *   - engineState via onStateChange() → Hover, selection, simulation status
+ * OUTPUTS:
+ *   - cursor changes via useTodoStore.getState().setCursor()
+ *   - engineState    via onStateChange()            → navInfoText for React
  *
- * INTERNAL (not exposed to React):
+ * INTERNAL:
  *   - simulationState  (node positions, physics)
  *   - navigationState  (pan/zoom transform)
  *   - user input handling (drag, scroll, touch)
@@ -152,7 +133,6 @@ import { TaskListOut } from "todo-client";
 import { CursorNeighbors, GraphViewerEngineState, computeCursorNeighbors, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
 import { getNavInfoText, GraphNavigationHandle, DEFAULT_NAV_MAPPING } from "./graphNavigation/types";
 import { useTodoStore } from "../stores/todoStore";
-import { Color } from "./types";
 import { GraphNavigationController } from "./graphNavigation/GraphNavigationController";
 import { navigationStyleGraphData } from "./preprocess/navigationStyleGraphData";
 import { nestGraphData, NestedGraphData } from "./preprocess/nestGraphData";
@@ -234,7 +214,6 @@ function computeFitTransform(
 export type EngineStateCallback = (state: GraphViewerEngineState) => void;
 
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
-const BACKGROUND_COLOR: Color = [0, 0, 0];
 
 /**
  * GraphViewerEngine - Imperative class that owns the animation loop.
@@ -547,7 +526,7 @@ export class GraphViewerEngine {
             //
             // Uses reconciliation to minimize DOM operations.
             // ─────────────────────────────────────────────────────────────
-            this.renderer.render(styledData, this.navigationState.transform, BACKGROUND_COLOR);
+            this.renderer.render(styledData, this.navigationState.transform);
 
             this.performanceMonitor?.end();
             this.animationFrameId = requestAnimationFrame(tick);
@@ -582,13 +561,3 @@ export class GraphViewerEngine {
         this.svg.remove();
     }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TODO: Hoist UI state (selection, cursor) to React level
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// React should maintain UI state (selectedNodeId, cursorNodeId, etc.) and
-// inject it into the data before calling setGraph(). The engine stays pure:
-// just processes whatever data it receives. Selection state can then affect
-// both styling AND navigation (focus on selected node).
-// ═══════════════════════════════════════════════════════════════════════════

@@ -7,14 +7,12 @@ import { useTodoStore } from "./stores/todoStore";
 const BASE_URL = 'http://localhost:8000';
 
 function App() {
-    const graphData = useTodoStore((s) => s.graphData);
+    
     const subscribe = useTodoStore((s) => s.subscribe);
-
     useEffect(() => {
         return subscribe(BASE_URL);
     }, [subscribe]);
 
-    if (!graphData) return null;
     return <GraphViewer />;
 }
 
