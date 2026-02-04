@@ -1,8 +1,9 @@
 /**
  * Maps time distance (in seconds) to urgency color.
- * - Past due / < 1 hour: bright red
- * - ~1 day: yellow
- * - >= 1 week: green
+ * Uses blue intensity scale: intense blue (urgent) → white (relaxed)
+ * - Past due / < 1 hour: intense blue
+ * - ~1 day: medium blue  
+ * - >= 1 week: near white (matches non-deadline nodes)
  * Uses logarithmic scale for smooth perceptual transitions.
  */
 
@@ -10,9 +11,8 @@
 const ONE_HOUR = 3600;
 const ONE_WEEK = 604800;
 
-// Hue values (0-360)
-const HUE_RED = 0;
-const HUE_GREEN = 120;
+// Blue hue (0-360)
+const HUE_BLUE = 215;
 
 /**
  * Convert HSL to RGB color array [r, g, b] with values 0-1
@@ -49,9 +49,9 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
  * @returns RGB color as [r, g, b] with values 0-1
  */
 export function getUrgencyColor(secondsUntilDue: number): [number, number, number] {
-    // Past due or very urgent: bright red
+    // Past due: most intense blue
     if (secondsUntilDue <= 0) {
-        return hslToRgb(HUE_RED, 0.9, 0.5);
+        return hslToRgb(HUE_BLUE, 0.85, 0.45);
     }
 
     // Clamp to range [1 hour, 1 week]
@@ -62,14 +62,16 @@ export function getUrgencyColor(secondsUntilDue: number): [number, number, numbe
     const logMax = Math.log(ONE_WEEK);
     const logTime = Math.log(clampedTime);
 
-    // Normalize to 0-1 (0 = urgent/red, 1 = relaxed/green)
+    // Normalize to 0-1 (0 = urgent, 1 = relaxed)
     const t = (logTime - logMin) / (logMax - logMin);
 
-    // Interpolate hue from red (0) to green (120)
-    const hue = HUE_RED + t * (HUE_GREEN - HUE_RED);
+    // Interpolate saturation: 85% (urgent) → 10% (relaxed/near white)
+    const saturation = 0.85 - t * 0.75;
+    
+    // Interpolate lightness: 45% (urgent/vivid) → 90% (relaxed/near white)
+    const lightness = 0.45 + t * 0.45;
 
-    // Keep saturation and lightness consistent for readability
-    return hslToRgb(hue, 0.7, 0.5);
+    return hslToRgb(HUE_BLUE, saturation, lightness);
 }
 
 /**
