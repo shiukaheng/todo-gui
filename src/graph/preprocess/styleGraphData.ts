@@ -197,13 +197,29 @@ export function baseStyleGraphData<G extends NestedGraphData>(graphData: G): Sty
 
 /** Apply conditional styling based on node state (e.g., completed, actionable, inferred). */
 export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphData>>(graphData: G): G {
+    // Build a lookup for task calculatedCompleted status
+    const taskCalcCompleted = new Map<string, boolean>();
+    for (const [tid, t] of Object.entries(graphData.tasks)) {
+        const d = t.data as { calculatedCompleted?: boolean };
+        taskCalcCompleted.set(tid, d.calculatedCompleted === true);
+    }
+
     return {
         ...graphData,
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, task]) => {
-                const data = task.data as { calculatedCompleted?: boolean; depsClear?: boolean; inferred?: boolean; completed?: boolean };
-                const isBlocked = !data.depsClear;
+                const data = task.data as { calculatedCompleted?: boolean; depsClear?: boolean; inferred?: boolean; completed?: boolean; children?: string[] };
                 const isInferred = data.inferred;
+
+                // Check if blocked: any direct dependency not calculatedCompleted
+                // children = dependency IDs where this task is fromId (things this depends on)
+                const childDepIds = data.children || [];
+                const childTaskIds = childDepIds
+                    .map(depId => (graphData.dependencies[depId]?.data as { toId?: string })?.toId)
+                    .filter((id): id is string => id != null);
+                
+                // Blocked if any dependency is not calculatedCompleted
+                const isBlocked = childTaskIds.length > 0 && childTaskIds.some(id => !taskCalcCompleted.get(id));
                 
                 // If blocked, ignore completed status - just show as blocked
                 // Only check completion when deps are clear
