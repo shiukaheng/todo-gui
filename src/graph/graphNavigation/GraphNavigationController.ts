@@ -36,7 +36,8 @@ export class GraphNavigationController {
         private readonly navDirectionMapping: NavDirectionMapping,
         private readonly selectors: string[],
         private readonly onCursorChange: (nodeId: string) => void,
-        private readonly onNavInfoTextChange: (text: string | null) => void
+        private readonly onNavInfoTextChange: (text: string | null) => void,
+        private readonly onSelectNearestToCenter?: () => boolean,
     ) {
         const self = this;
         this.handle = {
@@ -103,7 +104,22 @@ export class GraphNavigationController {
         }
     }
 
+    private hasNoCursor(): boolean {
+        const { topological } = this.cursorNeighbors;
+        return (
+            topological.children.length === 0 &&
+            topological.parents.length === 0 &&
+            topological.peers.size === 0
+        );
+    }
+
     private handleDirection(direction: NavDirection): void {
+        // No cursor - select nearest node to screen center
+        if (this.hasNoCursor()) {
+            this.onSelectNearestToCenter?.();
+            return;
+        }
+
         const target = this.navDirectionMapping[direction];
 
         // If already in confirmingTarget for same direction, move to first target

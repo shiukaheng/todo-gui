@@ -24,6 +24,7 @@ import {
     INITIAL_NAVIGATION_STATE,
     ViewportInfo,
 } from "./navigation";
+import { screenToWorld } from "./navigation/utils";
 import {
     ManualNavigationEngine,
     CursorFollowNavigationEngine,
@@ -86,7 +87,8 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             DEFAULT_NAV_MAPPING,
             DEFAULT_SELECTORS,
             setCursor,
-            setNavInfoText
+            setNavInfoText,
+            () => this.selectNearestToCenter(),
         );
 
         // SVG setup
@@ -221,6 +223,39 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             this.currentCursorNeighbors = newNeighbors;
             this.navigationController.setCursorNeighbors(newNeighbors);
         }
+    }
+
+    private selectNearestToCenter(): boolean {
+        // Need positions from simulation state
+        const positions = this.simulationState.positions;
+        const nodeIds = Object.keys(positions);
+        if (nodeIds.length === 0) return false;
+
+        // Get screen center in world coordinates
+        const viewport = this.getViewport();
+        const screenCenter = { x: viewport.width / 2, y: viewport.height / 2 };
+        const worldCenter = screenToWorld(screenCenter, this.navigationState.transform);
+
+        // Find nearest node to world center
+        let nearestId: string | null = null;
+        let nearestDistSq = Infinity;
+
+        for (const nodeId of nodeIds) {
+            const pos = positions[nodeId];
+            const dx = pos.x - worldCenter.x;
+            const dy = pos.y - worldCenter.y;
+            const distSq = dx * dx + dy * dy;
+            if (distSq < nearestDistSq) {
+                nearestDistSq = distSq;
+                nearestId = nodeId;
+            }
+        }
+
+        if (nearestId) {
+            this.setCursor(nearestId);
+            return true;
+        }
+        return false;
     }
 
     private startLoop(): void {
