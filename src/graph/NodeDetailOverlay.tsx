@@ -158,20 +158,24 @@ export function NodeDetailOverlay() {
 
             {/* Status line */}
             <div className="flex gap-4 text-xs">
-                {/* Completed - click to toggle */}
-                <span
-                    onClick={() => !task.inferred && toggleCompletion()}
-                    className={
-                        task.inferred
-                            ? "text-white/30"
-                            : task.completed
-                                ? "text-green-400 cursor-pointer hover:text-green-300"
-                                : "text-orange-400 cursor-pointer hover:text-orange-300"
-                    }
-                >
-                    {task.completed ? "completed" : "incomplete"}
-                    {task.inferred && " (inferred)"}
-                </span>
+                {/* Status: blocked > completed > incomplete */}
+                {task.depsClear === false ? (
+                    <span className="text-yellow-500/70">blocked</span>
+                ) : (
+                    <span
+                        onClick={() => !task.inferred && toggleCompletion()}
+                        className={
+                            task.inferred
+                                ? "text-white/30"
+                                : task.calculatedCompleted
+                                    ? "text-green-400 cursor-pointer hover:text-green-300"
+                                    : "text-orange-400 cursor-pointer hover:text-orange-300"
+                        }
+                    >
+                        {task.calculatedCompleted ? "completed" : "actionable"}
+                        {task.inferred && " (inferred)"}
+                    </span>
+                )}
 
                 {/* Due */}
                 {isEditing('due') ? (
@@ -196,11 +200,6 @@ export function NodeDetailOverlay() {
                     </span>
                 )}
             </div>
-
-            {/* Read-only info */}
-            {task.depsClear === false && (
-                <div className="mt-2 text-xs text-yellow-500/70">blocked</div>
-            )}
         </div>
     );
 }
