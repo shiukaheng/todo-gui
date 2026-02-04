@@ -30,7 +30,7 @@ export interface CursorFollowNavigationEngineConfig {
 }
 
 const DEFAULT_CONFIG: Required<CursorFollowNavigationEngineConfig> = {
-    marginMultiplier: 2.5,
+    marginMultiplier: 3,
     positionSmoothingRate: 5,
     scaleSmoothingRate: 3,
     defaultDistance: 100,
