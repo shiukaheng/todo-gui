@@ -96,6 +96,18 @@ export function NodeDetailOverlay() {
         }
     }, [task, api, isBlocked]);
 
+    const toggleInferred = useCallback(async () => {
+        if (!task || !api) return;
+        try {
+            await api.setTaskApiTasksTaskIdPatch({
+                taskId: task.id,
+                taskUpdate: { inferred: !task.inferred },
+            });
+        } catch (err) {
+            console.error("Failed to toggle inferred:", err);
+        }
+    }, [task, api]);
+
     // Global keyboard handler for space
     useEffect(() => {
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -184,6 +196,14 @@ export function NodeDetailOverlay() {
 
             {/* Status line */}
             <div className="flex gap-4 text-xs">
+                {/* Node type: task or inferred - click to toggle */}
+                <span
+                    onClick={toggleInferred}
+                    className="cursor-pointer text-white/50 hover:text-white/70"
+                >
+                    {task.inferred ? "inferred" : "task"}
+                </span>
+
                 {/* Status: blocked > completed > actionable */}
                 {isBlocked ? (
                     <span className="text-yellow-500/70">blocked</span>
@@ -199,7 +219,6 @@ export function NodeDetailOverlay() {
                         }
                     >
                         {task.calculatedCompleted ? "completed" : "actionable"}
-                        {task.inferred && " (inferred)"}
                     </span>
                 )}
 
