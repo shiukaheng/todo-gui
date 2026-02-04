@@ -1,5 +1,5 @@
 /**
- * Adddep command - create a new task that depends on the cursor node.
+ * Adddep command - create a new task that the cursor node depends on (add a blocker/parent).
  */
 
 import { CommandDefinition } from '../types';
@@ -8,7 +8,7 @@ import { output } from '../output';
 
 export const adddepCommand: CommandDefinition = {
     name: 'adddep',
-    description: 'Create a new task that depends on the cursor node',
+    description: 'Add a dependency (blocker) to the cursor node',
     aliases: ['ad'],
     positionals: [
         {
@@ -57,16 +57,16 @@ export const adddepCommand: CommandDefinition = {
         }
 
         try {
-            // Create the new task with a dependency on the cursor node
+            // Create a new task that blocks the cursor (cursor depends on new task)
             await api.addTaskApiTasksPost({
                 taskCreate: {
                     id: taskId,
                     text: args.text as string | undefined,
                     completed: args.completed as boolean,
-                    depends: [cursor],
+                    blocks: [cursor],
                 },
             });
-            output.success(`created task: ${taskId} (depends on ${cursor})`);
+            output.success(`created task: ${taskId} (${cursor} depends on it)`);
         } catch (err) {
             output.error(`failed to create task: ${err instanceof Error ? err.message : String(err)}`);
         }

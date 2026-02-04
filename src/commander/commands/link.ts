@@ -75,8 +75,8 @@ export const linkCommand: CommandDefinition = {
             // API: from_id depends on to_id (from=dependent, to=blocker)
             await api.linkTasksApiLinksPost({
                 linkRequest: {
-                    from: dependentTask,
-                    to: blockingTask,
+                    fromId: dependentTask,
+                    toId: blockingTask,
                 },
             });
             output.success(`linked: ${dependentTask} now depends on ${blockingTask}`);

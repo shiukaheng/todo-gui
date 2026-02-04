@@ -74,8 +74,16 @@ export const flipCommand: CommandDefinition = {
         // Check which direction the edge exists in graphData.dependencies
         // API: from_id depends on to_id (from=dependent, to=blocker)
         const deps = Object.values(graphData.dependencies || {});
+        
+        // Debug: log the dependencies
+        console.log('graphData.dependencies:', graphData.dependencies);
+        console.log('deps array:', deps);
+        console.log('Looking for edge between:', taskA, 'and', taskB);
+        deps.forEach(d => console.log('  dep:', d.fromId, '->', d.toId));
+        
         const aDependsOnB = deps.some(d => d.fromId === taskA && d.toId === taskB);
         const bDependsOnA = deps.some(d => d.fromId === taskB && d.toId === taskA);
+        console.log('aDependsOnB:', aDependsOnB, 'bDependsOnA:', bDependsOnA);
 
         if (!aDependsOnB && !bDependsOnA) {
             output.error(`no dependency exists between ${taskA} and ${taskB}`);
@@ -90,24 +98,29 @@ export const flipCommand: CommandDefinition = {
         try {
             if (aDependsOnB) {
                 // A depends on B, flip to B depends on A
+                console.log('Unlinking:', { fromId: taskA, toId: taskB });
                 await api.unlinkTasksApiLinksDelete({
-                    linkRequest: { from: taskA, to: taskB },
+                    linkRequest: { fromId: taskA, toId: taskB },
                 });
+                console.log('Linking:', { fromId: taskB, toId: taskA });
                 await api.linkTasksApiLinksPost({
-                    linkRequest: { from: taskB, to: taskA },
+                    linkRequest: { fromId: taskB, toId: taskA },
                 });
                 output.success(`flipped: ${taskB} now depends on ${taskA}`);
             } else {
                 // B depends on A, flip to A depends on B
+                console.log('Unlinking:', { fromId: taskB, toId: taskA });
                 await api.unlinkTasksApiLinksDelete({
-                    linkRequest: { from: taskB, to: taskA },
+                    linkRequest: { fromId: taskB, toId: taskA },
                 });
+                console.log('Linking:', { fromId: taskA, toId: taskB });
                 await api.linkTasksApiLinksPost({
-                    linkRequest: { from: taskA, to: taskB },
+                    linkRequest: { fromId: taskA, toId: taskB },
                 });
                 output.success(`flipped: ${taskA} now depends on ${taskB}`);
             }
         } catch (err) {
+            console.error('Flip error:', err);
             output.error(`failed to flip: ${err instanceof Error ? err.message : String(err)}`);
         }
     },

@@ -1,5 +1,5 @@
 /**
- * Addblock command - create a new task that blocks the cursor node.
+ * Addblock command - create a new task that depends on the cursor node (add a child).
  */
 
 import { CommandDefinition } from '../types';
@@ -8,7 +8,7 @@ import { output } from '../output';
 
 export const addblockCommand: CommandDefinition = {
     name: 'addblock',
-    description: 'Create a new task that blocks the cursor node',
+    description: 'Add a task that the cursor blocks (a child/dependent)',
     aliases: ['ab'],
     positionals: [
         {
@@ -57,17 +57,16 @@ export const addblockCommand: CommandDefinition = {
         }
 
         try {
-            // Create the new task that blocks the cursor node
-            // This means the cursor depends on the new task
+            // Create a new task that depends on the cursor (cursor blocks new task)
             await api.addTaskApiTasksPost({
                 taskCreate: {
                     id: taskId,
                     text: args.text as string | undefined,
                     completed: args.completed as boolean,
-                    blocks: [cursor],
+                    depends: [cursor],
                 },
             });
-            output.success(`created task: ${taskId} (blocks ${cursor})`);
+            output.success(`created task: ${taskId} (depends on ${cursor})`);
         } catch (err) {
             output.error(`failed to create task: ${err instanceof Error ? err.message : String(err)}`);
         }

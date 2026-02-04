@@ -70,8 +70,8 @@ export const unlinkCommand: CommandDefinition = {
             // API: from_id depends on to_id (from=dependent, to=blocker)
             await api.unlinkTasksApiLinksDelete({
                 linkRequest: {
-                    from: dependentTask,
-                    to: blockingTask,
+                    fromId: dependentTask,
+                    toId: blockingTask,
                 },
             });
             output.success(`unlinked: ${dependentTask} no longer depends on ${blockingTask}`);
