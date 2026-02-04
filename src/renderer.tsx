@@ -4,7 +4,7 @@ import "./index.css";
 import { GraphViewer } from "./graph/GraphViewer";
 import { useTodoStore } from "./stores/todoStore";
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = 'http://workstation.local:8000';
 
 function App() {
     
