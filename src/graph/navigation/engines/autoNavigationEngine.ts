@@ -40,11 +40,11 @@ export class AutoNavigationEngine implements IManualNavigationEngine {
     // Track previous cursor to detect transitions
     private prevCursorId: string | null = null;
 
-    // Track the last cursor we observed (for syncing on pause)
-    private lastKnownCursorId: string | null = null;
-
     // Track whether fly autoselect is paused (for mode switching logic)
     private flyAutoselectPaused: boolean = false;
+
+    // When true, ignore the next cursor change in fly mode (race condition prevention)
+    private ignoreCursorChangeOnce: boolean = false;
 
     // Callback when mode changes (for external listeners)
     private onModeChange?: (mode: AutoNavigationMode) => void;
@@ -88,11 +88,12 @@ export class AutoNavigationEngine implements IManualNavigationEngine {
             pauseAutoselect: (paused: boolean) => {
                 this.flyAutoselectPaused = paused;
                 flyEngineHandle.pauseAutoselect(paused);
-                // When pausing, sync prevCursorId to prevent race condition:
-                // Cursor may have been updated in the current frame (while active)
-                // but we're now paused, so don't treat it as a "new" change next frame
-                if (paused) {
-                    this.prevCursorId = this.lastKnownCursorId;
+                // When pausing, set flag to ignore the next cursor change.
+                // This prevents race condition: cursor may have been updated
+                // AFTER step() but BEFORE this pause, so next frame would
+                // incorrectly detect a "new" change with autoselect paused.
+                if (paused && this.currentMode === 'fly') {
+                    this.ignoreCursorChangeOnce = true;
                 }
             },
         };
@@ -161,16 +162,21 @@ export class AutoNavigationEngine implements IManualNavigationEngine {
     step(input: NavigationEngineInput, prevState: NavigationState): NavigationState {
         // Detect cursor transitions
         const cursorId = this.findCursorId(input.graph);
-        this.lastKnownCursorId = cursorId;
 
         // If cursor changed to a non-null value, consider switching to follow mode
         // - Not in fly mode: always switch to follow
         // - In fly mode with autoselect paused: switch to follow (user is doing manual cursor nav)
         // - In fly mode with autoselect active: stay in fly (cursor change is from auto-select)
         if (cursorId !== null && cursorId !== this.prevCursorId) {
-            const shouldSwitchToFollow = this.currentMode !== 'fly' || this.flyAutoselectPaused;
-            if (shouldSwitchToFollow) {
-                this.setMode('follow');
+            // Check if we should ignore this change (race condition from pause)
+            if (this.ignoreCursorChangeOnce && this.currentMode === 'fly') {
+                this.ignoreCursorChangeOnce = false;
+                // Don't switch modes, just consume the change
+            } else {
+                const shouldSwitchToFollow = this.currentMode !== 'fly' || this.flyAutoselectPaused;
+                if (shouldSwitchToFollow) {
+                    this.setMode('follow');
+                }
             }
         }
 
