@@ -151,8 +151,13 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     }
 
     getFlyNavigationHandle(): FlyNavigationHandle | null {
+        // Check for dedicated fly engine
         if (isFlyNavigationEngine(this.navigationEngine)) {
             return this.navigationEngine.handle;
+        }
+        // Check for auto engine with fly support
+        if (this.navigationEngine instanceof AutoNavigationEngine) {
+            return this.navigationEngine.flyHandle;
         }
         return null;
     }
@@ -179,8 +184,12 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
                 return engine;
             }
             case 'auto':
-            default:
-                return new AutoNavigationEngine();
+            default: {
+                const engine = new AutoNavigationEngine();
+                // Wire up cursor callback for fly mode within auto
+                engine.setCursorCallback((nodeId) => this.setCursor(nodeId));
+                return engine;
+            }
         }
     }
 

@@ -1,13 +1,15 @@
 /**
- * AutoNavigationEngine - Composite engine that switches between manual and follow modes.
+ * AutoNavigationEngine - Composite engine that switches between manual, follow, and fly modes.
  *
  * Behavior:
  * - Starts in follow mode by default (auto-fits all nodes when no cursor)
  * - When cursor transitions to a non-null node, switches to follow mode
  * - When user interacts (zoom, pan, drag), switches to manual mode
+ * - When WASD/zoom keys are pressed (via fly handle), switches to fly mode
  * - Delegates to the appropriate engine based on current mode
  *
  * Implements IManualNavigationEngine so InteractionController can interact with it.
+ * Exposes FlyNavigationHandle for keyboard-based viewport control.
  */
 
 import {
@@ -16,11 +18,13 @@ import {
     NavigationEngineInput,
     NavigationState,
     ScreenPoint,
+    FlyNavigationHandle,
 } from "../types";
 import { ManualNavigationEngine } from "./manualNavigationEngine";
 import { CursorFollowNavigationEngine } from "./cursorFollowNavigationEngine";
+import { FlyNavigationEngine } from "./flyNavigationEngine";
 
-export type AutoNavigationMode = 'manual' | 'follow';
+export type AutoNavigationMode = 'manual' | 'follow' | 'fly';
 
 export interface AutoNavigationEngineConfig {
     /** Initial mode. Default: 'follow' */
@@ -30,18 +34,59 @@ export interface AutoNavigationEngineConfig {
 export class AutoNavigationEngine implements IManualNavigationEngine {
     private manualEngine: ManualNavigationEngine;
     private followEngine: CursorFollowNavigationEngine;
+    private flyEngine: FlyNavigationEngine;
     private currentMode: AutoNavigationMode;
 
     // Track previous cursor to detect transitions
     private prevCursorId: string | null = null;
 
+    // Track whether fly autoselect is paused (for mode switching logic)
+    private flyAutoselectPaused: boolean = false;
+
     // Callback when mode changes (for external listeners)
     private onModeChange?: (mode: AutoNavigationMode) => void;
+
+    // Wrapped fly handle that switches to fly mode on use
+    readonly flyHandle: FlyNavigationHandle;
 
     constructor(config: AutoNavigationEngineConfig = {}) {
         this.manualEngine = new ManualNavigationEngine();
         this.followEngine = new CursorFollowNavigationEngine();
+        this.flyEngine = new FlyNavigationEngine();
         this.currentMode = config.initialMode ?? 'follow';
+
+        // Create wrapped fly handle that switches to fly mode when used
+        const flyEngineHandle = this.flyEngine.handle;
+        this.flyHandle = {
+            up: (pressed: boolean) => {
+                if (pressed) this.setMode('fly');
+                flyEngineHandle.up(pressed);
+            },
+            down: (pressed: boolean) => {
+                if (pressed) this.setMode('fly');
+                flyEngineHandle.down(pressed);
+            },
+            left: (pressed: boolean) => {
+                if (pressed) this.setMode('fly');
+                flyEngineHandle.left(pressed);
+            },
+            right: (pressed: boolean) => {
+                if (pressed) this.setMode('fly');
+                flyEngineHandle.right(pressed);
+            },
+            zoomIn: (pressed: boolean) => {
+                if (pressed) this.setMode('fly');
+                flyEngineHandle.zoomIn(pressed);
+            },
+            zoomOut: (pressed: boolean) => {
+                if (pressed) this.setMode('fly');
+                flyEngineHandle.zoomOut(pressed);
+            },
+            pauseAutoselect: (paused: boolean) => {
+                this.flyAutoselectPaused = paused;
+                flyEngineHandle.pauseAutoselect(paused);
+            },
+        };
     }
 
     /**
@@ -49,6 +94,13 @@ export class AutoNavigationEngine implements IManualNavigationEngine {
      */
     setOnModeChange(callback: (mode: AutoNavigationMode) => void): void {
         this.onModeChange = callback;
+    }
+
+    /**
+     * Set cursor callback for fly mode auto-select.
+     */
+    setCursorCallback(callback: (nodeId: string | null) => void): void {
+        this.flyEngine.setCursorCallback(callback);
     }
 
     /**
@@ -77,6 +129,11 @@ export class AutoNavigationEngine implements IManualNavigationEngine {
             if (mode === 'follow') {
                 this.followEngine.reset();
             }
+
+            // When switching to fly, reset fly engine so it inherits current transform
+            if (mode === 'fly') {
+                this.flyEngine.reset();
+            }
         }
     }
 
@@ -96,24 +153,35 @@ export class AutoNavigationEngine implements IManualNavigationEngine {
         // Detect cursor transitions
         const cursorId = this.findCursorId(input.graph);
 
-        // If cursor changed to a non-null value, switch to follow mode
+        // If cursor changed to a non-null value, consider switching to follow mode
+        // - Not in fly mode: always switch to follow
+        // - In fly mode with autoselect paused: switch to follow (user is doing manual cursor nav)
+        // - In fly mode with autoselect active: stay in fly (cursor change is from auto-select)
         if (cursorId !== null && cursorId !== this.prevCursorId) {
-            this.setMode('follow');
+            const shouldSwitchToFollow = this.currentMode !== 'fly' || this.flyAutoselectPaused;
+            if (shouldSwitchToFollow) {
+                this.setMode('follow');
+            }
         }
 
         this.prevCursorId = cursorId;
 
         // Delegate to the appropriate engine
-        if (this.currentMode === 'follow') {
-            return this.followEngine.step(input, prevState);
-        } else {
-            return this.manualEngine.step(input, prevState);
+        switch (this.currentMode) {
+            case 'fly':
+                return this.flyEngine.step(input, prevState);
+            case 'follow':
+                return this.followEngine.step(input, prevState);
+            case 'manual':
+            default:
+                return this.manualEngine.step(input, prevState);
         }
     }
 
     destroy(): void {
         this.manualEngine.destroy();
         this.followEngine.destroy?.();
+        this.flyEngine.destroy();
     }
 
     // ═══════════════════════════════════════════════════════════════════════

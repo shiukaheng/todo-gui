@@ -36,8 +36,9 @@ export function GraphViewer() {
                 return;
             }
 
-            // Fly mode: WASD for movement, E/Q for zoom, arrows for topological nav
-            if (navigationMode === 'fly') {
+            // Fly/Auto mode: WASD for movement, E/Q for zoom, arrows for topological nav
+            // In auto mode, WASD switches to fly mode; in fly mode, it's already there
+            if (navigationMode === 'fly' || navigationMode === 'auto') {
                 const key = e.key.toLowerCase();
                 // WASD + E/Q for viewport control - resumes autoselect
                 if (['w', 'a', 's', 'd', 'e', 'q'].includes(key)) {
@@ -53,8 +54,9 @@ export function GraphViewer() {
                     }
                     return;
                 }
-                // Arrow keys: pause autoselect, do topological navigation (stays paused)
-                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                // Arrow keys in fly mode: pause autoselect, do topological navigation
+                // In auto mode, arrow navigation will trigger follow mode switch
+                if (navigationMode === 'fly' && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
                     e.preventDefault();
                     handles.fly.pauseAutoselect(true);
                     switch (e.key) {
@@ -66,7 +68,7 @@ export function GraphViewer() {
                     return;
                 }
                 // Escape in fly mode - no special handling needed
-                if (e.key === 'Escape') {
+                if (navigationMode === 'fly' && e.key === 'Escape') {
                     return;
                 }
             }
@@ -109,16 +111,21 @@ export function GraphViewer() {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
             if (commandPlane.state.visible) return;
 
-            // Fly mode: release WASD/EQ keys
-            if (navigationMode === 'fly') {
+            // Fly/Auto mode: release WASD/EQ keys
+            if (navigationMode === 'fly' || navigationMode === 'auto') {
                 const key = e.key.toLowerCase();
-                switch (key) {
-                    case 'w': handles.fly.up(false); break;
-                    case 's': handles.fly.down(false); break;
-                    case 'a': handles.fly.left(false); break;
-                    case 'd': handles.fly.right(false); break;
-                    case 'e': handles.fly.zoomIn(false); break;
-                    case 'q': handles.fly.zoomOut(false); break;
+                if (['w', 'a', 's', 'd', 'e', 'q'].includes(key)) {
+                    // Pause autoselect when fly keys are released
+                    // This prevents fighting with arrow key topology navigation
+                    handles.fly.pauseAutoselect(true);
+                    switch (key) {
+                        case 'w': handles.fly.up(false); break;
+                        case 's': handles.fly.down(false); break;
+                        case 'a': handles.fly.left(false); break;
+                        case 'd': handles.fly.right(false); break;
+                        case 'e': handles.fly.zoomIn(false); break;
+                        case 'q': handles.fly.zoomOut(false); break;
+                    }
                 }
             }
         };
