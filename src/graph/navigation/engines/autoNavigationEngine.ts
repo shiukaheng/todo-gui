@@ -163,14 +163,17 @@ export class AutoNavigationEngine implements IManualNavigationEngine {
         // Detect cursor transitions
         const cursorId = this.findCursorId(input.graph);
 
+        // Capture and clear the ignore flag (it only applies to this one step)
+        const shouldIgnoreThisChange = this.ignoreCursorChangeOnce && this.currentMode === 'fly';
+        this.ignoreCursorChangeOnce = false;
+
         // If cursor changed to a non-null value, consider switching to follow mode
         // - Not in fly mode: always switch to follow
         // - In fly mode with autoselect paused: switch to follow (user is doing manual cursor nav)
         // - In fly mode with autoselect active: stay in fly (cursor change is from auto-select)
         if (cursorId !== null && cursorId !== this.prevCursorId) {
             // Check if we should ignore this change (race condition from pause)
-            if (this.ignoreCursorChangeOnce && this.currentMode === 'fly') {
-                this.ignoreCursorChangeOnce = false;
+            if (shouldIgnoreThisChange) {
                 // Don't switch modes, just consume the change
             } else {
                 const shouldSwitchToFollow = this.currentMode !== 'fly' || this.flyAutoselectPaused;
