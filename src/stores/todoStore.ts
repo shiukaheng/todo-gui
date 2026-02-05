@@ -7,7 +7,7 @@ import {
 } from 'todo-client';
 
 /** Navigation mode for the graph viewer */
-export type NavigationMode = 'auto' | 'manual' | 'follow';
+export type NavigationMode = 'auto' | 'manual' | 'follow' | 'fly';
 
 /** Simulation mode for the graph layout */
 export type SimulationMode = 'cola' | 'force';

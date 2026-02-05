@@ -29,7 +29,9 @@ import {
     ManualNavigationEngine,
     CursorFollowNavigationEngine,
     AutoNavigationEngine,
+    FlyNavigationEngine,
 } from "./navigation/engines";
+import { FlyNavigationHandle, isFlyNavigationEngine } from "./navigation/types";
 import { SVGRenderer } from "./render/SVGRenderer";
 import { PerformanceMonitor } from "./render/PerformanceMonitor";
 import { InputHandler, InteractionController } from "./input";
@@ -49,6 +51,7 @@ export abstract class AbstractGraphViewerEngine {
 
     abstract setGraph(taskList: TaskListOut): void;
     abstract getNavigationHandle(): GraphNavigationHandle;
+    abstract getFlyNavigationHandle(): FlyNavigationHandle | null;
     abstract destroy(): void;
 }
 
@@ -147,6 +150,13 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         return this.navigationController.handle;
     }
 
+    getFlyNavigationHandle(): FlyNavigationHandle | null {
+        if (isFlyNavigationEngine(this.navigationEngine)) {
+            return this.navigationEngine.handle;
+        }
+        return null;
+    }
+
     private setSimulationEngine(engine: SimulationEngine): void {
         this.simulationEngine.destroy?.();
         this.simulationEngine = engine;
@@ -163,6 +173,11 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
                 return new ManualNavigationEngine();
             case 'follow':
                 return new CursorFollowNavigationEngine();
+            case 'fly': {
+                const engine = new FlyNavigationEngine();
+                engine.setCursorCallback((nodeId) => this.setCursor(nodeId));
+                return engine;
+            }
             case 'auto':
             default:
                 return new AutoNavigationEngine();

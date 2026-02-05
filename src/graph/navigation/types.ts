@@ -231,3 +231,52 @@ export function isManualNavigationEngine(engine: NavigationEngine): engine is IM
     );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// FLY NAVIGATION ENGINE
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Abstract handle for fly navigation input.
+ * Provides continuous force-based movement and zoom.
+ */
+export interface FlyNavigationHandle {
+    /** Set upward force (true = key down, false = key up) */
+    up(pressed: boolean): void;
+    /** Set downward force (true = key down, false = key up) */
+    down(pressed: boolean): void;
+    /** Set leftward force (true = key down, false = key up) */
+    left(pressed: boolean): void;
+    /** Set rightward force (true = key down, false = key up) */
+    right(pressed: boolean): void;
+    /** Set zoom in force (true = key down, false = key up) */
+    zoomIn(pressed: boolean): void;
+    /** Set zoom out force (true = key down, false = key up) */
+    zoomOut(pressed: boolean): void;
+}
+
+/**
+ * Extended navigation engine interface for fly mode.
+ * Combines viewport control with auto-cursor selection.
+ */
+export interface IFlyNavigationEngine extends NavigationEngine {
+    /** Abstract input handle for key bindings */
+    readonly handle: FlyNavigationHandle;
+
+    /**
+     * Set callback for cursor changes (auto-selects nearest to center).
+     */
+    setCursorCallback(callback: (nodeId: string | null) => void): void;
+
+    /**
+     * Required destroy for cleanup.
+     */
+    destroy(): void;
+}
+
+/**
+ * Type guard to check if a navigation engine supports fly control.
+ */
+export function isFlyNavigationEngine(engine: NavigationEngine): engine is IFlyNavigationEngine {
+    return "handle" in engine && "setCursorCallback" in engine;
+}
+

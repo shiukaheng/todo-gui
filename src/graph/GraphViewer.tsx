@@ -13,8 +13,9 @@ const SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
 export function GraphViewer() {
     const navInfoText = useTodoStore((s) => s.navInfoText);
+    const navigationMode = useTodoStore((s) => s.navigationMode);
     const viewportContainerRef = useRef<HTMLDivElement>(null);
-    const navigationHandle = useGraphViewerEngine(viewportContainerRef);
+    const handles = useGraphViewerEngine(viewportContainerRef);
     const commandPlane = useCommandPlane();
 
     // Keyboard navigation
@@ -35,41 +36,86 @@ export function GraphViewer() {
                 return;
             }
 
+            // Fly mode: WASD for movement, E/Q for zoom
+            if (navigationMode === 'fly') {
+                const key = e.key.toLowerCase();
+                if (['w', 'a', 's', 'd', 'e', 'q'].includes(key)) {
+                    e.preventDefault();
+                    switch (key) {
+                        case 'w': handles.fly.up(true); break;
+                        case 's': handles.fly.down(true); break;
+                        case 'a': handles.fly.left(true); break;
+                        case 'd': handles.fly.right(true); break;
+                        case 'e': handles.fly.zoomIn(true); break;
+                        case 'q': handles.fly.zoomOut(true); break;
+                    }
+                    return;
+                }
+                // Escape in fly mode - no special handling needed
+                if (e.key === 'Escape') {
+                    return;
+                }
+            }
+
+            // Standard cursor navigation (non-fly modes)
             switch (e.key) {
                 case 'ArrowUp':
                     e.preventDefault();
-                    navigationHandle.up();
+                    handles.navigation.up();
                     break;
                 case 'ArrowDown':
                     e.preventDefault();
-                    navigationHandle.down();
+                    handles.navigation.down();
                     break;
                 case 'ArrowLeft':
                     e.preventDefault();
-                    navigationHandle.left();
+                    handles.navigation.left();
                     break;
                 case 'ArrowRight':
                     e.preventDefault();
-                    navigationHandle.right();
+                    handles.navigation.right();
                     break;
                 case 'Escape':
-                    if (navigationHandle.state.type !== 'idle') {
-                        navigationHandle.escape();
+                    if (handles.navigation.state.type !== 'idle') {
+                        handles.navigation.escape();
                     } else {
                         useTodoStore.getState().setCursor(null);
                     }
                     break;
                 default:
                     if (SELECTORS.includes(e.key)) {
-                        navigationHandle.chooseAmbiguous(e.key);
+                        handles.navigation.chooseAmbiguous(e.key);
                     }
                     break;
             }
         };
 
+        const handleKeyUp = (e: KeyboardEvent) => {
+            // Skip if typing in an input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+            if (commandPlane.state.visible) return;
+
+            // Fly mode: release WASD/EQ keys
+            if (navigationMode === 'fly') {
+                const key = e.key.toLowerCase();
+                switch (key) {
+                    case 'w': handles.fly.up(false); break;
+                    case 's': handles.fly.down(false); break;
+                    case 'a': handles.fly.left(false); break;
+                    case 'd': handles.fly.right(false); break;
+                    case 'e': handles.fly.zoomIn(false); break;
+                    case 'q': handles.fly.zoomOut(false); break;
+                }
+            }
+        };
+
         window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [navigationHandle, commandPlane]);
+        window.addEventListener('keyup', handleKeyUp);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+    }, [handles, commandPlane, navigationMode]);
 
     return (
         <div className="absolute w-full h-full bg-black">

@@ -1,21 +1,21 @@
 /**
- * Setnavmode command - switch navigation mode (auto, manual, follow).
+ * Setnavmode command - switch navigation mode (auto, manual, follow, fly).
  */
 
 import { CommandDefinition } from '../types';
 import { useTodoStore, NavigationMode } from '../../stores/todoStore';
 import { output } from '../output';
 
-const VALID_MODES: NavigationMode[] = ['auto', 'manual', 'follow'];
+const VALID_MODES: NavigationMode[] = ['auto', 'manual', 'follow', 'fly'];
 
 export const setnavmodeCommand: CommandDefinition = {
     name: 'setnavmode',
-    description: 'Switch navigation mode (auto, manual, follow)',
+    description: 'Switch navigation mode (auto, manual, follow, fly)',
     aliases: ['snm', 'nav'],
     positionals: [
         {
             name: 'mode',
-            description: 'Navigation mode: auto, manual, or follow',
+            description: 'Navigation mode: auto, manual, follow, or fly',
             required: false,
             complete: (partial) => {
                 return VALID_MODES.filter(m => 

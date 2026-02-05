@@ -7,3 +7,4 @@ export * from "./fitNavigationEngine";
 export * from "./manualNavigationEngine";
 export * from "./cursorFollowNavigationEngine";
 export * from "./autoNavigationEngine";
+export * from "./flyNavigationEngine";
