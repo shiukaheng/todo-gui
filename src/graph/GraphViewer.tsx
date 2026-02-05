@@ -36,11 +36,13 @@ export function GraphViewer() {
                 return;
             }
 
-            // Fly mode: WASD for movement, E/Q for zoom
+            // Fly mode: WASD for movement, E/Q for zoom, arrows for topological nav
             if (navigationMode === 'fly') {
                 const key = e.key.toLowerCase();
+                // WASD + E/Q for viewport control - resumes autoselect
                 if (['w', 'a', 's', 'd', 'e', 'q'].includes(key)) {
                     e.preventDefault();
+                    handles.fly.pauseAutoselect(false); // Resume autoselect when flying
                     switch (key) {
                         case 'w': handles.fly.up(true); break;
                         case 's': handles.fly.down(true); break;
@@ -48,6 +50,18 @@ export function GraphViewer() {
                         case 'd': handles.fly.right(true); break;
                         case 'e': handles.fly.zoomIn(true); break;
                         case 'q': handles.fly.zoomOut(true); break;
+                    }
+                    return;
+                }
+                // Arrow keys: pause autoselect, do topological navigation (stays paused)
+                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                    e.preventDefault();
+                    handles.fly.pauseAutoselect(true);
+                    switch (e.key) {
+                        case 'ArrowUp': handles.navigation.up(); break;
+                        case 'ArrowDown': handles.navigation.down(); break;
+                        case 'ArrowLeft': handles.navigation.left(); break;
+                        case 'ArrowRight': handles.navigation.right(); break;
                     }
                     return;
                 }

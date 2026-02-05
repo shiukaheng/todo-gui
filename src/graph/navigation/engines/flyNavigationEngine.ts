@@ -17,24 +17,24 @@ import {
 } from "../types";
 
 export interface FlyNavigationEngineConfig {
-    /** Pan acceleration in screen pixels/s². Default: 2000 */
+    /** Pan acceleration in screen pixels/s². Default: 5000 */
     panAccel?: number;
 
-    /** Pan drag (velocity multiplier per second, e.g. 0.01 = 1% retained after 1s). Default: 0.001 */
-    panDrag?: number;
+    /** Pan damping (higher = stops faster, ~5-20 typical). Default: 10 */
+    panDamping?: number;
 
     /** Zoom acceleration (log-scale units/s²). Default: 8 */
     zoomAccel?: number;
 
-    /** Zoom drag (velocity multiplier per second). Default: 0.001 */
-    zoomDrag?: number;
+    /** Zoom damping (higher = stops faster). Default: 8 */
+    zoomDamping?: number;
 }
 
 const DEFAULT_CONFIG: Required<FlyNavigationEngineConfig> = {
-    panAccel: 2000,
-    panDrag: 0.001,
+    panAccel: 3000,
+    panDamping: 5,
     zoomAccel: 8,
-    zoomDrag: 0.001,
+    zoomDamping: 8,
 };
 
 export class FlyNavigationEngine implements IFlyNavigationEngine {
@@ -47,6 +47,7 @@ export class FlyNavigationEngine implements IFlyNavigationEngine {
     private forceRight = false;
     private forceZoomIn = false;
     private forceZoomOut = false;
+    private autoselectPaused = false;
 
     // Physics state (in screen space)
     private centerX = 0;  // world coords
@@ -60,7 +61,6 @@ export class FlyNavigationEngine implements IFlyNavigationEngine {
 
     private initialized = false;
     private cursorCallback: ((nodeId: string | null) => void) | null = null;
-    private lastSelectedCursor: string | null = null;
 
     readonly handle: FlyNavigationHandle;
 
@@ -75,6 +75,7 @@ export class FlyNavigationEngine implements IFlyNavigationEngine {
             right: (pressed: boolean) => { this.forceRight = pressed; },
             zoomIn: (pressed: boolean) => { this.forceZoomIn = pressed; },
             zoomOut: (pressed: boolean) => { this.forceZoomOut = pressed; },
+            pauseAutoselect: (paused: boolean) => { this.autoselectPaused = paused; },
         };
     }
 
@@ -125,10 +126,10 @@ export class FlyNavigationEngine implements IFlyNavigationEngine {
         this.velocityX += accelX * dt;
         this.velocityY += accelY * dt;
 
-        // Apply drag: v *= drag^dt (exponential decay)
-        const panDragFactor = Math.pow(this.config.panDrag, dt);
-        this.velocityX *= panDragFactor;
-        this.velocityY *= panDragFactor;
+        // Apply damping: v *= e^(-damping * dt) (higher damping = faster stop)
+        const panDampingFactor = Math.exp(-this.config.panDamping * dt);
+        this.velocityX *= panDampingFactor;
+        this.velocityY *= panDampingFactor;
 
         // Convert screen velocity to world displacement and integrate position
         this.centerX += (this.velocityX / this.scale) * dt;
@@ -144,9 +145,9 @@ export class FlyNavigationEngine implements IFlyNavigationEngine {
         // Integrate zoom velocity
         this.zoomVelocity += zoomAccel * dt;
 
-        // Apply drag
-        const zoomDragFactor = Math.pow(this.config.zoomDrag, dt);
-        this.zoomVelocity *= zoomDragFactor;
+        // Apply damping: v *= e^(-damping * dt)
+        const zoomDampingFactor = Math.exp(-this.config.zoomDamping * dt);
+        this.zoomVelocity *= zoomDampingFactor;
 
         // Integrate scale (exponential)
         this.scale *= Math.exp(this.zoomVelocity * dt);
@@ -164,7 +165,7 @@ export class FlyNavigationEngine implements IFlyNavigationEngine {
     }
 
     private updateCursorToNearestCenter(graph: NavigationEngineInput['graph']): void {
-        if (!this.cursorCallback) return;
+        if (!this.cursorCallback || this.autoselectPaused) return;
 
         // Find nearest node to current center
         let nearestId: string | null = null;
@@ -184,11 +185,7 @@ export class FlyNavigationEngine implements IFlyNavigationEngine {
             }
         }
 
-        // Only update if changed (avoid unnecessary state updates)
-        if (nearestId !== this.lastSelectedCursor) {
-            this.lastSelectedCursor = nearestId;
-            this.cursorCallback(nearestId);
-        }
+        this.cursorCallback(nearestId);
     }
 
     destroy(): void {
@@ -206,12 +203,12 @@ export class FlyNavigationEngine implements IFlyNavigationEngine {
         this.scale = 1;
         this.zoomVelocity = 0;
         this.initialized = false;
-        this.lastSelectedCursor = null;
         this.forceUp = false;
         this.forceDown = false;
         this.forceLeft = false;
         this.forceRight = false;
         this.forceZoomIn = false;
         this.forceZoomOut = false;
+        this.autoselectPaused = false;
     }
 }

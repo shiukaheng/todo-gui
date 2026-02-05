@@ -252,6 +252,8 @@ export interface FlyNavigationHandle {
     zoomIn(pressed: boolean): void;
     /** Set zoom out force (true = key down, false = key up) */
     zoomOut(pressed: boolean): void;
+    /** Pause auto-select cursor (true = paused, false = resumed) */
+    pauseAutoselect(paused: boolean): void;
 }
 
 /**

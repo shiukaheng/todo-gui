@@ -22,6 +22,7 @@ const NOOP_FLY_HANDLE: FlyNavigationHandle = {
     right: (_pressed: boolean) => {},
     zoomIn: (_pressed: boolean) => {},
     zoomOut: (_pressed: boolean) => {},
+    pauseAutoselect: (_paused: boolean) => {},
 };
 
 export interface GraphViewerHandles {
