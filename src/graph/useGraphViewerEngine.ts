@@ -1,29 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { GraphViewerEngine, AbstractGraphViewerEngine } from "./GraphViewerEngine";
 import { GraphNavigationHandle } from "./graphNavigation/types";
 import { FlyNavigationHandle } from "./navigation/types";
 import { useTodoStore } from "../stores/todoStore";
-
-// No-op navigation handle for when engine isn't ready
-const NOOP_NAVIGATION_HANDLE: GraphNavigationHandle = {
-    up: () => {},
-    down: () => {},
-    left: () => {},
-    right: () => {},
-    chooseAmbiguous: () => false,
-    escape: () => {},
-    get state() { return { type: 'idle' as const }; },
-};
-
-const NOOP_FLY_HANDLE: FlyNavigationHandle = {
-    up: (_pressed: boolean) => {},
-    down: (_pressed: boolean) => {},
-    left: (_pressed: boolean) => {},
-    right: (_pressed: boolean) => {},
-    zoomIn: (_pressed: boolean) => {},
-    zoomOut: (_pressed: boolean) => {},
-    pauseAutoselect: (_paused: boolean) => {},
-};
 
 export interface GraphViewerHandles {
     navigation: GraphNavigationHandle;
@@ -32,12 +11,37 @@ export interface GraphViewerHandles {
 
 /**
  * useGraphViewerEngine - React hook that manages the engine lifecycle.
+ *
+ * Returns stable handle objects that delegate to the current engine.
+ * This ensures handles work correctly across HMR and before engine initialization.
  */
 export function useGraphViewerEngine(
     viewportContainerRef: React.RefObject<HTMLDivElement>
 ): GraphViewerHandles {
     const graphData = useTodoStore((s) => s.graphData);
     const engineRef = useRef<AbstractGraphViewerEngine | null>(null);
+
+    // Create stable delegating handles that always look up current engine
+    const handles = useMemo<GraphViewerHandles>(() => ({
+        navigation: {
+            up: () => engineRef.current?.getNavigationHandle().up(),
+            down: () => engineRef.current?.getNavigationHandle().down(),
+            left: () => engineRef.current?.getNavigationHandle().left(),
+            right: () => engineRef.current?.getNavigationHandle().right(),
+            chooseAmbiguous: (key: string) => engineRef.current?.getNavigationHandle().chooseAmbiguous(key) ?? false,
+            escape: () => engineRef.current?.getNavigationHandle().escape(),
+            get state() { return engineRef.current?.getNavigationHandle().state ?? { type: 'idle' as const }; },
+        },
+        fly: {
+            up: (pressed: boolean) => engineRef.current?.getFlyNavigationHandle()?.up(pressed),
+            down: (pressed: boolean) => engineRef.current?.getFlyNavigationHandle()?.down(pressed),
+            left: (pressed: boolean) => engineRef.current?.getFlyNavigationHandle()?.left(pressed),
+            right: (pressed: boolean) => engineRef.current?.getFlyNavigationHandle()?.right(pressed),
+            zoomIn: (pressed: boolean) => engineRef.current?.getFlyNavigationHandle()?.zoomIn(pressed),
+            zoomOut: (pressed: boolean) => engineRef.current?.getFlyNavigationHandle()?.zoomOut(pressed),
+            pauseAutoselect: (paused: boolean) => engineRef.current?.getFlyNavigationHandle()?.pauseAutoselect(paused),
+        },
+    }), []);
 
     // Create engine on mount
     useEffect(() => {
@@ -64,8 +68,5 @@ export function useGraphViewerEngine(
         }
     }, [graphData]);
 
-    return {
-        navigation: engineRef.current?.getNavigationHandle() ?? NOOP_NAVIGATION_HANDLE,
-        fly: engineRef.current?.getFlyNavigationHandle() ?? NOOP_FLY_HANDLE,
-    };
+    return handles;
 }
