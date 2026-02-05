@@ -92,7 +92,7 @@ export function useCommandPlane(): UseCommandPlaneReturn {
             const inputUpToCursor = s.input.slice(0, s.cursorPosition);
 
             // Find the start of the current token (respecting quotes)
-            let tokenStart = inputUpToCursor.length;
+            let tokenStart = 0;
             let inQuote: string | null = null;
             for (let i = 0; i < inputUpToCursor.length; i++) {
                 const char = inputUpToCursor[i];
