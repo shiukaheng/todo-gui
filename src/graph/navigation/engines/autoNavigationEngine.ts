@@ -40,6 +40,9 @@ export class AutoNavigationEngine implements IManualNavigationEngine {
     // Track previous cursor to detect transitions
     private prevCursorId: string | null = null;
 
+    // Track the last cursor we observed (for syncing on pause)
+    private lastKnownCursorId: string | null = null;
+
     // Track whether fly autoselect is paused (for mode switching logic)
     private flyAutoselectPaused: boolean = false;
 
@@ -85,6 +88,12 @@ export class AutoNavigationEngine implements IManualNavigationEngine {
             pauseAutoselect: (paused: boolean) => {
                 this.flyAutoselectPaused = paused;
                 flyEngineHandle.pauseAutoselect(paused);
+                // When pausing, sync prevCursorId to prevent race condition:
+                // Cursor may have been updated in the current frame (while active)
+                // but we're now paused, so don't treat it as a "new" change next frame
+                if (paused) {
+                    this.prevCursorId = this.lastKnownCursorId;
+                }
             },
         };
     }
@@ -152,6 +161,7 @@ export class AutoNavigationEngine implements IManualNavigationEngine {
     step(input: NavigationEngineInput, prevState: NavigationState): NavigationState {
         // Detect cursor transitions
         const cursorId = this.findCursorId(input.graph);
+        this.lastKnownCursorId = cursorId;
 
         // If cursor changed to a non-null value, consider switching to follow mode
         // - Not in fly mode: always switch to follow
