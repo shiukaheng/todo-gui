@@ -16,14 +16,10 @@
 //   ┌────────────────────┐                             │
 //   │ CONFIRMING_TARGET  │─── selector pressed ───────►│ (move cursor)
 //   │ (parents/children) │─── same direction ─────────►│ (move to first)
-//   └────────────────────┘                             │
-//        │                                             │
-//        │ peer direction + multiple parents           │
-//        ▼                                             │
-//   ┌────────────────────────┐                         │
-//   │ SELECTING_PARENT_FOR   │─── selector pressed ───►│ (move to peer)
-//   │ PEERS                  │                         │
-//   └────────────────────────┘─────────────────────────┘
+//   └────────────────────┘─────────────────────────────┘
+//
+//   Peer navigation (up/down) always moves directly to the closest peer,
+//   regardless of how many parents the node has.
 //
 
 export type NavDirection = 'up' | 'down' | 'left' | 'right';
@@ -34,10 +30,6 @@ export type NavState =
         type: 'confirmingTarget';
         direction: NavDirection;
         targetType: 'parents' | 'children';
-      }
-    | {
-        type: 'selectingParentForPeers';
-        peerDirection: 'prev' | 'next';
       };
 
 export const IDLE_STATE: NavState = { type: 'idle' };
@@ -48,8 +40,6 @@ export function getNavInfoText(state: NavState, candidateCount: number): string 
             return null;
         case 'confirmingTarget':
             return `Select ${state.targetType} (1-${candidateCount})`;
-        case 'selectingParentForPeers':
-            return `Select parent to find ${state.peerDirection} peer`;
     }
 }
 

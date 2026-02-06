@@ -4,7 +4,7 @@
  * Shows shortcut key overlays on nodes to indicate navigation options:
  * - Parents: →1, →2, →3 (or just → if single)
  * - Children: ←1, ←2 (or just ← if single)
- * - Peers: ↑/↓ on adjacent peers (or ↑?/↓? if multi-parent)
+ * - Peers: ↑/↓ on closest adjacent peers
  *
  * Also adds dark "navigation edges" from cursor to all navigable neighbors.
  */
@@ -83,42 +83,12 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
         });
     }
 
-    // Peers overlay
-    const parentIds = [...peers.keys()];
-    const hasMultipleParents = parentIds.length > 1;
-
-    if (parentIds.length === 1) {
-        // Single parent (or root peers): show up/down arrows on closest peers
-        const peerInfo = peers.get(parentIds[0])!;
-        if (peerInfo.prevPeer) {
-            overlays.set(peerInfo.prevPeer, prevPeerArrow);
-        }
-        if (peerInfo.nextPeer) {
-            overlays.set(peerInfo.nextPeer, nextPeerArrow);
-        }
-    } else if (hasMultipleParents) {
-        // Multiple parents: show ?-suffixed arrows to indicate disambiguation needed
-        // When in selectingParentForPeers mode, show numbered parent hints
-        if (navState.type === 'selectingParentForPeers') {
-            // Show just numbers on parents during selection (skip null key for root peers)
-            parentIds.forEach((parentId, index) => {
-                if (index < selectors.length && parentId !== null) {
-                    overlays.set(parentId, selectors[index]);
-                }
-            });
-        } else {
-            // Show ? hints on peers to indicate disambiguation needed
-            for (const parentId of parentIds) {
-                const peerInfo = peers.get(parentId)!;
-                // Show ? on whichever peers exist for this parent
-                if (peerInfo.prevPeer && !overlays.has(peerInfo.prevPeer)) {
-                    overlays.set(peerInfo.prevPeer, `${prevPeerArrow}?`);
-                }
-                if (peerInfo.nextPeer && !overlays.has(peerInfo.nextPeer)) {
-                    overlays.set(peerInfo.nextPeer, `${nextPeerArrow}?`);
-                }
-            }
-        }
+    // Peers overlay: show arrows on closest prev/next peer
+    if (peers.prevPeer) {
+        overlays.set(peers.prevPeer, prevPeerArrow);
+    }
+    if (peers.nextPeer) {
+        overlays.set(peers.nextPeer, nextPeerArrow);
     }
 
     // Find cursor node (has selectorOutline set)
@@ -134,10 +104,8 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
     const navigableNeighbors = new Set<string>();
     parents.forEach(id => navigableNeighbors.add(id));
     children.forEach(id => navigableNeighbors.add(id));
-    for (const peerInfo of peers.values()) {
-        if (peerInfo.prevPeer) navigableNeighbors.add(peerInfo.prevPeer);
-        if (peerInfo.nextPeer) navigableNeighbors.add(peerInfo.nextPeer);
-    }
+    if (peers.prevPeer) navigableNeighbors.add(peers.prevPeer);
+    if (peers.nextPeer) navigableNeighbors.add(peers.nextPeer);
 
     // Build navigation edges from cursor to navigable neighbors
     const navEdges: Record<string, any> = {};

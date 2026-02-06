@@ -77,8 +77,6 @@ export class GraphNavigationController {
             candidateCount = this.navState.targetType === 'parents'
                 ? topological.parents.length
                 : topological.children.length;
-        } else if (this.navState.type === 'selectingParentForPeers') {
-            candidateCount = this.cursorNeighbors.topological.peers.size;
         }
         this.onNavInfoTextChange(getNavInfoText(this.navState, candidateCount));
     }
@@ -91,15 +89,13 @@ export class GraphNavigationController {
                 return topological.parents;
             case 'children':
                 return topological.children;
-            case 'prevPeer':
+            case 'prevPeer': {
+                const peer = topological.peers.prevPeer;
+                return peer ? [peer] : [];
+            }
             case 'nextPeer': {
-                const parentIds = [...topological.peers.keys()];
-                if (parentIds.length === 1) {
-                    const peerInfo = topological.peers.get(parentIds[0])!;
-                    const peer = target === 'prevPeer' ? peerInfo.prevPeer : peerInfo.nextPeer;
-                    return peer ? [peer] : [];
-                }
-                return [];
+                const peer = topological.peers.nextPeer;
+                return peer ? [peer] : [];
             }
         }
     }
@@ -109,7 +105,8 @@ export class GraphNavigationController {
         return (
             topological.children.length === 0 &&
             topological.parents.length === 0 &&
-            topological.peers.size === 0
+            topological.peers.prevPeer === null &&
+            topological.peers.nextPeer === null
         );
     }
 
@@ -136,27 +133,12 @@ export class GraphNavigationController {
         // Check if this is a peer navigation
         const peerDir = getPeerDirection(target);
         if (peerDir) {
-            const parentIds = [...this.cursorNeighbors.topological.peers.keys()];
-
-            if (parentIds.length === 0) {
-                return;
+            const { peers } = this.cursorNeighbors.topological;
+            const targetPeer = peerDir === 'prev' ? peers.prevPeer : peers.nextPeer;
+            if (targetPeer) {
+                this.setCursor(targetPeer);
+                this.setNavState(IDLE_STATE);
             }
-
-            if (parentIds.length === 1) {
-                const peerInfo = this.cursorNeighbors.topological.peers.get(parentIds[0])!;
-                const targetPeer = peerDir === 'prev' ? peerInfo.prevPeer : peerInfo.nextPeer;
-                if (targetPeer) {
-                    this.setCursor(targetPeer);
-                    this.setNavState(IDLE_STATE);
-                }
-                return;
-            }
-
-            this.setNavState({
-                type: 'selectingParentForPeers',
-                peerDirection: peerDir,
-            });
-            this.pendingDirection = direction;
             return;
         }
 
@@ -193,24 +175,6 @@ export class GraphNavigationController {
                 this.setNavState(IDLE_STATE);
                 this.pendingDirection = null;
                 return true;
-            }
-            return false;
-        }
-
-        if (this.navState.type === 'selectingParentForPeers') {
-            const parentIds = [...this.cursorNeighbors.topological.peers.keys()];
-            if (selectorIndex < parentIds.length) {
-                const parentId = parentIds[selectorIndex];
-                const peerInfo = this.cursorNeighbors.topological.peers.get(parentId)!
-                const targetPeer = this.navState.peerDirection === 'prev'
-                    ? peerInfo.prevPeer
-                    : peerInfo.nextPeer;
-                if (targetPeer) {
-                    this.setCursor(targetPeer);
-                    this.setNavState(IDLE_STATE);
-                    this.pendingDirection = null;
-                    return true;
-                }
             }
             return false;
         }

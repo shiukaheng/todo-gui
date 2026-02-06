@@ -13,8 +13,8 @@ export type CursorNeighbors = {
     topological: {
         children: string[]
         parents: string[]
-        /** For each parent (or null for root peers), the prev/next peers relative to cursor position */
-        peers: Map<string | null, PeerInfo>
+        /** Closest prev/next peer across all parents (merged) */
+        peers: PeerInfo
     }
 }
 
@@ -33,13 +33,8 @@ export function cursorNeighborsEqual(a: CursorNeighbors, b: CursorNeighbors): bo
         if (ta.parents[i] !== tb.parents[i]) return false;
     }
 
-    // Compare Maps
-    if (ta.peers.size !== tb.peers.size) return false;
-    for (const [key, valA] of ta.peers) {
-        const valB = tb.peers.get(key);
-        if (!valB) return false;
-        if (valA.prevPeer !== valB.prevPeer || valA.nextPeer !== valB.nextPeer) return false;
-    }
+    // Compare peers
+    if (ta.peers.prevPeer !== tb.peers.prevPeer || ta.peers.nextPeer !== tb.peers.nextPeer) return false;
 
     return true;
 }
@@ -49,7 +44,7 @@ export const EMPTY_CURSOR_NEIGHBORS: CursorNeighbors = {
     topological: {
         children: [],
         parents: [],
-        peers: new Map(),
+        peers: { prevPeer: null, nextPeer: null },
     },
 };
 
@@ -76,7 +71,7 @@ export function computeCursorNeighbors(
         topological: {
             children: [],
             parents: [],
-            peers: new Map(),
+            peers: { prevPeer: null, nextPeer: null },
         },
     };
 
@@ -165,31 +160,30 @@ export function computeCursorNeighbors(
         return null;
     };
 
-    // Compute peers: for each parent, find closest peer above and below cursor
+    // Compute peers: merge siblings from all parents into one list, find closest prev/next
     const cursorPos = positions[cursorId];
-    const peers = new Map<string | null, PeerInfo>();
+    let peers: PeerInfo = { prevPeer: null, nextPeer: null };
 
-    for (const parentId of parents) {
-        const siblings = parentToChildren.get(parentId) || [];
-        const peersForParent = siblings.filter(id => id !== cursorId);
+    if (cursorPos) {
+        const allPeerCandidates = new Set<string>();
 
-        if (peersForParent.length > 0 && cursorPos) {
-            const peerInfo = computePeerInfo(peersForParent, cursorPos);
-            if (peerInfo) {
-                peers.set(parentId, peerInfo);
+        for (const parentId of parents) {
+            const siblings = parentToChildren.get(parentId) || [];
+            for (const id of siblings) {
+                if (id !== cursorId) allPeerCandidates.add(id);
             }
         }
-    }
 
-    // If cursor is a root node, treat other root nodes as peers under null key
-    const cursorIsRoot = rootNodes.includes(cursorId);
-    if (cursorIsRoot && cursorPos) {
-        const rootPeers = rootNodes.filter(id => id !== cursorId);
-        if (rootPeers.length > 0) {
-            const peerInfo = computePeerInfo(rootPeers, cursorPos);
-            if (peerInfo) {
-                peers.set(null, peerInfo);
+        // If cursor is a root node, treat other root nodes as peers too
+        const cursorIsRoot = rootNodes.includes(cursorId);
+        if (cursorIsRoot) {
+            for (const id of rootNodes) {
+                if (id !== cursorId) allPeerCandidates.add(id);
             }
+        }
+
+        if (allPeerCandidates.size > 0) {
+            peers = computePeerInfo([...allPeerCandidates], cursorPos) ?? peers;
         }
     }
 
