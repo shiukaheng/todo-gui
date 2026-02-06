@@ -58,7 +58,8 @@ export class InteractionController {
 
     // ─── Node drag state ───
     private draggingNodeId: string | null = null;
-    private dragOffset: Position | null = null; // Offset from cursor to node center
+    private dragOffset: Position | null = null; // Offset from cursor to node center (world coords)
+    private currentDragScreenPos: ScreenPoint | null = null; // Current mouse screen position during drag
 
     // ─── Canvas drag state ───
     private isDraggingCanvas = false;
@@ -107,6 +108,23 @@ export class InteractionController {
                 this.handleTouchTransform(event);
                 break;
         }
+    }
+
+    /**
+     * Update drag position every frame to handle simulation inertia.
+     * Called from the main animation loop.
+     */
+    updateFrame(): void {
+        if (this.draggingNodeId && this.currentDragScreenPos) {
+            this.applyCurrentDragPosition();
+        }
+    }
+
+    /**
+     * Check if currently dragging a node (used by navigation engines to pause following).
+     */
+    isDraggingNode(): boolean {
+        return this.draggingNodeId !== null;
     }
 
     /**
@@ -181,20 +199,30 @@ export class InteractionController {
     private startNodeDrag(nodeId: string, screen: ScreenPoint): void {
         if (!this.deps) return;
 
+        // CRITICAL: Set dragging state FIRST before any calculations
+        // This ensures isDraggingNode() returns true immediately
+        this.draggingNodeId = nodeId;
+        this.currentDragScreenPos = screen;
+
         const transform = this.deps.getNavigationState().transform;
         const cursorWorld = screenToWorld([screen.x, screen.y], transform);
 
         // Get node's current world position
         const simState = this.deps.getSimulationState();
         const nodePos = simState.positions[nodeId];
-        if (!nodePos) return;
+        if (!nodePos) {
+            // Reset if node not found
+            this.draggingNodeId = null;
+            this.currentDragScreenPos = null;
+            return;
+        }
 
-        this.draggingNodeId = nodeId;
         // Store offset from cursor to node center (so node doesn't jump)
         this.dragOffset = {
             x: nodePos.x - cursorWorld[0],
             y: nodePos.y - cursorWorld[1],
         };
+
 
         // Pin the node at its current position
         const engine = this.deps.getSimulationEngine();
@@ -206,14 +234,32 @@ export class InteractionController {
     private updateNodeDrag(screen: ScreenPoint): void {
         if (!this.deps || !this.draggingNodeId || !this.dragOffset) return;
 
+        // Update the current screen position
+        this.currentDragScreenPos = screen;
+
+        // Recalculate and update the pin position
+        this.applyCurrentDragPosition();
+    }
+
+    /**
+     * Apply the current drag position based on stored screen position and current transform.
+     * Called when mouse moves AND every frame to handle simulation inertia.
+     */
+    private applyCurrentDragPosition(): void {
+        if (!this.deps || !this.draggingNodeId || !this.dragOffset || !this.currentDragScreenPos) return;
+
         const transform = this.deps.getNavigationState().transform;
-        const cursorWorld = screenToWorld([screen.x, screen.y], transform);
+        const cursorWorld = screenToWorld(
+            [this.currentDragScreenPos.x, this.currentDragScreenPos.y],
+            transform
+        );
 
         // Apply offset to keep node at same relative position to cursor
         const newPos: Position = {
             x: cursorWorld[0] + this.dragOffset.x,
             y: cursorWorld[1] + this.dragOffset.y,
         };
+
 
         // Update pin position
         const engine = this.deps.getSimulationEngine();
@@ -233,6 +279,7 @@ export class InteractionController {
 
         this.draggingNodeId = null;
         this.dragOffset = null;
+        this.currentDragScreenPos = null;
     }
 
     // ─── Canvas dragging ───
@@ -304,6 +351,13 @@ export class InteractionController {
         const prev = this.velocitySamples[this.velocitySamples.length - 2];
         const last = this.velocitySamples[this.velocitySamples.length - 1];
         const dt = (last.time - prev.time) / 1000; // Convert to seconds
+
+        // If too much time has passed since last sample, user has stopped moving
+        const timeSinceLastSample = (performance.now() - last.time) / 1000;
+        if (timeSinceLastSample > 0.1) {
+            // More than 100ms since last movement - no momentum
+            return null;
+        }
 
         if (dt < 0.001) return null;
 

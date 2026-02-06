@@ -68,6 +68,7 @@ export class ManualNavigationEngine implements IManualNavigationEngine {
     // Track if we need to initialize from prevState
     private initialized = false;
     private hasExplicitInitialTransform: boolean;
+    private lastReturnedTransform: ViewTransform | null = null;
 
     constructor(config: ManualNavigationEngineConfig = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
@@ -89,6 +90,21 @@ export class ManualNavigationEngine implements IManualNavigationEngine {
                 this.transform = { ...prevState.transform };
             }
             this.initialized = true;
+        }
+
+        // If prevState transform differs from what we returned last frame,
+        // it means another navigation engine was active - sync to it
+        // (Don't sync if prevState matches what we returned, as that's our own change)
+        if (this.lastReturnedTransform) {
+            const prevStateMatchesOurReturn =
+                Math.abs(prevState.transform.tx - this.lastReturnedTransform.tx) < 0.01 &&
+                Math.abs(prevState.transform.ty - this.lastReturnedTransform.ty) < 0.01 &&
+                Math.abs(prevState.transform.a - this.lastReturnedTransform.a) < 0.0001;
+            
+            if (!prevStateMatchesOurReturn) {
+                // Another engine was active, sync to prevState
+                this.transform = { ...prevState.transform };
+            }
         }
 
         // Apply momentum
@@ -115,6 +131,7 @@ export class ManualNavigationEngine implements IManualNavigationEngine {
             }
         }
 
+        this.lastReturnedTransform = this.transform;
         return { transform: this.transform };
     }
 

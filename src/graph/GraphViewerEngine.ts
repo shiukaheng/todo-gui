@@ -318,9 +318,17 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
             // 4. Navigate (pan/zoom)
             this.navigationState = this.navigationEngine.step(
-                { graph: styledData, viewport: this.getViewport(), deltaTime },
+                { 
+                    graph: styledData, 
+                    viewport: this.getViewport(), 
+                    deltaTime,
+                    isDraggingNode: this.interactionController.isDraggingNode()
+                },
                 this.navigationState
             );
+
+            // 4.5. Update interaction controller (for drag position with simulation inertia)
+            this.interactionController.updateFrame();
 
             // 5. Render
             this.renderer.render(styledData, this.navigationState.transform);

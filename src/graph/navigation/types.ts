@@ -134,6 +134,9 @@ export interface NavigationEngineInput<G extends NestedGraphData = NestedGraphDa
 
     /** Time since last frame in milliseconds (for animations). */
     readonly deltaTime: number;
+
+    /** Whether a node is currently being dragged (navigation should pause). */
+    readonly isDraggingNode?: boolean;
 }
 
 /**

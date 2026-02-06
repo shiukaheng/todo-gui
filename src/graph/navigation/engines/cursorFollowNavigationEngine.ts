@@ -55,8 +55,13 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
     }
 
     step(input: NavigationEngineInput, prevState: NavigationState): NavigationState {
-        const { graph, viewport, deltaTime } = input;
+        const { graph, viewport, deltaTime, isDraggingNode } = input;
         const dt = deltaTime / 1000; // Convert to seconds
+
+        // If dragging a node, freeze navigation (return prevState as-is)
+        if (isDraggingNode) {
+            return prevState;
+        }
 
         // Find cursor node (the one with selectorOutline !== null)
         let cursorId: string | null = null;

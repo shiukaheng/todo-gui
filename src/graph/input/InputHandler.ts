@@ -201,7 +201,7 @@ export class InputHandler {
                 this.emit({
                     type: "drag-start",
                     target: this.mouseDownTarget,
-                    screen: this.mouseDownPoint,
+                    screen: current, // Use current position, not mouseDownPoint
                 });
             }
         }

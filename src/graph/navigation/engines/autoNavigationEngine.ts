@@ -160,6 +160,11 @@ export class AutoNavigationEngine implements IManualNavigationEngine {
     // ═══════════════════════════════════════════════════════════════════════
 
     step(input: NavigationEngineInput, prevState: NavigationState): NavigationState {
+        // If dragging a node, delegate to manual engine (freeze navigation)
+        if (input.isDraggingNode) {
+            return this.manualEngine.step(input, prevState);
+        }
+
         // Detect cursor transitions
         const cursorId = this.findCursorId(input.graph);
 
