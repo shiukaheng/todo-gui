@@ -184,12 +184,21 @@ export interface ScreenPoint {
  */
 export interface IManualNavigationEngine extends NavigationEngine {
     /**
+     * Apply a raw transform delta (multiplies with current transform).
+     * This is the most direct way to apply multi-touch gestures.
+     * @param delta - Transform to compose with current transform (current = delta * current)
+     */
+    applyTransform(delta: ViewTransform): void;
+
+    /**
      * Apply incremental pan in screen pixels.
+     * Convenience method - equivalent to applyTransform with translation-only matrix.
      */
     pan(dx: number, dy: number): void;
 
     /**
      * Zoom around a screen point.
+     * Convenience method - equivalent to applyTransform with scale around point.
      * @param center - Screen coordinates to zoom around
      * @param factor - Zoom multiplier (>1 = zoom in, <1 = zoom out)
      */
@@ -197,6 +206,7 @@ export interface IManualNavigationEngine extends NavigationEngine {
 
     /**
      * Rotate around a screen point.
+     * Convenience method - equivalent to applyTransform with rotation around point.
      * @param center - Screen coordinates to rotate around
      * @param radians - Rotation angle in radians
      */
@@ -226,6 +236,7 @@ export interface IManualNavigationEngine extends NavigationEngine {
  */
 export function isManualNavigationEngine(engine: NavigationEngine): engine is IManualNavigationEngine {
     return (
+        "applyTransform" in engine &&
         "pan" in engine &&
         "zoom" in engine &&
         "rotate" in engine &&

@@ -66,8 +66,9 @@ export class InteractionController {
     private lastDragScreenPos: ScreenPoint | null = null;
     private velocitySamples: VelocitySample[] = [];
 
-    // ─── Touch transform state ───
-    private touchTransformActive = false;
+    // ─── Touch finger tracking ───
+    private activeFingers = new Map<number, { start: ScreenPoint; current: ScreenPoint; target: InteractionTarget }>();
+    private fingerTransformBaseline: { center: ScreenPoint; scale: number; rotation: number } | null = null;
 
     constructor(deps: InteractionControllerDeps) {
         this.deps = deps;
@@ -82,38 +83,33 @@ export class InteractionController {
         switch (event.type) {
             // ─── Mouse/Pointer events ───
             case "drag-start":
-                console.log("[InteractionController] Drag start:", event.target);
                 this.handleDragStart(event.target, event.screen);
                 break;
             case "drag-move":
-                console.log("[InteractionController] Drag move:", event.target);
                 this.handleDragMove(event.target, event.screen);
                 break;
             case "drag-end":
-                console.log("[InteractionController] Drag end:", event.target);
                 this.handleDragEnd(event.target, event.screen);
                 break;
             case "click":
-                console.log("[InteractionController] Click:", event.target);
                 this.handleClick(event.target, event.screen);
                 break;
             case "zoom":
-                console.log("[InteractionController] Zoom:", event.delta);
                 this.handleZoom(event.screen, event.delta);
                 break;
 
-            // ─── Touch events ───
-            case "tap":
-                console.log("[InteractionController] Tap:", event.target);
-                this.handleTap(event.target, event.screen);
+            // ─── Touch: Individual finger tracking ───
+            case "finger-down":
+                this.handleFingerDown(event.fingerId, event.target, event.screen);
                 break;
-            case "long-press":
-                console.log("[InteractionController] Long-press:", event.target);
-                this.handleLongPress(event.target, event.screen);
+            case "finger-move":
+                this.handleFingerMove(event.fingerId, event.screen);
                 break;
-            case "touch-transform":
-                console.log("[InteractionController] Touch transform:", event.phase);
-                this.handleTouchTransform(event);
+            case "finger-up":
+                this.handleFingerUp(event.fingerId, event.screen);
+                break;
+            case "finger-cancel":
+                this.handleFingerCancel(event.fingerId, event.screen);
                 break;
         }
     }
@@ -163,7 +159,8 @@ export class InteractionController {
         this.isDraggingCanvas = false;
         this.lastDragScreenPos = null;
         this.velocitySamples = [];
-        this.touchTransformActive = false;
+        this.activeFingers.clear();
+        this.fingerTransformBaseline = null;
         this.deps = null;
         this.destroyed = true;
     }
@@ -396,7 +393,7 @@ export class InteractionController {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // CLICK/TAP HANDLERS
+    // CLICK HANDLER
     // ═══════════════════════════════════════════════════════════════════════
 
     private handleClick(target: InteractionTarget, screen: ScreenPoint): void {
@@ -405,139 +402,206 @@ export class InteractionController {
         }
     }
 
-    private handleTap(target: InteractionTarget, screen: ScreenPoint): void {
-        // Treat tap same as click for now
-        this.handleClick(target, screen);
-    }
-
-    private handleLongPress(target: InteractionTarget, screen: ScreenPoint): void {
-        // TODO: Implement long-press handling (context menu, etc.)
-        if (target.type === "node") {
-            console.log("[InteractionController] Long-press on node:", target.nodeId);
-        }
-    }
-
     // ═══════════════════════════════════════════════════════════════════════
-    // TOUCH TRANSFORM HANDLER
+    // FINGER TRACKING HANDLERS
     // ═══════════════════════════════════════════════════════════════════════
 
-    private handleTouchTransform(event: UIEvent & { type: "touch-transform" }): void {
+    private handleFingerDown(fingerId: number, target: InteractionTarget, screen: ScreenPoint): void {
         if (!this.deps) return;
 
-        const { phase, target, center, translation, scale, rotation } = event;
+        // Track this finger
+        this.activeFingers.set(fingerId, { start: screen, current: screen, target });
 
-        switch (phase) {
-            case "start":
-                this.startTouchTransform(target, center);
-                break;
-            case "update":
-                this.updateTouchTransform(target, center, translation, scale, rotation);
-                break;
-            case "end":
-                this.endTouchTransform();
-                break;
-            case "cancel":
-                this.cancelTouchTransform();
-                break;
+        // If this is the first finger on a node, start node drag
+        if (this.activeFingers.size === 1 && target.type === "node") {
+            this.startNodeDrag(target.nodeId, screen);
         }
-    }
 
-    private startTouchTransform(target: InteractionTarget, center: ScreenPoint): void {
-        if (!this.deps) return;
-
-        if (target.type === "node") {
-            // Start node drag
-            this.startNodeDrag(target.nodeId, center);
-        } else {
-            // Start canvas transform
+        // If we now have 2+ fingers, stop any momentum and establish baseline
+        if (this.activeFingers.size >= 2) {
             const nav = this.deps.getNavigationEngine();
             if (isManualNavigationEngine(nav)) {
                 nav.stopMomentum();
             }
-
-            this.touchTransformActive = true;
-            this.lastDragScreenPos = center;
-            this.velocitySamples = [{ position: center, time: performance.now() }];
-        }
-    }
-
-    private updateTouchTransform(
-        target: InteractionTarget,
-        center: ScreenPoint,
-        translation: ScreenPoint,
-        scale: number,
-        rotation: number
-    ): void {
-        if (!this.deps) return;
-
-        if (this.draggingNodeId) {
-            // Update node drag position
-            this.updateNodeDrag(center);
-        } else if (this.touchTransformActive) {
-            // Apply canvas transform
-            const nav = this.deps.getNavigationEngine();
-            if (!isManualNavigationEngine(nav)) return;
-
-            // Apply pan (delta from last position)
-            if (this.lastDragScreenPos) {
-                const dx = center.x - this.lastDragScreenPos.x;
-                const dy = center.y - this.lastDragScreenPos.y;
-                nav.pan(dx, dy);
-            }
-
-            // Apply zoom if scale changed significantly
-            if (Math.abs(scale - 1) > 0.001) {
-                nav.zoom({ x: center.x, y: center.y }, scale);
-            }
-
-            // Apply rotation if changed significantly
-            if (Math.abs(rotation) > 0.001) {
-                nav.rotate({ x: center.x, y: center.y }, rotation);
-            }
-
-            this.lastDragScreenPos = center;
-            this.addVelocitySample(center);
-        }
-    }
-
-    private endTouchTransform(): void {
-        if (!this.deps) return;
-
-        if (this.draggingNodeId) {
-            this.endNodeDrag();
-        } else if (this.touchTransformActive) {
-            // Apply momentum
-            const nav = this.deps.getNavigationEngine();
-            if (isManualNavigationEngine(nav)) {
-                const velocity = this.calculateVelocity();
-                if (velocity) {
-                    nav.setVelocity(velocity.vx, velocity.vy);
-                }
-            }
-
-            this.touchTransformActive = false;
-            this.lastDragScreenPos = null;
+            this.fingerTransformBaseline = this.computeFingerGeometry(this.activeFingers);
             this.velocitySamples = [];
         }
     }
 
-    private cancelTouchTransform(): void {
+    private handleFingerMove(fingerId: number, screen: ScreenPoint): void {
         if (!this.deps) return;
 
-        // On cancel, just clean up without momentum
-        if (this.draggingNodeId) {
-            // Unpin the node (it will snap back via simulation)
-            const engine = this.deps.getSimulationEngine();
-            const pins = new Map<string, PinStatus>();
-            pins.set(this.draggingNodeId, { pinned: false });
-            engine.pinNodes(pins);
+        const finger = this.activeFingers.get(fingerId);
+        if (!finger) return;
 
-            this.draggingNodeId = null;
-            this.dragOffset = null;
+        // Update current position
+        finger.current = screen;
+
+        if (this.draggingNodeId && this.activeFingers.size === 1) {
+            // Single finger dragging a node
+            this.updateNodeDrag(screen);
+        } else if (this.activeFingers.size === 1) {
+            // Single finger canvas drag (pan only)
+            const nav = this.deps.getNavigationEngine();
+            if (!isManualNavigationEngine(nav)) return;
+
+            const dx = screen.x - finger.start.x;
+            const dy = screen.y - finger.start.y;
+
+            // Use incremental pan for single finger
+            if (this.lastDragScreenPos) {
+                const idx = screen.x - this.lastDragScreenPos.x;
+                const idy = screen.y - this.lastDragScreenPos.y;
+                nav.pan(idx, idy);
+            }
+
+            this.lastDragScreenPos = screen;
+            this.addVelocitySample(screen);
+        } else if (this.activeFingers.size >= 2) {
+            // Multi-finger: compute transform
+            this.applyFingerTransform();
+        }
+    }
+
+    private handleFingerUp(fingerId: number, screen: ScreenPoint): void {
+        if (!this.deps) return;
+
+        const finger = this.activeFingers.get(fingerId);
+        if (!finger) return;
+
+        // Update final position
+        finger.current = screen;
+
+        const wasMultiFinger = this.activeFingers.size >= 2;
+
+        // Remove this finger
+        this.activeFingers.delete(fingerId);
+
+        if (this.activeFingers.size === 0) {
+            // All fingers lifted
+            if (this.draggingNodeId) {
+                this.endNodeDrag();
+            } else {
+                // Apply momentum if we were panning
+                const nav = this.deps.getNavigationEngine();
+                if (isManualNavigationEngine(nav)) {
+                    const velocity = this.calculateVelocity();
+                    if (velocity) {
+                        nav.setVelocity(velocity.vx, velocity.vy);
+                    }
+                }
+            }
+
+            this.lastDragScreenPos = null;
+            this.velocitySamples = [];
+            this.fingerTransformBaseline = null;
+        } else if (wasMultiFinger && this.activeFingers.size === 1) {
+            // Went from multi-finger to single finger - reset baseline
+            this.fingerTransformBaseline = null;
+            this.velocitySamples = [];
+
+            // Reset lastDragScreenPos for single finger panning
+            const remainingFinger = this.activeFingers.values().next().value;
+            if (remainingFinger) {
+                this.lastDragScreenPos = remainingFinger.current;
+            }
+        } else if (this.activeFingers.size >= 2) {
+            // Still have multiple fingers - update baseline
+            this.fingerTransformBaseline = this.computeFingerGeometry(this.activeFingers);
+        }
+    }
+
+    private handleFingerCancel(fingerId: number, screen: ScreenPoint): void {
+        // Treat cancel same as finger up, but without momentum
+        const finger = this.activeFingers.get(fingerId);
+        if (!finger) return;
+
+        this.activeFingers.delete(fingerId);
+
+        if (this.activeFingers.size === 0) {
+            if (this.draggingNodeId) {
+                // Unpin the node
+                const engine = this.deps.getSimulationEngine();
+                const pins = new Map<string, PinStatus>();
+                pins.set(this.draggingNodeId, { pinned: false });
+                engine.pinNodes(pins);
+
+                this.draggingNodeId = null;
+                this.dragOffset = null;
+            }
+
+            this.lastDragScreenPos = null;
+            this.velocitySamples = [];
+            this.fingerTransformBaseline = null;
+        }
+    }
+
+    private computeFingerGeometry(fingers: Map<number, { start: ScreenPoint; current: ScreenPoint; target: InteractionTarget }>): { center: ScreenPoint; scale: number; rotation: number } {
+        const positions: ScreenPoint[] = [];
+        for (const finger of fingers.values()) {
+            positions.push(finger.current);
         }
 
-        this.touchTransformActive = false;
-        this.lastDragScreenPos = null;
-        this.velocitySamples = [];
+        // Compute center
+        const center = {
+            x: positions.reduce((sum, p) => sum + p.x, 0) / positions.length,
+            y: positions.reduce((sum, p) => sum + p.y, 0) / positions.length,
+        };
+
+        // For 2+ fingers, compute scale and rotation from first two fingers
+        if (positions.length >= 2) {
+            const dx = positions[1].x - positions[0].x;
+            const dy = positions[1].y - positions[0].y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+
+            return { center, scale: distance, rotation: angle };
+        }
+
+        return { center, scale: 1, rotation: 0 };
+    }
+
+    private applyFingerTransform(): void {
+        if (!this.deps || !this.fingerTransformBaseline || this.activeFingers.size < 2) return;
+
+        const current = this.computeFingerGeometry(this.activeFingers);
+        const baseline = this.fingerTransformBaseline;
+
+        // Compute deltas
+        const scaleFactor = current.scale / baseline.scale;
+        const rotationDelta = current.rotation - baseline.rotation;
+        const translationDelta = {
+            x: current.center.x - baseline.center.x,
+            y: current.center.y - baseline.center.y,
+        };
+
+        const nav = this.deps.getNavigationEngine();
+        if (!isManualNavigationEngine(nav)) return;
+
+        // Apply as incremental transform
+        // Order: translate to baseline center, rotate, scale, translate back, then translate delta
+        const cos = Math.cos(rotationDelta);
+        const sin = Math.sin(rotationDelta);
+
+        // Build the incremental transform matrix
+        // T(delta) * T(center) * R * S * T(-center)
+        const cx = baseline.center.x;
+        const cy = baseline.center.y;
+
+        // Combined transform: translate(-cx, -cy) -> scale -> rotate -> translate(cx, cy) -> translate(delta)
+        const a = scaleFactor * cos;
+        const b = scaleFactor * sin;
+        const c = -scaleFactor * sin;
+        const d = scaleFactor * cos;
+        const tx = -cx * a - cy * c + cx + translationDelta.x;
+        const ty = -cx * b - cy * d + cy + translationDelta.y;
+
+        nav.applyTransform({ a, b, c, d, tx, ty });
+
+        // Update baseline to current
+        this.fingerTransformBaseline = current;
+
+        // Track for momentum (use center movement)
+        this.addVelocitySample(current.center);
     }
 }

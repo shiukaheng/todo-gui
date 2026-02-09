@@ -17,6 +17,7 @@ import {
     IManualNavigationEngine,
     NavigationEngineInput,
     NavigationState,
+    ViewTransform,
     ScreenPoint,
     FlyNavigationHandle,
 } from "../types";
@@ -211,6 +212,11 @@ export class AutoNavigationEngine implements IManualNavigationEngine {
     // ═══════════════════════════════════════════════════════════════════════
     // MANUAL NAVIGATION ENGINE INTERFACE (delegates to manual engine)
     // ═══════════════════════════════════════════════════════════════════════
+
+    applyTransform(delta: ViewTransform): void {
+        this.onUserInteraction();
+        this.manualEngine.applyTransform(delta);
+    }
 
     pan(dx: number, dy: number): void {
         this.onUserInteraction();

@@ -20,6 +20,7 @@ import {
     scaleAround,
     rotateAround,
     getScale,
+    multiplyTransforms,
 } from "../../render/utils";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -142,6 +143,31 @@ export class ManualNavigationEngine implements IManualNavigationEngine {
     // ═══════════════════════════════════════════════════════════════════════
     // MANUAL NAVIGATION ENGINE INTERFACE
     // ═══════════════════════════════════════════════════════════════════════
+
+    applyTransform(delta: ViewTransform): void {
+        // Multiply delta with current transform: new = delta * current
+        this.transform = multiplyTransforms(delta, this.transform);
+
+        // Apply scale clamping if the transform resulted in out-of-bounds scale
+        const currentScale = getScale(this.transform);
+        if (currentScale < this.config.minScale || currentScale > this.config.maxScale) {
+            const clampedScale = Math.max(
+                this.config.minScale,
+                Math.min(this.config.maxScale, currentScale)
+            );
+            const scaleFactor = clampedScale / currentScale;
+
+            // Scale the transform uniformly to clamp
+            this.transform = {
+                a: this.transform.a * scaleFactor,
+                b: this.transform.b * scaleFactor,
+                c: this.transform.c * scaleFactor,
+                d: this.transform.d * scaleFactor,
+                tx: this.transform.tx,
+                ty: this.transform.ty,
+            };
+        }
+    }
 
     pan(dx: number, dy: number): void {
         this.transform = {
