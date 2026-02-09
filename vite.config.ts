@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  base: '/todo/',
+  base: process.env.BASE_PATH || '/',
   plugins: [react()],
   define: {
     // Polyfill process.env for packages that expect Node.js environment
