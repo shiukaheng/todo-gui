@@ -281,7 +281,7 @@ export class InputHandler {
     private onTouchMove = (e: TouchEvent): void => {
         e.preventDefault();
 
-        if (e.touches.length === 1 && !this.isTouchTransforming) {
+        if (e.touches.length === 1) {
             this.handleSingleTouchMove(e.touches[0]);
         } else if (e.touches.length === 2) {
             this.handleTwoFingerMove(e.touches[0], e.touches[1]);

@@ -82,29 +82,37 @@ export class InteractionController {
         switch (event.type) {
             // ─── Mouse/Pointer events ───
             case "drag-start":
+                console.log("[InteractionController] Drag start:", event.target);
                 this.handleDragStart(event.target, event.screen);
                 break;
             case "drag-move":
+                console.log("[InteractionController] Drag move:", event.target);
                 this.handleDragMove(event.target, event.screen);
                 break;
             case "drag-end":
+                console.log("[InteractionController] Drag end:", event.target);
                 this.handleDragEnd(event.target, event.screen);
                 break;
             case "click":
+                console.log("[InteractionController] Click:", event.target);
                 this.handleClick(event.target, event.screen);
                 break;
             case "zoom":
+                console.log("[InteractionController] Zoom:", event.delta);
                 this.handleZoom(event.screen, event.delta);
                 break;
 
             // ─── Touch events ───
             case "tap":
+                console.log("[InteractionController] Tap:", event.target);
                 this.handleTap(event.target, event.screen);
                 break;
             case "long-press":
+                console.log("[InteractionController] Long-press:", event.target);
                 this.handleLongPress(event.target, event.screen);
                 break;
             case "touch-transform":
+                console.log("[InteractionController] Touch transform:", event.phase);
                 this.handleTouchTransform(event);
                 break;
         }
