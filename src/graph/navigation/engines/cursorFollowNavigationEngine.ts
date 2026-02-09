@@ -13,7 +13,9 @@ import {
     NavigationEngineInput,
     NavigationState,
     createPanZoomTransform,
+    ViewTransform,
 } from "../types";
+import { getScale, getRotation, multiplyTransforms, translateMatrix, scaleMatrix, rotateMatrix } from "../../render/utils";
 
 export interface CursorFollowNavigationEngineConfig {
     /** Margin multiplier applied to max neighbor distance. Default: 2.5 */
@@ -25,6 +27,9 @@ export interface CursorFollowNavigationEngineConfig {
     /** Smoothing rate for scale (higher = faster). Default: 3 */
     scaleSmoothingRate?: number;
 
+    /** Smoothing rate for rotation (higher = faster). Default: 3 */
+    rotationSmoothingRate?: number;
+
     /** Default distance when no neighbors exist. Default: 100 */
     defaultDistance?: number;
 }
@@ -33,6 +38,7 @@ const DEFAULT_CONFIG: Required<CursorFollowNavigationEngineConfig> = {
     marginMultiplier: 3,
     positionSmoothingRate: 5,
     scaleSmoothingRate: 3,
+    rotationSmoothingRate: 3,
     defaultDistance: 100,
 };
 
@@ -43,6 +49,7 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
     private smoothedCenterX: number | null = null;
     private smoothedCenterY: number | null = null;
     private smoothedScale: number | null = null;
+    private smoothedRotation: number | null = null; // in radians
 
     // Track previous state to detect transitions
     private prevNeighborCount = 0;
@@ -101,20 +108,32 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
         const targetCenterY = cursorPos[1];
 
         // Initialize smoothed values on first step
-        if (!this.initialized || this.smoothedCenterX === null || this.smoothedCenterY === null || this.smoothedScale === null) {
-            // Try to extract current center from prevState
-            const prevScale = Math.sqrt(prevState.transform.a * prevState.transform.a + prevState.transform.b * prevState.transform.b);
+        if (!this.initialized || this.smoothedCenterX === null || this.smoothedCenterY === null || this.smoothedScale === null || this.smoothedRotation === null) {
+            // Try to extract current center, scale, and rotation from prevState
+            const prevScale = getScale(prevState.transform);
+            const prevRotation = getRotation(prevState.transform);
+
             if (prevScale > 0.001) {
-                // Compute current center in world coordinates
-                const currentCenterX = (viewport.width / 2 - prevState.transform.tx) / prevScale;
-                const currentCenterY = (viewport.height / 2 - prevState.transform.ty) / prevScale;
+                // Compute current center in world coordinates (accounting for rotation)
+                // Inverse transform: (screen - translation) / (rotation * scale)
+                const screenCenterX = viewport.width / 2 - prevState.transform.tx;
+                const screenCenterY = viewport.height / 2 - prevState.transform.ty;
+
+                // Apply inverse rotation and scale
+                const cos = Math.cos(-prevRotation);
+                const sin = Math.sin(-prevRotation);
+                const currentCenterX = (cos * screenCenterX - sin * screenCenterY) / prevScale;
+                const currentCenterY = (sin * screenCenterX + cos * screenCenterY) / prevScale;
+
                 this.smoothedCenterX = currentCenterX;
                 this.smoothedCenterY = currentCenterY;
                 this.smoothedScale = prevScale;
+                this.smoothedRotation = prevRotation;
             } else {
                 this.smoothedCenterX = targetCenterX;
                 this.smoothedCenterY = targetCenterY;
                 this.smoothedScale = targetScale;
+                this.smoothedRotation = 0; // Follow mode has no rotation
             }
             this.initialized = true;
         }
@@ -129,18 +148,33 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
             // Formula: smoothed += (target - smoothed) * (1 - e^(-rate * dt))
             const posAlpha = 1 - Math.exp(-this.config.positionSmoothingRate * dt);
             const scaleAlpha = 1 - Math.exp(-this.config.scaleSmoothingRate * dt);
+            const rotationAlpha = 1 - Math.exp(-this.config.rotationSmoothingRate * dt);
 
             this.smoothedCenterX += (targetCenterX - this.smoothedCenterX) * posAlpha;
             this.smoothedCenterY += (targetCenterY - this.smoothedCenterY) * posAlpha;
             this.smoothedScale += (targetScale - this.smoothedScale) * scaleAlpha;
+
+            // Interpolate rotation toward zero (follow mode has no rotation)
+            this.smoothedRotation = this.smoothedRotation! - this.smoothedRotation! * rotationAlpha;
         }
 
-        // Compute translation to center the smoothed position
-        const panX = viewport.width / 2 - this.smoothedCenterX * this.smoothedScale;
-        const panY = viewport.height / 2 - this.smoothedCenterY * this.smoothedScale;
+        // Build transform: translate to origin, rotate, scale, translate to screen center
+        // Order: T(center) * S(scale) * R(rotation) * T(-worldCenter)
+        const cos = Math.cos(this.smoothedRotation!);
+        const sin = Math.sin(this.smoothedRotation!);
+
+        // Combined matrix for S * R
+        const a = this.smoothedScale * cos;
+        const b = this.smoothedScale * sin;
+        const c = -this.smoothedScale * sin;
+        const d = this.smoothedScale * cos;
+
+        // Translation: screen_center - scale * rotation * world_center
+        const tx = viewport.width / 2 - (a * this.smoothedCenterX + c * this.smoothedCenterY);
+        const ty = viewport.height / 2 - (b * this.smoothedCenterX + d * this.smoothedCenterY);
 
         return {
-            transform: createPanZoomTransform(this.smoothedScale, panX, panY),
+            transform: { a, b, c, d, tx, ty },
         };
     }
 
@@ -185,24 +219,39 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
         );
 
         // Initialize or interpolate
-        if (!this.initialized || this.smoothedCenterX === null || this.smoothedCenterY === null || this.smoothedScale === null) {
+        if (!this.initialized || this.smoothedCenterX === null || this.smoothedCenterY === null || this.smoothedScale === null || this.smoothedRotation === null) {
             this.smoothedCenterX = targetCenterX;
             this.smoothedCenterY = targetCenterY;
             this.smoothedScale = targetScale;
+            this.smoothedRotation = getRotation(prevState.transform);
             this.initialized = true;
         } else {
             const posAlpha = 1 - Math.exp(-this.config.positionSmoothingRate * dt);
             const scaleAlpha = 1 - Math.exp(-this.config.scaleSmoothingRate * dt);
+            const rotationAlpha = 1 - Math.exp(-this.config.rotationSmoothingRate * dt);
+
             this.smoothedCenterX += (targetCenterX - this.smoothedCenterX) * posAlpha;
             this.smoothedCenterY += (targetCenterY - this.smoothedCenterY) * posAlpha;
             this.smoothedScale += (targetScale - this.smoothedScale) * scaleAlpha;
+
+            // Interpolate rotation toward zero
+            this.smoothedRotation = this.smoothedRotation - this.smoothedRotation * rotationAlpha;
         }
 
-        const panX = viewport.width / 2 - this.smoothedCenterX * this.smoothedScale;
-        const panY = viewport.height / 2 - this.smoothedCenterY * this.smoothedScale;
+        // Build transform with rotation
+        const cos = Math.cos(this.smoothedRotation);
+        const sin = Math.sin(this.smoothedRotation);
+
+        const a = this.smoothedScale * cos;
+        const b = this.smoothedScale * sin;
+        const c = -this.smoothedScale * sin;
+        const d = this.smoothedScale * cos;
+
+        const tx = viewport.width / 2 - (a * this.smoothedCenterX + c * this.smoothedCenterY);
+        const ty = viewport.height / 2 - (b * this.smoothedCenterX + d * this.smoothedCenterY);
 
         return {
-            transform: createPanZoomTransform(this.smoothedScale, panX, panY),
+            transform: { a, b, c, d, tx, ty },
         };
     }
 
@@ -260,6 +309,7 @@ export class CursorFollowNavigationEngine implements NavigationEngine {
         this.smoothedCenterX = null;
         this.smoothedCenterY = null;
         this.smoothedScale = null;
+        this.smoothedRotation = null;
         this.prevNeighborCount = 0;
         this.hadCursor = false;
         this.initialized = false;

@@ -176,3 +176,11 @@ export function rotateAround(
 export function getScale(t: ViewTransform): number {
     return Math.sqrt(t.a * t.a + t.b * t.b);
 }
+
+/**
+ * Extract rotation angle from a transform matrix.
+ * @returns Rotation in radians
+ */
+export function getRotation(t: ViewTransform): number {
+    return Math.atan2(t.b, t.a);
+}
