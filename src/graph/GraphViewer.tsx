@@ -140,17 +140,23 @@ export function GraphViewer() {
 
     return (
         <div className="absolute w-full h-full bg-black">
-            <div className="absolute w-full h-full" ref={viewportContainerRef} />
-            <div className="absolute top-8 left-8 flex flex-col">
-                <ConnectionStatusPanel />
-                <NodeDetailOverlay />
-                <OutputPanel />
+            <div className="absolute w-full h-full z-0" ref={viewportContainerRef} />
+            <div className="absolute top-8 left-8 flex flex-col z-10 pointer-events-none">
+                <div className="pointer-events-auto">
+                    <ConnectionStatusPanel />
+                </div>
+                <div className="pointer-events-auto">
+                    <NodeDetailOverlay />
+                </div>
+                <div className="pointer-events-auto">
+                    <OutputPanel />
+                </div>
             </div>
             {/* <div className="absolute top-8 right-8">
                 <DeadlinePanel />
             </div> */}
             {navInfoText && !commandPlane.state.visible && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white font-mono text-sm">
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white font-mono text-sm z-10">
                     {navInfoText}
                 </div>
             )}

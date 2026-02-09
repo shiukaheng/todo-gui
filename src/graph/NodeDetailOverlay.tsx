@@ -177,7 +177,7 @@ export function NodeDetailOverlay() {
                             onChange={(e) => setEdit({ ...edit, value: e.target.value })}
                             onKeyDown={handleKeyDown}
                             autoFocus
-                            className="bg-white/10 border border-white/30 rounded px-2 py-0.5 text-white outline-none"
+                            className="bg-white/10 border border-white/30 rounded px-2 py-0.5 text-white outline-none text-base"
                         />
                         <button onClick={saveEdit} className="text-green-400 hover:text-green-300 text-xs">save</button>
                         <button onClick={cancelEdit} className="text-white/40 hover:text-white/60 text-xs">cancel</button>
@@ -202,7 +202,7 @@ export function NodeDetailOverlay() {
                             onChange={(e) => setEdit({ ...edit, value: e.target.value })}
                             onKeyDown={handleKeyDown}
                             autoFocus
-                            className="bg-white/10 border border-white/30 rounded px-2 py-0.5 text-white outline-none"
+                            className="bg-white/10 border border-white/30 rounded px-2 py-0.5 text-white outline-none text-base"
                         />
                         <button onClick={saveEdit} className="text-green-400 hover:text-green-300">save</button>
                         <button onClick={cancelEdit} className="text-white/40 hover:text-white/60">cancel</button>
@@ -254,7 +254,7 @@ export function NodeDetailOverlay() {
                             onChange={(e) => setEdit({ ...edit, value: e.target.value })}
                             onKeyDown={handleKeyDown}
                             autoFocus
-                            className="bg-white/10 border border-white/30 rounded px-1 py-0.5 text-white text-xs outline-none"
+                            className="bg-white/10 border border-white/30 rounded px-1 py-0.5 text-white text-base outline-none"
                         />
                         <input
                             type="time"
@@ -262,7 +262,7 @@ export function NodeDetailOverlay() {
                             onChange={(e) => setEdit({ ...edit, timeValue: e.target.value })}
                             onKeyDown={handleKeyDown}
                             placeholder="23:59"
-                            className="bg-white/10 border border-white/30 rounded px-1 py-0.5 text-white text-xs outline-none w-20"
+                            className="bg-white/10 border border-white/30 rounded px-1 py-0.5 text-white text-base outline-none w-20"
                         />
                         <button onClick={saveEdit} className="text-green-400 hover:text-green-300">save</button>
                         <button onClick={clearDue} className="text-red-400 hover:text-red-300">clear</button>

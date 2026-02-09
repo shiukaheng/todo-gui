@@ -414,6 +414,11 @@ export class InteractionController {
         if (target.type === "node") {
             this.deps?.onNodeClick?.(target.nodeId);
         } else if (target.type === "canvas") {
+            // Don't open command plane if an input is currently focused
+            const activeElement = document.activeElement;
+            if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) {
+                return;
+            }
             this.deps?.onCanvasTap?.();
         }
     }

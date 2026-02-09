@@ -69,7 +69,7 @@ export function CommandPlane({ controller }: CommandPlaneProps) {
     };
 
     return (
-        <div className="absolute bottom-8 left-8 w-96 font-mono text-sm select-none">
+        <div className="absolute bottom-8 left-8 w-96 font-mono text-sm select-none z-10">
             {/* Completions */}
             {state.completions.length > 0 && (
                 <div className="mb-1 max-h-40 overflow-y-auto">
