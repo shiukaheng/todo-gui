@@ -5,9 +5,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { type CommandPlaneState, type CompletionSuggestion } from '../types';
 import { commandRegistry } from '../CommandRegistry';
+import { useTodoStore } from '../../stores/todoStore';
 
-const INITIAL_STATE: CommandPlaneState = {
-    visible: false,
+const INITIAL_STATE: Omit<CommandPlaneState, 'visible'> = {
     input: '',
     cursorPosition: 0,
     completions: [],
@@ -31,17 +31,24 @@ export interface UseCommandPlaneReturn {
 }
 
 export function useCommandPlane(): UseCommandPlaneReturn {
-    const [state, setState] = useState<CommandPlaneState>(INITIAL_STATE);
-    const inputRef = useRef(state.input);
+    const [localState, setLocalState] = useState<Omit<CommandPlaneState, 'visible'>>(INITIAL_STATE);
+    const visible = useTodoStore(s => s.commandPlaneVisible);
+    const inputRef = useRef(localState.input);
+
+    // Combine Zustand visibility with local state
+    const state: CommandPlaneState = {
+        ...localState,
+        visible,
+    };
 
     // Keep ref in sync
     useEffect(() => {
-        inputRef.current = state.input;
-    }, [state.input]);
+        inputRef.current = localState.input;
+    }, [localState.input]);
 
     const updateCompletions = useCallback((input: string, cursorPosition: number) => {
         const completions = commandRegistry.complete(input, cursorPosition);
-        setState(s => ({
+        setLocalState(s => ({
             ...s,
             completions,
             selectedCompletionIndex: completions.length > 0 ? 0 : -1,
@@ -49,13 +56,13 @@ export function useCommandPlane(): UseCommandPlaneReturn {
     }, []);
 
     const show = useCallback(() => {
-        setState(s => ({ ...s, visible: true }));
+        useTodoStore.getState().showCommandPlane();
     }, []);
 
     const hide = useCallback(() => {
-        setState(s => ({
+        useTodoStore.getState().hideCommandPlane();
+        setLocalState(s => ({
             ...s,
-            visible: false,
             input: '',
             cursorPosition: 0,
             completions: [],
@@ -66,7 +73,7 @@ export function useCommandPlane(): UseCommandPlaneReturn {
 
     const setInput = useCallback((input: string, cursorPosition?: number) => {
         const pos = cursorPosition ?? input.length;
-        setState(s => ({
+        setLocalState(s => ({
             ...s,
             input,
             cursorPosition: pos,
@@ -76,14 +83,14 @@ export function useCommandPlane(): UseCommandPlaneReturn {
     }, [updateCompletions]);
 
     const selectCompletion = useCallback((index: number) => {
-        setState(s => ({
+        setLocalState(s => ({
             ...s,
             selectedCompletionIndex: Math.max(-1, Math.min(s.completions.length - 1, index)),
         }));
     }, []);
 
     const applyCompletion = useCallback(() => {
-        setState(s => {
+        setLocalState(s => {
             if (s.selectedCompletionIndex < 0 || s.selectedCompletionIndex >= s.completions.length) {
                 return s;
             }
@@ -131,7 +138,7 @@ export function useCommandPlane(): UseCommandPlaneReturn {
     }, []);
 
     const nextCompletion = useCallback(() => {
-        setState(s => ({
+        setLocalState(s => ({
             ...s,
             selectedCompletionIndex: s.completions.length > 0
                 ? (s.selectedCompletionIndex + 1) % s.completions.length
@@ -140,7 +147,7 @@ export function useCommandPlane(): UseCommandPlaneReturn {
     }, []);
 
     const prevCompletion = useCallback(() => {
-        setState(s => ({
+        setLocalState(s => ({
             ...s,
             selectedCompletionIndex: s.completions.length > 0
                 ? (s.selectedCompletionIndex - 1 + s.completions.length) % s.completions.length
@@ -156,7 +163,7 @@ export function useCommandPlane(): UseCommandPlaneReturn {
         }
 
         // Add to history
-        setState(s => ({
+        setLocalState(s => ({
             ...s,
             history: [...s.history.filter(h => h !== input), input],
         }));
@@ -170,7 +177,7 @@ export function useCommandPlane(): UseCommandPlaneReturn {
     }, [hide]);
 
     const historyUp = useCallback(() => {
-        setState(s => {
+        setLocalState(s => {
             if (s.history.length === 0) return s;
             const newIndex = s.historyIndex < 0
                 ? s.history.length - 1
@@ -188,7 +195,7 @@ export function useCommandPlane(): UseCommandPlaneReturn {
     }, []);
 
     const historyDown = useCallback(() => {
-        setState(s => {
+        setLocalState(s => {
             if (s.historyIndex < 0) return s;
             const newIndex = s.historyIndex + 1;
             if (newIndex >= s.history.length) {

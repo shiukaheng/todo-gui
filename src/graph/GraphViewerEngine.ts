@@ -135,6 +135,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             getNavigationState: () => this.navigationState,
             getSimulationState: () => this.simulationState,
             onNodeClick: (nodeId) => setCursor(nodeId),
+            onCanvasTap: () => useTodoStore.getState().showCommandPlane(),
         });
         this.inputHandler.setCallback((event) => this.interactionController.handleEvent(event));
 

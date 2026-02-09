@@ -31,6 +31,7 @@ export interface InteractionControllerDeps {
     getNavigationState: () => NavigationState;
     getSimulationState: () => SimulationState;
     onNodeClick?: (nodeId: string) => void;
+    onCanvasTap?: () => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -399,6 +400,8 @@ export class InteractionController {
     private handleClick(target: InteractionTarget, screen: ScreenPoint): void {
         if (target.type === "node") {
             this.deps?.onNodeClick?.(target.nodeId);
+        } else if (target.type === "canvas") {
+            this.deps?.onCanvasTap?.();
         }
     }
 

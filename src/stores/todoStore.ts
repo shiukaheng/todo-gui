@@ -33,11 +33,16 @@ interface TodoStore {
     api: DefaultApi | null;
     unsubscribe: (() => void) | null;
 
+    // Command plane state
+    commandPlaneVisible: boolean;
+
     // Actions
     setCursor: (nodeId: string | null) => void;
     setNavInfoText: (text: string | null) => void;
     setNavigationMode: (mode: NavigationMode) => void;
     setSimulationMode: (mode: SimulationMode) => void;
+    showCommandPlane: () => void;
+    hideCommandPlane: () => void;
     subscribe: (baseUrl: string) => () => void;
     disconnect: () => void;
 }
@@ -54,11 +59,14 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     lastDataReceived: null,
     api: null,
     unsubscribe: null,
+    commandPlaneVisible: false,
 
     setCursor: (nodeId) => set({ cursor: nodeId }),
     setNavInfoText: (text) => set({ navInfoText: text }),
     setNavigationMode: (mode) => set({ navigationMode: mode }),
     setSimulationMode: (mode) => set({ simulationMode: mode }),
+    showCommandPlane: () => set({ commandPlaneVisible: true }),
+    hideCommandPlane: () => set({ commandPlaneVisible: false }),
 
     disconnect: () => {
         get().unsubscribe?.();
