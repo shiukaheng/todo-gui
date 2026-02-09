@@ -113,7 +113,7 @@ export function CommandPlane({ controller }: CommandPlaneProps) {
                         // Keep focus on input while command plane is visible
                         setTimeout(() => inputRef.current?.focus(), 0);
                     }}
-                    className="flex-1 bg-transparent ml-1 text-white outline-none"
+                    className="flex-1 bg-transparent ml-1 text-white outline-none text-base"
                     placeholder=""
                     autoComplete="off"
                     spellCheck={false}
