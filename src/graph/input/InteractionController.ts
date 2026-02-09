@@ -99,6 +99,11 @@ export class InteractionController {
                 this.handleZoom(event.screen, event.delta);
                 break;
 
+            // ─── Touch: Gestures ───
+            case "tap":
+                this.handleTap(event.target, event.screen);
+                break;
+
             // ─── Touch: Individual finger tracking ───
             case "finger-down":
                 this.handleFingerDown(event.fingerId, event.target, event.screen);
@@ -394,10 +399,18 @@ export class InteractionController {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // CLICK HANDLER
+    // CLICK/TAP HANDLERS
     // ═══════════════════════════════════════════════════════════════════════
 
     private handleClick(target: InteractionTarget, screen: ScreenPoint): void {
+        // Mouse click: only handle node clicks, not canvas
+        if (target.type === "node") {
+            this.deps?.onNodeClick?.(target.nodeId);
+        }
+    }
+
+    private handleTap(target: InteractionTarget, screen: ScreenPoint): void {
+        // Touch tap: handle both node taps and canvas taps
         if (target.type === "node") {
             this.deps?.onNodeClick?.(target.nodeId);
         } else if (target.type === "canvas") {

@@ -27,6 +27,9 @@ export type UIEvent =
     | { type: "click"; target: InteractionTarget; screen: ScreenPoint }
     | { type: "zoom"; screen: ScreenPoint; delta: number }
 
+    // ─── Touch: Gestures ───
+    | { type: "tap"; target: InteractionTarget; screen: ScreenPoint }
+
     // ─── Touch: Individual finger tracking ───
     | { type: "finger-down"; fingerId: number; target: InteractionTarget; screen: ScreenPoint }
     | { type: "finger-move"; fingerId: number; screen: ScreenPoint }
@@ -325,8 +328,8 @@ export class InputHandler {
                     const dist = distance(startPos, screen);
 
                     if (elapsed < TAP_MAX_DURATION && dist < DRAG_THRESHOLD) {
-                        // Emit tap event for compatibility
-                        this.emit({ type: "click", target: startTarget, screen });
+                        // Emit tap event (touch-specific, different from mouse click)
+                        this.emit({ type: "tap", target: startTarget, screen });
                     }
                 }
             }
