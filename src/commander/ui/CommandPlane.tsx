@@ -116,6 +116,8 @@ export function CommandPlane({ controller }: CommandPlaneProps) {
                     className="flex-1 bg-transparent ml-1 text-white outline-none text-base"
                     placeholder=""
                     autoComplete="off"
+                    autoCapitalize="off"
+                    autoCorrect="off"
                     spellCheck={false}
                 />
             </div>

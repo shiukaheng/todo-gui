@@ -18,6 +18,8 @@ import {
     WebColaEngine,
     ForceDirectedEngine,
 } from "./simulation";
+// TEMPORARY: Position persistence until backend storage exists (remove this line to disable)
+import { PositionPersistenceManager } from "./simulation/PositionPersistenceManager";
 import {
     NavigationEngine,
     NavigationState,
@@ -78,6 +80,9 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private currentSimulationMode: SimulationMode;
     private storeUnsubscribe: (() => void) | null = null;
 
+    // TEMPORARY: Position persistence manager (remove this line to disable)
+    private positionPersistence: PositionPersistenceManager;
+
     constructor(
         container: HTMLDivElement,
         getCursor: () => string | null,
@@ -102,7 +107,14 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
         // Subsystems
         this.renderer = new SVGRenderer(this.svg);
-        
+
+        // TEMPORARY: Initialize position persistence and load saved positions
+        this.positionPersistence = new PositionPersistenceManager();
+        const savedPositions = this.positionPersistence.loadPositions();
+        if (Object.keys(savedPositions).length > 0) {
+            this.simulationState = { positions: savedPositions };
+        }
+
         // Initialize simulation engine based on store mode
         this.currentSimulationMode = useTodoStore.getState().simulationMode;
         this.simulationEngine = this.createSimulationEngine(this.currentSimulationMode);
@@ -138,6 +150,9 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             onCanvasTap: () => useTodoStore.getState().showCommandPlane(),
         });
         this.inputHandler.setCallback((event) => this.interactionController.handleEvent(event));
+
+        // TEMPORARY: Start position persistence monitoring
+        this.positionPersistence.start(() => this.simulationState);
 
         this.lastFrameTime = performance.now();
         this.startLoop();
@@ -346,6 +361,8 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
         }
+        // TEMPORARY: Stop position persistence monitoring
+        this.positionPersistence.stop();
         this.storeUnsubscribe?.();
         this.storeUnsubscribe = null;
         this.inputHandler.destroy();
