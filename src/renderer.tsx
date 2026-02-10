@@ -17,8 +17,14 @@ function App() {
     const subscribe = useTodoStore((s) => s.subscribe);
 
     useEffect(() => {
-        // Only auto-connect if a default URL is configured
-        const defaultUrl = window.__CONFIG__?.defaultApiUrl;
+        // Auto-connect using configured URL or current origin
+        // Empty string -> use current origin (works with dev proxy and production nginx)
+        // Explicit URL -> use that URL (for external API servers)
+        const configuredUrl = window.__CONFIG__?.defaultApiUrl;
+        const defaultUrl = configuredUrl !== null && configuredUrl !== undefined
+            ? (configuredUrl || window.location.origin)
+            : null;
+
         if (defaultUrl) {
             return subscribe(defaultUrl);
         }
