@@ -325,23 +325,35 @@ export function NodeDetailOverlay() {
             <div className="flex gap-4 text-xs items-center">
                 {/* Node type selector */}
                 {isEditing('nodeType') ? (
-                    <select
-                        value={edit.value}
-                        onChange={(e) => {
-                            setNodeType(e.target.value);
-                            setEdit({ field: null, value: '' });
-                        }}
-                        onBlur={() => setEdit({ field: null, value: '' })}
-                        autoFocus
-                        className="bg-white/10 text-white hover:text-white border border-white/20 rounded px-2 py-1 cursor-pointer text-xs"
-                        style={{ color: 'white' }}
-                    >
-                        <option value="Task" style={{ backgroundColor: '#1f2937', color: 'white' }}>task</option>
-                        <option value="And" style={{ backgroundColor: '#1f2937', color: 'white' }}>and (all)</option>
-                        <option value="Or" style={{ backgroundColor: '#1f2937', color: 'white' }}>or (any)</option>
-                        <option value="Not" style={{ backgroundColor: '#1f2937', color: 'white' }}>not (none)</option>
-                        <option value="ExactlyOne" style={{ backgroundColor: '#1f2937', color: 'white' }}>xor (one)</option>
-                    </select>
+                    <div className="relative">
+                        <div className="absolute top-0 left-0 bg-gray-800 border border-white/20 rounded shadow-lg z-50">
+                            {[
+                                { value: 'Task', label: 'task' },
+                                { value: 'And', label: 'and (all)' },
+                                { value: 'Or', label: 'or (any)' },
+                                { value: 'Not', label: 'not (none)' },
+                                { value: 'ExactlyOne', label: 'xor (one)' },
+                            ].map(option => (
+                                <div
+                                    key={option.value}
+                                    onClick={() => {
+                                        setNodeType(option.value);
+                                        setEdit({ field: null, value: '' });
+                                    }}
+                                    className={`px-3 py-1.5 cursor-pointer hover:bg-white/10 text-xs ${
+                                        option.value === edit.value ? 'bg-white/5 text-white' : 'text-white/80'
+                                    }`}
+                                >
+                                    {option.label}
+                                </div>
+                            ))}
+                        </div>
+                        {/* Invisible backdrop to close on click outside */}
+                        <div
+                            className="fixed inset-0 z-40"
+                            onClick={() => setEdit({ field: null, value: '' })}
+                        />
+                    </div>
                 ) : (
                     <span
                         onClick={() => startEdit('nodeType', task.nodeType || 'Task')}
