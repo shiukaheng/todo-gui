@@ -19,7 +19,7 @@ interface Task {
 }
 
 interface EditState {
-    field: 'id' | 'text' | 'due' | 'nodeType' | null;
+    field: 'id' | 'text' | 'due' | null;
     value: string;
     parsedDate?: Date | null; // Parsed date from natural language or picker
     parseError?: string; // Error message if parsing fails
@@ -184,12 +184,15 @@ export function NodeDetailOverlay() {
         }
     }, [task, api, isBlocked]);
 
-    const setNodeType = useCallback(async (newType: string) => {
+    const toggleNodeType = useCallback(async () => {
         if (!task || !api) return;
+        const types = ['Task', 'And', 'Or', 'Not', 'ExactlyOne'];
+        const currentIndex = types.indexOf(task.nodeType || 'Task');
+        const nextType = types[(currentIndex + 1) % types.length];
         try {
             await api.setTaskApiTasksTaskIdPatch({
                 taskId: task.id,
-                nodeUpdate: { nodeType: newType },
+                nodeUpdate: { nodeType: nextType },
             });
         } catch (err) {
             console.error("Failed to change node type:", err);
@@ -323,54 +326,22 @@ export function NodeDetailOverlay() {
 
             {/* Status line */}
             <div className="flex gap-4 text-xs items-center">
-                {/* Node type selector */}
-                {isEditing('nodeType') ? (
-                    <div className="relative">
-                        <div className="absolute top-0 left-0 bg-gray-800 border border-white/20 rounded shadow-lg z-50">
-                            {[
-                                { value: 'Task', label: 'task' },
-                                { value: 'And', label: 'and (all)' },
-                                { value: 'Or', label: 'or (any)' },
-                                { value: 'Not', label: 'not (none)' },
-                                { value: 'ExactlyOne', label: 'xor (one)' },
-                            ].map(option => (
-                                <div
-                                    key={option.value}
-                                    onClick={() => {
-                                        setNodeType(option.value);
-                                        setEdit({ field: null, value: '' });
-                                    }}
-                                    className={`px-3 py-1.5 cursor-pointer hover:bg-white/10 text-xs ${
-                                        option.value === edit.value ? 'bg-white/5 text-white' : 'text-white/80'
-                                    }`}
-                                >
-                                    {option.label}
-                                </div>
-                            ))}
-                        </div>
-                        {/* Invisible backdrop to close on click outside */}
-                        <div
-                            className="fixed inset-0 z-40"
-                            onClick={() => setEdit({ field: null, value: '' })}
-                        />
-                    </div>
-                ) : (
-                    <span
-                        onClick={() => startEdit('nodeType', task.nodeType || 'Task')}
-                        className="cursor-pointer hover:text-white text-white/80"
-                    >
-                        {(() => {
-                            const type = task.nodeType || 'Task';
-                            switch(type) {
-                                case 'And': return 'and (all)';
-                                case 'Or': return 'or (any)';
-                                case 'Not': return 'not (none)';
-                                case 'ExactlyOne': return 'xor (one)';
-                                default: return 'task';
-                            }
-                        })()}
-                    </span>
-                )}
+                {/* Node type toggle */}
+                <span
+                    onClick={toggleNodeType}
+                    className="cursor-pointer hover:text-white text-white/80"
+                >
+                    {(() => {
+                        const type = task.nodeType || 'Task';
+                        switch(type) {
+                            case 'And': return 'and (all)';
+                            case 'Or': return 'or (any)';
+                            case 'Not': return 'not (none)';
+                            case 'ExactlyOne': return 'xor (one)';
+                            default: return 'task';
+                        }
+                    })()}
+                </span>
 
                 {/* Status: blocked > completed > actionable */}
                 {isBlocked ? (
