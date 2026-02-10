@@ -473,7 +473,7 @@ export function NodeDetailOverlay() {
                     <span
                         onClick={() => startEdit('due', task.due?.toString() || '')}
                         className="cursor-pointer hover:opacity-80"
-                        style={task.calculatedDue && !task.calculatedCompleted ? { color: getUrgencyColorCSSFromTimestamp(task.calculatedDue) } : undefined}
+                        style={task.calculatedDue && !task.calculatedValue ? { color: getUrgencyColorCSSFromTimestamp(task.calculatedDue) } : undefined}
                     >
                         due: {task.calculatedDue
                             ? `${formatDateRelative(task.calculatedDue)} / ${formatDateAbsolute(task.calculatedDue)}`
