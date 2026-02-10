@@ -208,6 +208,7 @@ export function NodeDetailOverlay() {
     // - Space: toggle completion
     // - 't': cycle node type
     // - 'r': edit description (text)
+    // - 'f': edit due date
     // - F2: rename node (id)
     // - Escape: cancel edit (handled in input's onKeyDown)
     useEffect(() => {
@@ -231,6 +232,11 @@ export function NodeDetailOverlay() {
             if (e.key === 'r' && task) {
                 e.preventDefault();
                 startEdit('text', task.text);
+            }
+
+            if (e.key === 'f' && task) {
+                e.preventDefault();
+                startEdit('due', task.due?.toString() || '');
             }
 
             if (e.key === 'F2' && task) {
