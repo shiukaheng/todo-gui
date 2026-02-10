@@ -1,8 +1,22 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTodoStore } from "../stores/todoStore";
 import { formatDistanceToNow } from "date-fns";
 import { getUrgencyColorCSSFromTimestamp } from "../utils/urgencyColor";
-import * as chrono from "chrono-node";
+import { parseDate } from "chrono-node";
+
+interface Task {
+    id: string;
+    text: string;
+    nodeType?: string;
+    depsClear?: boolean;
+    calculatedValue?: boolean;
+    isActionable?: boolean;
+    calculatedDue?: number | null;
+    due?: number | null;
+    completed?: boolean;
+    children?: string[];
+    parents?: string[];
+}
 
 interface EditState {
     field: 'id' | 'text' | 'due' | null;
@@ -17,15 +31,13 @@ export function NodeDetailOverlay() {
     const graphData = useTodoStore((s) => s.graphData);
     const api = useTodoStore((s) => s.api);
 
-    const task = cursor && graphData?.tasks[cursor] ? graphData.tasks[cursor] : null;
-
-    // Debug: log task data
-    // Current task loaded
+    const task: Task | null = cursor && graphData?.tasks[cursor] ? graphData.tasks[cursor] : null;
 
     // Backend provides depsClear - no need to calculate manually
     const isBlocked = task ? (task.depsClear === false) : false;
 
     const [edit, setEdit] = useState<EditState>({ field: null, value: '' });
+    const parseDebounceRef = useRef<number | null>(null);
 
     // Reset edit state when cursor changes
     useEffect(() => {
@@ -88,19 +100,25 @@ export function NodeDetailOverlay() {
         }
     };
 
-    const tryParseNaturalLanguage = () => {
-        if (!edit.value.trim()) {
-            setEdit({ ...edit, parsedDate: null, parseError: undefined });
-            return;
+    const tryParseNaturalLanguage = useCallback(() => {
+        if (parseDebounceRef.current) {
+            clearTimeout(parseDebounceRef.current);
         }
 
-        const parsed = chrono.parseDate(edit.value);
-        if (parsed) {
-            setEdit({ ...edit, parsedDate: parsed, parseError: undefined });
-        } else {
-            setEdit({ ...edit, parsedDate: null, parseError: 'Could not parse date. Try "tomorrow", "in 2 hours", "next monday at 3pm", or use the calendar.' });
-        }
-    };
+        parseDebounceRef.current = window.setTimeout(() => {
+            if (!edit.value.trim()) {
+                setEdit({ ...edit, parsedDate: null, parseError: undefined });
+                return;
+            }
+
+            const parsed = parseDate(edit.value);
+            if (parsed) {
+                setEdit({ ...edit, parsedDate: parsed, parseError: undefined });
+            } else {
+                setEdit({ ...edit, parsedDate: null, parseError: 'Could not parse date. Try "tomorrow", "in 2 hours", "next monday at 3pm", or use the calendar.' });
+            }
+        }, 300);
+    }, [edit]);
 
     // Save edit with a specific parsed date (used by Enter key to avoid race condition)
     const saveEditWithDate = async (parsedDate: Date | null) => {
@@ -132,7 +150,7 @@ export function NodeDetailOverlay() {
                     // Actually we need to save immediately with null date
                     saveEditWithDate(null);
                 } else {
-                    const parsed = chrono.parseDate(edit.value);
+                    const parsed = parseDate(edit.value);
                     if (parsed) {
                         // Valid date - update state and save
                         setEdit({ ...edit, parsedDate: parsed, parseError: undefined });

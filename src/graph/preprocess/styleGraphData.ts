@@ -196,19 +196,30 @@ export function baseStyleGraphData<G extends NestedGraphData>(graphData: G): Sty
     } as StyledGraphData<G>;
 }
 
+interface TaskData {
+    nodeType?: string;
+    calculatedValue?: boolean;
+    depsClear?: boolean;
+    isActionable?: boolean;
+    calculatedDue?: number | null;
+}
+
+function isValidTaskData(data: unknown): data is TaskData {
+    return typeof data === 'object' && data !== null;
+}
+
 /** Apply conditional styling based on node state (e.g., completed, actionable, node type). */
 export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphData>>(graphData: G): G {
     return {
         ...graphData,
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, task]) => {
-                const data = task.data as {
-                    nodeType?: string;
-                    calculatedValue?: boolean;
-                    depsClear?: boolean;
-                    isActionable?: boolean;
-                    calculatedDue?: number | null;
-                };
+                const data = task.data;
+                if (!isValidTaskData(data)) {
+                    console.warn('Invalid task data structure:', data);
+                    return [taskId, task];
+                }
+                // Now data is properly typed as TaskData
 
                 // Node type determines shape
                 const nodeType = data.nodeType || "Task";

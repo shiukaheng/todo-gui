@@ -108,12 +108,8 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         // Subsystems
         this.renderer = new SVGRenderer(this.svg);
 
-        // TEMPORARY: Initialize position persistence and load saved positions
+        // TEMPORARY: Initialize position persistence
         this.positionPersistence = new PositionPersistenceManager();
-        const savedPositions = this.positionPersistence.loadPositions();
-        if (Object.keys(savedPositions).length > 0) {
-            this.simulationState = { positions: savedPositions };
-        }
 
         // Initialize simulation engine based on store mode
         this.currentSimulationMode = useTodoStore.getState().simulationMode;
@@ -159,7 +155,37 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     }
 
     setGraph(taskList: TaskListOut): void {
-        this.graphData = preprocessGraph(taskList);
+        const graphData = preprocessGraph(taskList);
+        this.graphData = graphData;
+
+        // TEMPORARY: Load and validate saved positions when graph is set
+        const savedPositions = this.positionPersistence.loadPositions();
+        const currentNodeIds = new Set(Object.keys(graphData.tasks));
+
+        // Filter out positions for nodes that no longer exist
+        const validPositions: Record<string, { x: number; y: number }> = {};
+        let invalidCount = 0;
+
+        for (const [nodeId, pos] of Object.entries(savedPositions)) {
+            if (currentNodeIds.has(nodeId)) {
+                validPositions[nodeId] = pos;
+            } else {
+                invalidCount++;
+            }
+        }
+
+        if (invalidCount > 0) {
+            console.log(`[GraphViewer] Removed ${invalidCount} stale node positions`);
+        }
+
+        // Only use saved positions if we have good coverage of current nodes
+        const coverageRatio = Object.keys(validPositions).length / currentNodeIds.size;
+        if (coverageRatio > 0.5 && Object.keys(validPositions).length > 0) {
+            this.simulationState = { positions: validPositions };
+            console.log(`[GraphViewer] Restored ${Object.keys(validPositions).length} node positions`);
+        } else if (Object.keys(savedPositions).length > 0) {
+            console.log('[GraphViewer] Insufficient coverage, starting fresh layout');
+        }
     }
 
     getNavigationHandle(): GraphNavigationHandle {
