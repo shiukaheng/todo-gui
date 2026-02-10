@@ -25,6 +25,13 @@ export function CommandPlane({ controller }: CommandPlaneProps) {
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
+        // Ctrl+C to clear input
+        if (e.ctrlKey && e.key === 'c') {
+            e.preventDefault();
+            setInput('', 0);
+            return;
+        }
+
         switch (e.key) {
             case 'Tab':
                 e.preventDefault();
