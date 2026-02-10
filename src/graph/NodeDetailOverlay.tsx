@@ -204,7 +204,10 @@ export function NodeDetailOverlay() {
     // TODO: Move keyboard handling to a centralized system
     // This is getting out of hand with handlers scattered across components
 
-    // Global keyboard handler for space (toggle completion) and 't' (cycle node type)
+    // Global keyboard handler for:
+    // - Space: toggle completion
+    // - 't': cycle node type
+    // - F2: rename node (Escape to cancel is already handled in input's onKeyDown)
     useEffect(() => {
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
             // Don't handle keys when typing in inputs
@@ -221,6 +224,11 @@ export function NodeDetailOverlay() {
             if (e.key === 't' && task) {
                 e.preventDefault();
                 toggleNodeType();
+            }
+
+            if (e.key === 'F2' && task) {
+                e.preventDefault();
+                startEdit('id', task.id);
             }
         };
         window.addEventListener('keydown', handleGlobalKeyDown);
