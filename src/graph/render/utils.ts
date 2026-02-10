@@ -19,7 +19,7 @@ export interface ViewTransform {
 export type Color = [number, number, number];
 export type Vec2 = [number, number];
 
-export type NodeShape = 'square' | 'upTriangle' | 'downTriangle' | 'circle' | 'triangleCircle';
+export type NodeShape = 'square' | 'upTriangle' | 'downTriangle' | 'diamond' | 'triangleCircle';
 
 export interface RenderNode {
     data: { id: string };

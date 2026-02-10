@@ -287,11 +287,13 @@ export class SVGRenderer {
             const rightX = x + side / 2;
             // Flip: bottom vertex at top, top vertices at bottom
             pathD = `M ${x} ${bottomY} L ${rightX} ${topY} L ${leftX} ${topY} Z`;
-        } else if (node.shape === 'circle') {
-            // Circle (ExactlyOne gate)
-            const radius = halfSize;
-            // Use SVG arc commands to draw a circle
-            pathD = `M ${x - radius} ${y} A ${radius} ${radius} 0 1 0 ${x + radius} ${y} A ${radius} ${radius} 0 1 0 ${x - radius} ${y} Z`;
+        } else if (node.shape === 'diamond') {
+            // Diamond (ExactlyOne gate) - square rotated 45 degrees
+            const top = y - halfSize;
+            const bottom = y + halfSize;
+            const left = x - halfSize;
+            const right = x + halfSize;
+            pathD = `M ${x} ${top} L ${right} ${y} L ${x} ${bottom} L ${left} ${y} Z`;
         } else if (node.shape === 'triangleCircle') {
             // Triangle with circle overlay (NOT gate)
             const side = size;

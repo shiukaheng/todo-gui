@@ -150,7 +150,7 @@ function computeNodeColors<G extends NestedGraphData>(graphData: G): Map<string,
     return colors;
 }
 
-export type NodeShape = 'square' | 'upTriangle';
+export type NodeShape = 'square' | 'upTriangle' | 'downTriangle' | 'diamond' | 'triangleCircle';
 
 export type StyledGraphData<G extends NestedGraphData> = ExtendNestedGraphData<
     // Node extra properties
@@ -228,7 +228,7 @@ export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphD
                     'And': 'upTriangle',
                     'Or': 'downTriangle',
                     'Not': 'triangleCircle',
-                    'ExactlyOne': 'circle'
+                    'ExactlyOne': 'diamond'
                 };
                 const shape: NodeShape = shapeMap[nodeType] || 'square';
 
