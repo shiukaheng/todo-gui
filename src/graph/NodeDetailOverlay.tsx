@@ -19,7 +19,7 @@ interface Task {
 }
 
 interface EditState {
-    field: 'id' | 'text' | 'due' | null;
+    field: 'id' | 'text' | 'due' | 'nodeType' | null;
     value: string;
     parsedDate?: Date | null; // Parsed date from natural language or picker
     parseError?: string; // Error message if parsing fails
@@ -324,18 +324,41 @@ export function NodeDetailOverlay() {
             {/* Status line */}
             <div className="flex gap-4 text-xs items-center">
                 {/* Node type selector */}
-                <select
-                    value={task.nodeType || "Task"}
-                    onChange={(e) => setNodeType(e.target.value)}
-                    className="bg-white/10 text-white hover:text-white border border-white/20 rounded px-2 py-1 cursor-pointer text-xs"
-                    style={{ color: 'white' }}
-                >
-                    <option value="Task" style={{ backgroundColor: '#1f2937', color: 'white' }}>task</option>
-                    <option value="And" style={{ backgroundColor: '#1f2937', color: 'white' }}>and (all)</option>
-                    <option value="Or" style={{ backgroundColor: '#1f2937', color: 'white' }}>or (any)</option>
-                    <option value="Not" style={{ backgroundColor: '#1f2937', color: 'white' }}>not (none)</option>
-                    <option value="ExactlyOne" style={{ backgroundColor: '#1f2937', color: 'white' }}>xor (one)</option>
-                </select>
+                {isEditing('nodeType') ? (
+                    <select
+                        value={edit.value}
+                        onChange={(e) => {
+                            setNodeType(e.target.value);
+                            setEdit({ field: null, value: '' });
+                        }}
+                        onBlur={() => setEdit({ field: null, value: '' })}
+                        autoFocus
+                        className="bg-white/10 text-white hover:text-white border border-white/20 rounded px-2 py-1 cursor-pointer text-xs"
+                        style={{ color: 'white' }}
+                    >
+                        <option value="Task" style={{ backgroundColor: '#1f2937', color: 'white' }}>task</option>
+                        <option value="And" style={{ backgroundColor: '#1f2937', color: 'white' }}>and (all)</option>
+                        <option value="Or" style={{ backgroundColor: '#1f2937', color: 'white' }}>or (any)</option>
+                        <option value="Not" style={{ backgroundColor: '#1f2937', color: 'white' }}>not (none)</option>
+                        <option value="ExactlyOne" style={{ backgroundColor: '#1f2937', color: 'white' }}>xor (one)</option>
+                    </select>
+                ) : (
+                    <span
+                        onClick={() => startEdit('nodeType', task.nodeType || 'Task')}
+                        className="cursor-pointer hover:text-white text-white/80"
+                    >
+                        {(() => {
+                            const type = task.nodeType || 'Task';
+                            switch(type) {
+                                case 'And': return 'and (all)';
+                                case 'Or': return 'or (any)';
+                                case 'Not': return 'not (none)';
+                                case 'ExactlyOne': return 'xor (one)';
+                                default: return 'task';
+                            }
+                        })()}
+                    </span>
+                )}
 
                 {/* Status: blocked > completed > actionable */}
                 {isBlocked ? (
