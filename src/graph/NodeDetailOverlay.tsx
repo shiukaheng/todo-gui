@@ -19,6 +19,9 @@ export function NodeDetailOverlay() {
 
     const task = cursor && graphData?.tasks[cursor] ? graphData.tasks[cursor] : null;
 
+    // Debug: log task data
+    // Current task loaded
+
     // Backend provides depsClear - no need to calculate manually
     const isBlocked = task ? (task.depsClear === false) : false;
 
@@ -70,7 +73,7 @@ export function NodeDetailOverlay() {
                         update.due = null;
                     }
                 }
-                await api.setTaskApiTasksTaskIdPatch({ taskId: task.id, taskUpdate: update });
+                await api.setTaskApiTasksTaskIdPatch({ taskId: task.id, nodeUpdate: update });
             }
             setEdit({ field: null, value: '' });
         } catch (err) {
@@ -118,7 +121,7 @@ export function NodeDetailOverlay() {
         try {
             await api.setTaskApiTasksTaskIdPatch({
                 taskId: task.id,
-                taskUpdate: { completed: !task.completed },
+                nodeUpdate: { completed: !task.completed },
             });
         } catch (err) {
             console.error("Failed to toggle completion:", err);
@@ -130,7 +133,7 @@ export function NodeDetailOverlay() {
         try {
             await api.setTaskApiTasksTaskIdPatch({
                 taskId: task.id,
-                taskUpdate: { nodeType: newType },
+                nodeUpdate: { nodeType: newType },
             });
         } catch (err) {
             console.error("Failed to change node type:", err);
@@ -177,7 +180,7 @@ export function NodeDetailOverlay() {
     const clearDue = async () => {
         if (!api || !task) return;
         try {
-            await api.setTaskApiTasksTaskIdPatch({ taskId: task.id, taskUpdate: { due: null } });
+            await api.setTaskApiTasksTaskIdPatch({ taskId: task.id, nodeUpdate: { due: null } });
             setEdit({ field: null, value: '' });
         } catch (err) {
             console.error("Failed to clear due date:", err);

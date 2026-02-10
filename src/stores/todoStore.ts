@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-    type TaskListOut,
+    type NodeListOut,
     DefaultApi,
     Configuration,
     subscribeToTasks,
@@ -17,7 +17,7 @@ export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'er
 
 interface TodoStore {
     // State
-    graphData: TaskListOut | null;
+    graphData: NodeListOut | null;
     cursor: string | null;
     navInfoText: string | null;
     navigationMode: NavigationMode;
@@ -91,12 +91,14 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
         const api = new DefaultApi(new Configuration({ basePath: baseUrl }));
 
         const unsubscribe = subscribeToTasks(
-            (data) => set({
-                graphData: data,
-                connectionStatus: 'connected',
-                lastDataReceived: Date.now(),
-                lastError: null,
-            }),
+            (data) => {
+                set({
+                    graphData: data,
+                    connectionStatus: 'connected',
+                    lastDataReceived: Date.now(),
+                    lastError: null,
+                });
+            },
             {
                 baseUrl,
                 onError: (err) => {
