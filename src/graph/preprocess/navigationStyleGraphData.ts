@@ -100,10 +100,9 @@ export function navigationStyleGraphData<G extends StyledGraphData<NestedGraphDa
         }
     }
 
-    // Collect all navigable neighbor IDs for navigation edges
+    // Collect navigable neighbor IDs for navigation edges
+    // Only add peers - parents/children already have dependency edges
     const navigableNeighbors = new Set<string>();
-    parents.forEach(id => navigableNeighbors.add(id));
-    children.forEach(id => navigableNeighbors.add(id));
     if (peers.prevPeer) navigableNeighbors.add(peers.prevPeer);
     if (peers.nextPeer) navigableNeighbors.add(peers.nextPeer);
 
