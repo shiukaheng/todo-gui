@@ -36,42 +36,34 @@ export function GraphViewer() {
                 return;
             }
 
-            // Fly/Auto mode: Arrows for viewport movement, E/Q for zoom, WASD for topological nav
-            // In auto mode, arrow keys switch to fly mode; in fly mode, it's already there
+            // Fly/Auto mode: WASD for movement, E/Q for zoom, arrows for topological nav
+            // In auto mode, WASD switches to fly mode; in fly mode, it's already there
             if (navigationMode === 'fly' || navigationMode === 'auto') {
                 const key = e.key.toLowerCase();
-                // E/Q for zoom control - resumes autoselect
-                if (['e', 'q'].includes(key)) {
+                // WASD + E/Q for viewport control - resumes autoselect
+                if (['w', 'a', 's', 'd', 'e', 'q'].includes(key)) {
                     e.preventDefault();
                     handles.fly.pauseAutoselect(false); // Resume autoselect when flying
                     switch (key) {
+                        case 'w': handles.fly.up(true); break;
+                        case 's': handles.fly.down(true); break;
+                        case 'a': handles.fly.left(true); break;
+                        case 'd': handles.fly.right(true); break;
                         case 'e': handles.fly.zoomIn(true); break;
                         case 'q': handles.fly.zoomOut(true); break;
                     }
                     return;
                 }
-                // Arrow keys for viewport control - resumes autoselect
-                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                    e.preventDefault();
-                    handles.fly.pauseAutoselect(false); // Resume autoselect when flying
-                    switch (e.key) {
-                        case 'ArrowUp': handles.fly.up(true); break;
-                        case 'ArrowDown': handles.fly.down(true); break;
-                        case 'ArrowLeft': handles.fly.left(true); break;
-                        case 'ArrowRight': handles.fly.right(true); break;
-                    }
-                    return;
-                }
-                // WASD in fly mode: pause autoselect, do topological navigation
-                // In auto mode, WASD navigation will trigger follow mode switch
-                if (navigationMode === 'fly' && ['w', 'a', 's', 'd'].includes(key)) {
+                // Arrow keys in fly mode: pause autoselect, do topological navigation
+                // In auto mode, arrow navigation will trigger follow mode switch
+                if (navigationMode === 'fly' && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
                     e.preventDefault();
                     handles.fly.pauseAutoselect(true);
-                    switch (key) {
-                        case 'w': handles.navigation.up(); break;
-                        case 's': handles.navigation.down(); break;
-                        case 'a': handles.navigation.left(); break;
-                        case 'd': handles.navigation.right(); break;
+                    switch (e.key) {
+                        case 'ArrowUp': handles.navigation.up(); break;
+                        case 'ArrowDown': handles.navigation.down(); break;
+                        case 'ArrowLeft': handles.navigation.left(); break;
+                        case 'ArrowRight': handles.navigation.right(); break;
                     }
                     return;
                 }
@@ -82,21 +74,20 @@ export function GraphViewer() {
             }
 
             // Standard cursor navigation (non-fly modes)
-            const key = e.key.toLowerCase();
-            switch (key) {
-                case 'w':
+            switch (e.key) {
+                case 'ArrowUp':
                     e.preventDefault();
                     handles.navigation.up();
                     break;
-                case 's':
+                case 'ArrowDown':
                     e.preventDefault();
                     handles.navigation.down();
                     break;
-                case 'a':
+                case 'ArrowLeft':
                     e.preventDefault();
                     handles.navigation.left();
                     break;
-                case 'd':
+                case 'ArrowRight':
                     e.preventDefault();
                     handles.navigation.right();
                     break;
@@ -120,26 +111,20 @@ export function GraphViewer() {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
             if (commandPlane.state.visible) return;
 
-            // Fly/Auto mode: release arrow/EQ keys
+            // Fly/Auto mode: release WASD/EQ keys
             if (navigationMode === 'fly' || navigationMode === 'auto') {
                 const key = e.key.toLowerCase();
-                if (['e', 'q'].includes(key)) {
-                    // Pause autoselect when zoom keys are released
+                if (['w', 'a', 's', 'd', 'e', 'q'].includes(key)) {
+                    // Pause autoselect when fly keys are released
+                    // This prevents fighting with arrow key topology navigation
                     handles.fly.pauseAutoselect(true);
                     switch (key) {
+                        case 'w': handles.fly.up(false); break;
+                        case 's': handles.fly.down(false); break;
+                        case 'a': handles.fly.left(false); break;
+                        case 'd': handles.fly.right(false); break;
                         case 'e': handles.fly.zoomIn(false); break;
                         case 'q': handles.fly.zoomOut(false); break;
-                    }
-                }
-                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                    // Pause autoselect when arrow keys are released
-                    // This prevents fighting with WASD topology navigation
-                    handles.fly.pauseAutoselect(true);
-                    switch (e.key) {
-                        case 'ArrowUp': handles.fly.up(false); break;
-                        case 'ArrowDown': handles.fly.down(false); break;
-                        case 'ArrowLeft': handles.fly.left(false); break;
-                        case 'ArrowRight': handles.fly.right(false); break;
                     }
                 }
             }
