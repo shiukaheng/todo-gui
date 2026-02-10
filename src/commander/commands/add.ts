@@ -72,7 +72,7 @@ export const addCommand: CommandDefinition = {
 
         try {
             await api.addTaskApiTasksPost({
-                taskCreate: {
+                nodeCreate: {
                     id: taskId,
                     text: args.text as string | undefined,
                     completed: args.completed as boolean,
