@@ -207,7 +207,9 @@ export function NodeDetailOverlay() {
     // Global keyboard handler for:
     // - Space: toggle completion
     // - 't': cycle node type
-    // - F2: rename node (Escape to cancel is already handled in input's onKeyDown)
+    // - 'r': edit description (text)
+    // - F2: rename node (id)
+    // - Escape: cancel edit (handled in input's onKeyDown)
     useEffect(() => {
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
             // Don't handle keys when typing in inputs
@@ -224,6 +226,11 @@ export function NodeDetailOverlay() {
             if (e.key === 't' && task) {
                 e.preventDefault();
                 toggleNodeType();
+            }
+
+            if (e.key === 'r' && task) {
+                e.preventDefault();
+                startEdit('text', task.text);
             }
 
             if (e.key === 'F2' && task) {
