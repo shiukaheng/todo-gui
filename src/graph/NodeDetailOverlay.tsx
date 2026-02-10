@@ -3,6 +3,7 @@ import { useTodoStore } from "../stores/todoStore";
 import { formatDistanceToNow } from "date-fns";
 import { getUrgencyColorCSSFromTimestamp } from "../utils/urgencyColor";
 import { parseDate } from "chrono-node";
+import { useCommandPlane } from "../commander";
 
 interface Task {
     id: string;
@@ -30,6 +31,7 @@ export function NodeDetailOverlay() {
     const cursor = useTodoStore((s) => s.cursor);
     const graphData = useTodoStore((s) => s.graphData);
     const api = useTodoStore((s) => s.api);
+    const commandPlane = useCommandPlane();
 
     const task: Task | null = cursor && graphData?.tasks[cursor] ? graphData.tasks[cursor] : null;
 
@@ -199,18 +201,31 @@ export function NodeDetailOverlay() {
         }
     }, [task, api]);
 
-    // Global keyboard handler for space
+    // TODO: Move keyboard handling to a centralized system
+    // This is getting out of hand with handlers scattered across components
+
+    // Global keyboard handler for space (toggle completion) and 't' (cycle node type)
     useEffect(() => {
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            // Don't handle keys when typing in inputs
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+            // Don't handle keys when command panel is open (same pattern as GraphViewer)
+            if (commandPlane.state.visible) return;
+
             if (e.key === ' ' && canToggle) {
                 e.preventDefault();
                 toggleCompletion();
             }
+
+            if (e.key === 't' && task) {
+                e.preventDefault();
+                toggleNodeType();
+            }
         };
         window.addEventListener('keydown', handleGlobalKeyDown);
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-    }, [canToggle, toggleCompletion]);
+    }, [canToggle, toggleCompletion, task, toggleNodeType, commandPlane.state.visible]);
 
     if (!task) return null;
 
