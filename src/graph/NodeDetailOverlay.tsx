@@ -54,6 +54,13 @@ export function NodeDetailOverlay() {
     const saveEdit = async () => {
         if (!api || !task || !edit.field) return;
 
+        // Validation: prevent saving unparsed dates
+        if (edit.field === 'due' && edit.value.trim() !== '' && !edit.parsedDate) {
+            console.error("Cannot save unparsed date");
+            setEdit({ ...edit, parseError: 'Please enter a valid date or use the calendar.' });
+            return;
+        }
+
         try {
             if (edit.field === 'id') {
                 await api.renameTaskApiTasksTaskIdRenamePost({
@@ -95,14 +102,45 @@ export function NodeDetailOverlay() {
         }
     };
 
+    // Save edit with a specific parsed date (used by Enter key to avoid race condition)
+    const saveEditWithDate = async (parsedDate: Date | null) => {
+        if (!api || !task || edit.field !== 'due') return;
+
+        try {
+            const update: Record<string, any> = {};
+            if (parsedDate) {
+                update.due = Math.floor(parsedDate.getTime() / 1000);
+            } else {
+                update.due = null;
+            }
+            await api.setTaskApiTasksTaskIdPatch({ taskId: task.id, nodeUpdate: update });
+            setEdit({ field: null, value: '' });
+        } catch (err) {
+            console.error("Failed to update task:", err);
+        }
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
             e.preventDefault();
             if (edit.field === 'due') {
-                tryParseNaturalLanguage();
-                // Only save if we have a parsed date or if clearing
-                if (edit.parsedDate || !edit.value.trim()) {
-                    saveEdit();
+                // Parse date synchronously to avoid race condition
+                if (!edit.value.trim()) {
+                    // Clearing the date - update state and save
+                    setEdit({ ...edit, parsedDate: null, parseError: undefined });
+                    // Save will happen with the updated state in next render, but we can call it
+                    // Actually we need to save immediately with null date
+                    saveEditWithDate(null);
+                } else {
+                    const parsed = chrono.parseDate(edit.value);
+                    if (parsed) {
+                        // Valid date - update state and save
+                        setEdit({ ...edit, parsedDate: parsed, parseError: undefined });
+                        saveEditWithDate(parsed);
+                    } else {
+                        // Invalid date - show error, don't save
+                        setEdit({ ...edit, parsedDate: null, parseError: 'Could not parse date. Try "tomorrow", "in 2 hours", "next monday at 3pm", or use the calendar.' });
+                    }
                 }
             } else {
                 saveEdit();
@@ -169,12 +207,36 @@ export function NodeDetailOverlay() {
 
     const formatDueDateForInput = (ts: number | null) => {
         if (!ts) return "";
-        return new Date(ts * 1000).toISOString().slice(0, 10); // YYYY-MM-DD
+        const date = new Date(ts * 1000);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`; // YYYY-MM-DD in local time
     };
 
     const formatDueTimeForInput = (ts: number | null) => {
         if (!ts) return "";
-        return new Date(ts * 1000).toISOString().slice(11, 16); // HH:MM
+        const date = new Date(ts * 1000);
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${hours}:${minutes}`; // HH:MM in local time
+    };
+
+    // Format Date object for date input (local time, not UTC)
+    const formatDateObjectForInput = (date: Date | null) => {
+        if (!date) return "";
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`; // YYYY-MM-DD in local time
+    };
+
+    // Format Date object for time input (local time, not UTC)
+    const formatTimeObjectForInput = (date: Date | null) => {
+        if (!date) return "";
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${hours}:${minutes}`; // HH:MM in local time
     };
 
     const clearDue = async () => {
@@ -307,7 +369,7 @@ export function NodeDetailOverlay() {
                                 <>
                                     <input
                                         type="date"
-                                        value={edit.parsedDate ? edit.parsedDate.toISOString().slice(0, 10) : ''}
+                                        value={formatDateObjectForInput(edit.parsedDate || null)}
                                         onChange={(e) => {
                                             const newDate = e.target.value ? new Date(e.target.value) : null;
                                             // Preserve time if it exists
@@ -322,7 +384,7 @@ export function NodeDetailOverlay() {
                                     />
                                     <input
                                         type="time"
-                                        value={edit.parsedDate ? edit.parsedDate.toTimeString().slice(0, 5) : ''}
+                                        value={formatTimeObjectForInput(edit.parsedDate || null)}
                                         onChange={(e) => {
                                             if (edit.parsedDate && e.target.value) {
                                                 const [hours, minutes] = e.target.value.split(':').map(Number);

@@ -56,8 +56,8 @@ const DEFAULT_CONFIG: Required<PositionPersistenceConfig> = {
  */
 export class PositionPersistenceManager {
     private config: Required<PositionPersistenceConfig>;
-    private pollIntervalId: number | null = null;
-    private saveTimeoutId: number | null = null;
+    private pollIntervalId: ReturnType<typeof setInterval> | null = null;
+    private saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     private lastPositions: Record<string, Position> | null = null;
     private isCurrentlySettled = false;
