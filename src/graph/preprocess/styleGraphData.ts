@@ -196,58 +196,55 @@ export function baseStyleGraphData<G extends NestedGraphData>(graphData: G): Sty
     } as StyledGraphData<G>;
 }
 
-/** Apply conditional styling based on node state (e.g., completed, actionable, inferred). */
+/** Apply conditional styling based on node state (e.g., completed, actionable, node type). */
 export function conditionalStyleGraphData<G extends StyledGraphData<NestedGraphData>>(graphData: G): G {
-    // Build a lookup for task calculatedCompleted status
-    const taskCalcCompleted = new Map<string, boolean>();
-    for (const [tid, t] of Object.entries(graphData.tasks)) {
-        const d = t.data as { calculatedCompleted?: boolean };
-        taskCalcCompleted.set(tid, d.calculatedCompleted === true);
-    }
-
     return {
         ...graphData,
         tasks: Object.fromEntries(
             Object.entries(graphData.tasks).map(([taskId, task]) => {
-                const data = task.data as { calculatedCompleted?: boolean; depsClear?: boolean; inferred?: boolean; completed?: boolean; children?: string[]; calculatedDue?: number | null };
-                const isInferred = data.inferred;
+                const data = task.data as {
+                    nodeType?: string;
+                    calculatedValue?: boolean;
+                    depsClear?: boolean;
+                    isActionable?: boolean;
+                    calculatedDue?: number | null;
+                };
 
-                // Check if blocked: any direct dependency not calculatedCompleted
-                // children = dependency IDs where this task is fromId (things this depends on)
-                const childDepIds = data.children || [];
-                const childTaskIds = childDepIds
-                    .map(depId => (graphData.dependencies[depId]?.data as { toId?: string })?.toId)
-                    .filter((id): id is string => id != null);
-                
-                // Blocked if any dependency is not calculatedCompleted
-                const isBlocked = childTaskIds.length > 0 && childTaskIds.some(id => !taskCalcCompleted.get(id));
-                
-                // If blocked, ignore completed status - just show as blocked
-                // Only check completion when deps are clear
-                const isCompleted = !isBlocked && data.calculatedCompleted;
-                const isActionable = !isBlocked && !isCompleted;
+                // Node type determines shape
+                const nodeType = data.nodeType || "Task";
+                const shapeMap: Record<string, NodeShape> = {
+                    'Task': 'square',
+                    'And': 'upTriangle',
+                    'Or': 'downTriangle',
+                    'Not': 'triangleCircle',
+                    'ExactlyOne': 'circle'
+                };
+                const shape: NodeShape = shapeMap[nodeType] || 'square';
 
-                // Shape: upward triangle for inferred (AND gate), square for regular
-                const shape: NodeShape = isInferred ? 'upTriangle' : 'square';
-                // Hollow: incomplete/blocked = hollow (background fill), complete = solid (color fill)
+                // Backend provides all calculated properties
+                const isBlocked = data.depsClear === false;
+                const isCompleted = data.calculatedValue === true;
+                const isActionable = data.isActionable === true;
+
+                // Hollow: incomplete = hollow (background fill), complete = solid (color fill)
                 const hollow = !isCompleted;
 
-                // Label color: urgency-based if has due date and not calculatedCompleted, else white
+                // Label color: urgency-based if has due date and not completed, else white
                 let labelColor: Color = [1, 1, 1];
-                if (data.calculatedDue && !data.calculatedCompleted) {
+                if (data.calculatedDue && !isCompleted) {
                     labelColor = getUrgencyColorFromTimestamp(data.calculatedDue);
                 }
 
                 let styledTask = { ...task, shape, hollow, labelColor };
 
                 if (isBlocked) {
-                    // Blocked: dim the node, ignore its own completed status
+                    // Blocked: dim the node
                     return [taskId, { ...styledTask, brightnessMultiplier: 0.1 }];
                 }
                 if (isCompleted) {
                     return [taskId, { ...styledTask, text: styledTask.text }];
                 }
-                // Actionable: deps clear, not completed
+                // Actionable or other states
                 return [taskId, styledTask];
             })
         ),

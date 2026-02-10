@@ -270,18 +270,41 @@ export class SVGRenderer {
         let pathD: string;
         if (node.shape === 'upTriangle') {
             // Upright equilateral triangle (AND gate)
-            // Height of equilateral triangle: h = side * sqrt(3) / 2
-            // We want it to fit in the same bounding box as the square
             const side = size;
             const h = side * Math.sqrt(3) / 2;
-            // Center the triangle vertically
             const topY = y - h / 2;
             const bottomY = y + h / 2;
             const leftX = x - side / 2;
             const rightX = x + side / 2;
             pathD = `M ${x} ${topY} L ${rightX} ${bottomY} L ${leftX} ${bottomY} Z`;
+        } else if (node.shape === 'downTriangle') {
+            // Inverted equilateral triangle (OR gate)
+            const side = size;
+            const h = side * Math.sqrt(3) / 2;
+            const topY = y - h / 2;
+            const bottomY = y + h / 2;
+            const leftX = x - side / 2;
+            const rightX = x + side / 2;
+            // Flip: bottom vertex at top, top vertices at bottom
+            pathD = `M ${x} ${bottomY} L ${rightX} ${topY} L ${leftX} ${topY} Z`;
+        } else if (node.shape === 'circle') {
+            // Circle (ExactlyOne gate)
+            const radius = halfSize;
+            // Use SVG arc commands to draw a circle
+            pathD = `M ${x - radius} ${y} A ${radius} ${radius} 0 1 0 ${x + radius} ${y} A ${radius} ${radius} 0 1 0 ${x - radius} ${y} Z`;
+        } else if (node.shape === 'triangleCircle') {
+            // Triangle with circle overlay (NOT gate)
+            const side = size;
+            const h = side * Math.sqrt(3) / 2;
+            const topY = y - h / 2;
+            const bottomY = y + h / 2;
+            const leftX = x - side / 2;
+            const rightX = x + side / 2;
+            const radius = halfSize * 0.6;
+            // Draw upTriangle, then add circle in the same path
+            pathD = `M ${x} ${topY} L ${rightX} ${bottomY} L ${leftX} ${bottomY} Z M ${x - radius} ${y} A ${radius} ${radius} 0 1 0 ${x + radius} ${y} A ${radius} ${radius} 0 1 0 ${x - radius} ${y} Z`;
         } else {
-            // Square
+            // Square (default for Task nodes)
             const left = x - halfSize;
             const right = x + halfSize;
             const top = y - halfSize;

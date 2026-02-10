@@ -19,20 +19,8 @@ export function NodeDetailOverlay() {
 
     const task = cursor && graphData?.tasks[cursor] ? graphData.tasks[cursor] : null;
 
-    // Compute if task is blocked (any dependency not calculatedCompleted)
-    const isBlocked = (() => {
-        if (!task || !graphData) return false;
-        const childDepIds = task.children || [];
-        const deps = graphData.dependencies || {};
-        const tasks = graphData.tasks || {};
-        for (const depId of childDepIds) {
-            const dep = deps[depId];
-            if (!dep) continue;
-            const depTask = tasks[dep.toId];
-            if (depTask && !depTask.calculatedCompleted) return true;
-        }
-        return false;
-    })();
+    // Backend provides depsClear - no need to calculate manually
+    const isBlocked = task ? (task.depsClear === false) : false;
 
     const [edit, setEdit] = useState<EditState>({ field: null, value: '' });
 
@@ -122,11 +110,11 @@ export function NodeDetailOverlay() {
         }
     };
 
-    // Space to toggle completion (disabled for inferred or blocked nodes)
-    const canToggle = task && !task.inferred && !isBlocked;
-    
+    // Space to toggle completion (disabled for gates or blocked nodes)
+    const canToggle = task && task.nodeType === "Task" && !isBlocked;
+
     const toggleCompletion = useCallback(async () => {
-        if (!task || !api || task.inferred || isBlocked) return;
+        if (!task || !api || task.nodeType !== "Task" || isBlocked) return;
         try {
             await api.setTaskApiTasksTaskIdPatch({
                 taskId: task.id,
@@ -137,15 +125,15 @@ export function NodeDetailOverlay() {
         }
     }, [task, api, isBlocked]);
 
-    const toggleInferred = useCallback(async () => {
+    const setNodeType = useCallback(async (newType: string) => {
         if (!task || !api) return;
         try {
             await api.setTaskApiTasksTaskIdPatch({
                 taskId: task.id,
-                taskUpdate: { inferred: !task.inferred },
+                taskUpdate: { nodeType: newType },
             });
         } catch (err) {
-            console.error("Failed to toggle inferred:", err);
+            console.error("Failed to change node type:", err);
         }
     }, [task, api]);
 
@@ -251,14 +239,20 @@ export function NodeDetailOverlay() {
             </div>
 
             {/* Status line */}
-            <div className="flex gap-4 text-xs">
-                {/* Node type: task or inferred - click to toggle */}
-                <span
-                    onClick={toggleInferred}
-                    className="cursor-pointer text-white/50 hover:text-white/70"
+            <div className="flex gap-4 text-xs items-center">
+                {/* Node type selector */}
+                <select
+                    value={task.nodeType || "Task"}
+                    onChange={(e) => setNodeType(e.target.value)}
+                    className="bg-white/10 text-white hover:text-white border border-white/20 rounded px-2 py-1 cursor-pointer text-xs"
+                    style={{ color: 'white' }}
                 >
-                    {task.inferred ? "inferred" : "task"}
-                </span>
+                    <option value="Task" style={{ backgroundColor: '#1f2937', color: 'white' }}>task</option>
+                    <option value="And" style={{ backgroundColor: '#1f2937', color: 'white' }}>and (all)</option>
+                    <option value="Or" style={{ backgroundColor: '#1f2937', color: 'white' }}>or (any)</option>
+                    <option value="Not" style={{ backgroundColor: '#1f2937', color: 'white' }}>not (none)</option>
+                    <option value="ExactlyOne" style={{ backgroundColor: '#1f2937', color: 'white' }}>xor (one)</option>
+                </select>
 
                 {/* Status: blocked > completed > actionable */}
                 {isBlocked ? (
@@ -267,14 +261,14 @@ export function NodeDetailOverlay() {
                     <span
                         onClick={() => canToggle && toggleCompletion()}
                         className={
-                            task.inferred
+                            task.nodeType !== "Task"
                                 ? "text-white/30"
-                                : task.calculatedCompleted
+                                : task.calculatedValue
                                     ? "text-green-400 cursor-pointer hover:text-green-300"
                                     : "text-orange-400 cursor-pointer hover:text-orange-300"
                         }
                     >
-                        {task.calculatedCompleted ? "completed" : "actionable"}
+                        {task.calculatedValue ? "completed" : "actionable"}
                     </span>
                 )}
 
