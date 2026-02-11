@@ -303,6 +303,8 @@ export function NodeDetailOverlay() {
             setEdit({ field: null, value: '' });
         } catch (err) {
             console.error("Failed to clear due date:", err);
+            // Still close edit mode on error
+            setEdit({ field: null, value: '' });
         }
     };
 
@@ -413,6 +415,7 @@ export function NodeDetailOverlay() {
                                         className="bg-white/10 border border-white/30 rounded px-2 py-0.5 text-white text-base outline-none flex-1"
                                     />
                                     <button
+                                        onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => setEdit({ ...edit, showPicker: true })}
                                         className="text-white hover:text-white/80 px-2"
                                         title="Open calendar"
@@ -457,6 +460,7 @@ export function NodeDetailOverlay() {
                                         className="bg-white/10 border border-white/30 rounded px-1 py-0.5 text-white text-base outline-none w-20"
                                     />
                                     <button
+                                        onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => setEdit({ ...edit, showPicker: false })}
                                         className="text-white/60 hover:text-white/80 text-xs"
                                         title="Back to text input"
@@ -478,14 +482,25 @@ export function NodeDetailOverlay() {
                         )}
                         <div className="flex items-center gap-2">
                             <button
+                                onMouseDown={(e) => e.preventDefault()}
                                 onClick={saveEdit}
                                 disabled={edit.field === 'due' && edit.value.trim() !== '' && !edit.parsedDate}
                                 className="text-green-400 hover:text-green-300 disabled:text-gray-500 disabled:cursor-not-allowed"
                             >
                                 save
                             </button>
-                            <button onClick={clearDue} className="text-red-400 hover:text-red-300">clear</button>
-                            <button onClick={cancelEdit} className="text-white/40 hover:text-white/60">cancel</button>
+                            <button
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    clearDue();
+                                }}
+                                className="text-red-400 hover:text-red-300"
+                            >
+                                clear
+                            </button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={cancelEdit} className="text-white/40 hover:text-white/60">cancel</button>
                         </div>
                     </div>
                 ) : (
