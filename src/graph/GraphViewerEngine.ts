@@ -182,7 +182,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         const coverageRatio = Object.keys(validPositions).length / currentNodeIds.size;
         if (coverageRatio > 0.5 && Object.keys(validPositions).length > 0) {
             this.simulationState = { positions: validPositions };
-            console.log(`[GraphViewer] Restored ${Object.keys(validPositions).length} node positions`);
+            // console.log(`[GraphViewer] Restored ${Object.keys(validPositions).length} node positions`);
         } else if (Object.keys(savedPositions).length > 0) {
             console.log('[GraphViewer] Insufficient coverage, starting fresh layout');
         }

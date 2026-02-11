@@ -133,7 +133,7 @@ export class PositionPersistenceManager {
 
             const parsed = JSON.parse(stored) as Record<string, Position>;
             const count = Object.keys(parsed).length;
-            console.log(`[PositionPersistence] Loaded ${count} node positions from storage`);
+            // console.log(`[PositionPersistence] Loaded ${count} node positions from storage`);
             return parsed;
         } catch (err) {
             console.error("[PositionPersistence] Failed to load positions:", err);
