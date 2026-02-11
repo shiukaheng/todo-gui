@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import {
-    type NodeListOut,
+    type AppState,
     DefaultApi,
     Configuration,
-    subscribeToTasks,
+    subscribeToState,
 } from 'todo-client';
 
 /** Navigation mode for the graph viewer */
@@ -17,7 +17,7 @@ export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'er
 
 interface TodoStore {
     // State
-    graphData: NodeListOut | null;
+    graphData: AppState | null;
     cursor: string | null;
     navInfoText: string | null;
     navigationMode: NavigationMode;
@@ -90,7 +90,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
 
         const api = new DefaultApi(new Configuration({ basePath: baseUrl }));
 
-        const unsubscribe = subscribeToTasks(
+        const unsubscribe = subscribeToState(
             (data) => {
                 set({
                     graphData: data,
