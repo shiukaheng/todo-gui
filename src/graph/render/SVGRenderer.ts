@@ -593,7 +593,7 @@ export class SVGRenderer {
 
                 // Wave parameters
                 const wavelength = 1000;  // Screen pixels per wave cycle
-                const period = 3;         // Seconds per wave cycle
+                const period = 1.5;       // Seconds per wave cycle
                 const currentTime = performance.now() / 1000;
 
                 // Phase as function of screen distance and time
