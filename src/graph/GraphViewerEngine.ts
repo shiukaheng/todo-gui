@@ -11,6 +11,7 @@ import { navigationStyleGraphData } from "./preprocess/navigationStyleGraphData"
 import { cursorStyleGraphData } from "./preprocess/styleGraphData";
 import { preprocessGraph, ProcessedGraphData } from "./preprocess/pipeline";
 import { preprocessPlans, ProcessedPlansData, EMPTY_PLANS_DATA } from "./preprocess/preprocessPlans";
+import { stylePlans, cursorStylePlans, StyledPlansData } from "./preprocess/stylePlans";
 import {
     SimulationEngine,
     SimulationState,
@@ -66,6 +67,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
     private graphData: ProcessedGraphData | null = null;
     private plansData: ProcessedPlansData = EMPTY_PLANS_DATA;
+    private styledPlansData: StyledPlansData = { plans: {} };
     private simulationEngine: SimulationEngine;
     private simulationState: SimulationState = EMPTY_SIMULATION_STATE;
     private navigationEngine: NavigationEngine;
@@ -145,7 +147,14 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             getNavigationState: () => this.navigationState,
             getSimulationState: () => this.simulationState,
             onNodeClick: (nodeId) => setCursor(nodeId),
-            onCanvasTap: () => useTodoStore.getState().showCommandPlane(),
+            onCanvasTap: () => {
+                const state = useTodoStore.getState();
+                if (state.commandPlaneVisible) {
+                    state.hideCommandPlane();
+                } else {
+                    state.showCommandPlane();
+                }
+            },
         });
         this.inputHandler.setCallback((event) => this.interactionController.handleEvent(event));
 
@@ -165,9 +174,14 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         });
         this.graphData = graphData;
 
-        // Preprocess plans data
+        // Preprocess and style plans data
         const validNodeIds = new Set(Object.keys(graphData.tasks));
         this.plansData = preprocessPlans(appState.plans, validNodeIds);
+
+        // Style plans once (no need to do per-frame)
+        let styledPlans = stylePlans(this.plansData);
+        styledPlans = cursorStylePlans(styledPlans, this.getCursor());
+        this.styledPlansData = styledPlans;
 
         // TEMPORARY: Load and validate saved positions when graph is set
         const savedPositions = this.positionPersistence.loadPositions();
@@ -358,7 +372,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             // 2. Update cursor neighbors (for navigation)
             this.updateCursorNeighbors(positionedData);
 
-            // 3. Apply styling
+            // 3. Apply styling (graph - per frame for cursor/navigation changes)
             const cursor = this.getCursor();
             let styledData = cursorStyleGraphData(positionedData, cursor);
             styledData = navigationStyleGraphData(
@@ -371,9 +385,9 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
             // 4. Navigate (pan/zoom)
             this.navigationState = this.navigationEngine.step(
-                { 
-                    graph: styledData, 
-                    viewport: this.getViewport(), 
+                {
+                    graph: styledData,
+                    viewport: this.getViewport(),
                     deltaTime,
                     isDraggingNode: this.interactionController.isDraggingNode()
                 },
@@ -383,8 +397,13 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             // 4.5. Update interaction controller (for drag position with simulation inertia)
             this.interactionController.updateFrame();
 
-            // 5. Render
-            this.renderer.render(styledData, this.navigationState.transform);
+            // 5. Render (merge styled graph + cached styled plans)
+            const renderData = {
+                tasks: styledData.tasks,
+                dependencies: styledData.dependencies,
+                plans: this.styledPlansData.plans,
+            };
+            this.renderer.render(renderData, this.navigationState.transform);
 
             this.performanceMonitor?.end();
             this.animationFrameId = requestAnimationFrame(tick);

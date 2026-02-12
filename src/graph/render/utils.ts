@@ -45,9 +45,19 @@ export interface RenderEdge {
     dotted: boolean;
 }
 
+export interface RenderPlan {
+    data: { id: string };
+    text: string | null;
+    steps: Array<{ nodeId: string; order: number }>;
+    color: Color;
+    opacity: number;
+    // Future: path style, highlighting, etc.
+}
+
 export interface RenderGraphData {
     tasks: { [key: string]: RenderNode };
     dependencies: { [key: string]: RenderEdge };
+    plans: { [key: string]: RenderPlan };
 }
 
 export const FONT_SIZE = 14;

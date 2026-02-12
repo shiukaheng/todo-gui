@@ -80,6 +80,7 @@ export class SVGRenderer {
     render(data: RenderGraphData, transform: ViewTransform, backgroundColor: Color = [0, 0, 0]): void {
         const currentNodeIds = new Set(Object.keys(data.tasks));
         const currentEdgeIds = new Set(Object.keys(data.dependencies));
+        // Plans available in data.plans, but not rendered yet
 
         // Remove stale edges
         for (const [id, elements] of this.edgeElements) {

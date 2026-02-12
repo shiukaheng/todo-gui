@@ -12,6 +12,7 @@ import { SimulationEngine, SimulationState, PinStatus, Position } from "../simul
 import { NavigationEngine, NavigationState, isManualNavigationEngine } from "../navigation";
 import { screenToWorld, Vec2 } from "../render/utils";
 import { UIEvent, ScreenPoint, InteractionTarget } from "./InputHandler";
+import { useTodoStore } from "../../stores/todoStore";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -414,9 +415,13 @@ export class InteractionController {
         if (target.type === "node") {
             this.deps?.onNodeClick?.(target.nodeId);
         } else if (target.type === "canvas") {
-            // Don't open command plane if an input is currently focused
             const activeElement = document.activeElement;
-            if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) {
+            const isInputFocused = activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement;
+            const commandPlaneVisible = useTodoStore.getState().commandPlaneVisible;
+
+            // Don't open command plane if an input is currently focused,
+            // UNLESS the command plane is visible (in which case we want to hide it)
+            if (isInputFocused && !commandPlaneVisible) {
                 return;
             }
             this.deps?.onCanvasTap?.();

@@ -25,6 +25,7 @@ export class SVGRendererRedraw {
 
     render(data: RenderGraphData, transform: ViewTransform): void {
         this.svg.innerHTML = "";
+        // Plans available in data.plans, but not rendered yet
 
         // Draw edges first (below nodes)
         for (const [id, edge] of Object.entries(data.dependencies)) {
