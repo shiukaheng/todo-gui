@@ -20,6 +20,7 @@ const SCALE = 2.0;
 // Node sizing
 const NODE_SQUARE_SIZE = FONT_SIZE * 0.6 * SCALE;
 const NODE_TEXT_GAP = 4 * SCALE;
+const TOUCH_HIT_PADDING = 12 * SCALE;  // Extra padding for touch targets (makes ~44px minimum)
 const NODE_OUTLINE_WIDTH_SCALE = 0.5;
 
 // Selector ring
@@ -46,6 +47,7 @@ const BREATH_MAX_BRIGHTNESS = 1.0;
 
 interface NodeElements {
     group: SVGGElement;
+    hitArea: SVGRectElement;  // Invisible larger touch target
     selectorRing: SVGRectElement;
     shape: SVGPathElement;  // Can render square or D-shape
     text: SVGTextElement;
@@ -266,13 +268,20 @@ export class SVGRenderer {
             this.svg.appendChild(elements.group);
         }
 
-        const { group, selectorRing, shape, text, shortcutKeyText } = elements;
+        const { group, hitArea, selectorRing, shape, text, shortcutKeyText } = elements;
         const brightness = node.brightnessMultiplier;
 
         // Minimal style: square node with text below
         const size = NODE_SQUARE_SIZE;
         const halfSize = size / 2;
         const textGap = NODE_TEXT_GAP;
+
+        // Hit area: larger invisible touch target
+        const hitSize = size + TOUCH_HIT_PADDING * 2;
+        hitArea.setAttribute("x", (x - hitSize / 2).toString());
+        hitArea.setAttribute("y", (y - hitSize / 2).toString());
+        hitArea.setAttribute("width", hitSize.toString());
+        hitArea.setAttribute("height", hitSize.toString());
 
         // Selector ring: outer breathing ring
         if (node.selectorOutline) {
@@ -377,6 +386,11 @@ export class SVGRenderer {
         group.dataset.nodeId = id;
         group.style.pointerEvents = "all";
 
+        // Hit area: invisible larger touch target (rendered first, behind everything)
+        const hitArea = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        hitArea.setAttribute("fill", "transparent");
+        hitArea.style.pointerEvents = "all";
+
         // Selector ring: outer breathing ring (rendered behind the node)
         const selectorRing = document.createElementNS("http://www.w3.org/2000/svg", "rect");
         selectorRing.style.pointerEvents = "none";
@@ -385,7 +399,7 @@ export class SVGRenderer {
 
         // Shape path: can render square or D-shape
         const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        shape.style.pointerEvents = "all";
+        shape.style.pointerEvents = "none";  // hitArea handles pointer events
 
         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
         text.setAttribute("text-anchor", "middle");
@@ -403,12 +417,13 @@ export class SVGRenderer {
         shortcutKeyText.style.pointerEvents = "none";
         shortcutKeyText.style.display = "none";
 
+        group.appendChild(hitArea);
         group.appendChild(selectorRing);
         group.appendChild(shape);
         group.appendChild(text);
         group.appendChild(shortcutKeyText);
 
-        return { group, selectorRing, shape, text, shortcutKeyText };
+        return { group, hitArea, selectorRing, shape, text, shortcutKeyText };
     }
 
     private reconcileEdge(id: string, edge: RenderEdge, from: Vec2, to: Vec2, transform: ViewTransform): void {

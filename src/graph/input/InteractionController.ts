@@ -593,9 +593,8 @@ export class InteractionController {
         const current = this.computeFingerGeometry(this.activeFingers);
         const baseline = this.fingerTransformBaseline;
 
-        // Compute deltas
+        // Compute deltas (NO ROTATION - only scale and translation)
         const scaleFactor = current.scale / baseline.scale;
-        const rotationDelta = current.rotation - baseline.rotation;
         const translationDelta = {
             x: current.center.x - baseline.center.x,
             y: current.center.y - baseline.center.y,
@@ -604,23 +603,19 @@ export class InteractionController {
         const nav = this.deps.getNavigationEngine();
         if (!isManualNavigationEngine(nav)) return;
 
-        // Apply as incremental transform
-        // Order: translate to baseline center, rotate, scale, translate back, then translate delta
-        const cos = Math.cos(rotationDelta);
-        const sin = Math.sin(rotationDelta);
-
-        // Build the incremental transform matrix
-        // T(delta) * T(center) * R * S * T(-center)
+        // Apply as incremental transform (scale + translate, no rotation)
+        // Order: translate to baseline center, scale, translate back, then translate delta
         const cx = baseline.center.x;
         const cy = baseline.center.y;
 
-        // Combined transform: translate(-cx, -cy) -> scale -> rotate -> translate(cx, cy) -> translate(delta)
-        const a = scaleFactor * cos;
-        const b = scaleFactor * sin;
-        const c = -scaleFactor * sin;
-        const d = scaleFactor * cos;
-        const tx = -cx * a - cy * c + cx + translationDelta.x;
-        const ty = -cx * b - cy * d + cy + translationDelta.y;
+        // Combined transform: translate(-cx, -cy) -> scale -> translate(cx, cy) -> translate(delta)
+        // Simplified without rotation: just scale + translate
+        const a = scaleFactor;
+        const b = 0;
+        const c = 0;
+        const d = scaleFactor;
+        const tx = -cx * (scaleFactor - 1) + translationDelta.x;
+        const ty = -cy * (scaleFactor - 1) + translationDelta.y;
 
         nav.applyTransform({ a, b, c, d, tx, ty });
 
