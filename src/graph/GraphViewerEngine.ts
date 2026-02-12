@@ -11,7 +11,7 @@ import { navigationStyleGraphData } from "./preprocess/navigationStyleGraphData"
 import { cursorStyleGraphData } from "./preprocess/styleGraphData";
 import { preprocessGraph, ProcessedGraphData } from "./preprocess/pipeline";
 import { preprocessPlans, ProcessedPlansData, EMPTY_PLANS_DATA } from "./preprocess/preprocessPlans";
-import { stylePlans, cursorStylePlans, StyledPlansData } from "./preprocess/stylePlans";
+import { stylePlans, StyledPlansData } from "./preprocess/stylePlans";
 import {
     SimulationEngine,
     SimulationState,
@@ -179,9 +179,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         this.plansData = preprocessPlans(appState.plans, validNodeIds);
 
         // Style plans once (no need to do per-frame)
-        let styledPlans = stylePlans(this.plansData);
-        styledPlans = cursorStylePlans(styledPlans, this.getCursor());
-        this.styledPlansData = styledPlans;
+        this.styledPlansData = stylePlans(this.plansData);
 
         // TEMPORARY: Load and validate saved positions when graph is set
         const savedPositions = this.positionPersistence.loadPositions();
