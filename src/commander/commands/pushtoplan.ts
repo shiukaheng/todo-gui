@@ -15,11 +15,29 @@ export const pushtoplanCommand: CommandDefinition = {
             name: 'planId',
             description: 'Plan ID to push to',
             required: true,
+            complete: (partial) => {
+                const graphData = useTodoStore.getState().graphData;
+                if (!graphData?.plans) return [];
+
+                const planIds = Object.keys(graphData.plans);
+                return planIds.filter(id =>
+                    id.toLowerCase().startsWith(partial.toLowerCase())
+                );
+            },
         },
         {
             name: 'nodeIds',
             description: 'Node IDs to add (omit to use cursor)',
             required: false,
+            complete: (partial) => {
+                const graphData = useTodoStore.getState().graphData;
+                if (!graphData?.tasks) return [];
+
+                const nodeIds = Object.keys(graphData.tasks);
+                return nodeIds.filter(id =>
+                    id.toLowerCase().startsWith(partial.toLowerCase())
+                );
+            },
         },
     ],
     handler: async (args) => {

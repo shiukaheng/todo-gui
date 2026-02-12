@@ -20,6 +20,15 @@ export const addplanCommand: CommandDefinition = {
             name: 'nodeIds',
             description: 'Space-separated node IDs in sequence',
             required: true,
+            complete: (partial) => {
+                const graphData = useTodoStore.getState().graphData;
+                if (!graphData?.tasks) return [];
+
+                const nodeIds = Object.keys(graphData.tasks);
+                return nodeIds.filter(id =>
+                    id.toLowerCase().startsWith(partial.toLowerCase())
+                );
+            },
         },
     ],
     options: [

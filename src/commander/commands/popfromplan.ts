@@ -15,6 +15,15 @@ export const popfromplanCommand: CommandDefinition = {
             name: 'planId',
             description: 'Plan ID to pop from',
             required: true,
+            complete: (partial) => {
+                const graphData = useTodoStore.getState().graphData;
+                if (!graphData?.plans) return [];
+
+                const planIds = Object.keys(graphData.plans);
+                return planIds.filter(id =>
+                    id.toLowerCase().startsWith(partial.toLowerCase())
+                );
+            },
         },
     ],
     handler: async (args) => {
