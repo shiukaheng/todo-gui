@@ -526,6 +526,12 @@ export class SVGRenderer {
             const from = positions[i];
             const to = positions[i + 1];
 
+            // Check if this step's node is completed
+            const stepNodeId = plan.steps[i].nodeId;
+            const stepTask = tasks[stepNodeId];
+            const isStepCompleted = stepTask?.data?.calculatedValue === true;
+            const completionOpacityMultiplier = isStepCompleted ? 0.5 : 1.0;
+
             const [x1, y1] = worldToScreen(from, transform);
             const [x2, y2] = worldToScreen(to, transform);
 
@@ -596,7 +602,7 @@ export class SVGRenderer {
 
                 // Opacity from phase (cosine wave: 0.3 to 1.0)
                 const waveOpacity = 0.3 + 0.7 * (Math.cos(phase * Math.PI * 2) * 0.5 + 0.5);
-                triangle.setAttribute("opacity", (plan.opacity * waveOpacity).toString());
+                triangle.setAttribute("opacity", (plan.opacity * waveOpacity * completionOpacityMultiplier).toString());
             }
 
             cumulativeScreenDistance += segmentLength;
