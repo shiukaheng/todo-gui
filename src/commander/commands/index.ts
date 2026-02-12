@@ -21,6 +21,7 @@ import { setsimmodeCommand } from './setsimmode';
 import { addplanCommand } from './addplan';
 import { deleteplanCommand } from './deleteplan';
 import { pushtoplanCommand } from './pushtoplan';
+import { popfromplanCommand } from './popfromplan';
 
 /** Register all built-in commands */
 export function registerBuiltinCommands(): void {
@@ -42,4 +43,5 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(addplanCommand);
     commandRegistry.register(deleteplanCommand);
     commandRegistry.register(pushtoplanCommand);
+    commandRegistry.register(popfromplanCommand);
 }
