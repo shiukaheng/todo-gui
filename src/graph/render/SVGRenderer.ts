@@ -67,10 +67,16 @@ export class SVGRenderer {
     private edgeElements: Map<string, EdgeElements> = new Map();
     private planPathElements: Map<string, PlanPathElements> = new Map();
     private offScreenIndicator: SVGPolygonElement | null = null;
+    private styleElement: SVGStyleElement | null = null;
 
     constructor(svg: SVGSVGElement) {
         this.svg = svg;
         this.svg.style.userSelect = "none";
+        this.injectStyles();
+    }
+
+    private injectStyles(): void {
+        // No CSS animations needed - we animate phase in render loop
     }
 
     /** Get or create the off-screen indicator element */
@@ -504,6 +510,8 @@ export class SVGRenderer {
         const gapSize = triangleSize;    // Gap same length as triangle
         const patternSize = triangleSize + gapSize;
 
+        let cumulativeScreenDistance = 0;
+
         for (let i = 0; i < elements.segments.length; i++) {
             const segment = elements.segments[i];
             const from = positions[i];
@@ -512,7 +520,7 @@ export class SVGRenderer {
             const [x1, y1] = worldToScreen(from, transform);
             const [x2, y2] = worldToScreen(to, transform);
 
-            // Calculate segment length and angle
+            // Calculate segment length and angle in screen space
             const dx = x2 - x1;
             const dy = y2 - y1;
             const segmentLength = Math.sqrt(dx * dx + dy * dy);
@@ -564,8 +572,25 @@ export class SVGRenderer {
 
                 triangle.setAttribute("points", `${tipX},${tipY} ${baseLeftX},${baseLeftY} ${baseRightX},${baseRightY}`);
                 triangle.setAttribute("fill", color);
-                triangle.setAttribute("opacity", opacity);
+
+                // Calculate phase based on screen-space distance traveled + animated time offset
+                const screenDistanceAlongSegment = segmentLength * t;
+                const totalScreenDistanceToTriangle = cumulativeScreenDistance + screenDistanceAlongSegment;
+
+                // Wave parameters
+                const wavelength = 1000;  // Screen pixels per wave cycle
+                const period = 3;         // Seconds per wave cycle
+                const currentTime = performance.now() / 1000;
+
+                // Phase as function of screen distance and time
+                const phase = (totalScreenDistanceToTriangle / wavelength - currentTime / period) % 1.0;
+
+                // Opacity from phase (cosine wave: 0.3 to 1.0)
+                const waveOpacity = 0.3 + 0.7 * (Math.cos(phase * Math.PI * 2) * 0.5 + 0.5);
+                triangle.setAttribute("opacity", (plan.opacity * waveOpacity).toString());
             }
+
+            cumulativeScreenDistance += segmentLength;
         }
     }
 
