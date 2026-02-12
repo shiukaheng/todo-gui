@@ -59,6 +59,7 @@ interface EdgeElements {
 interface PlanPathElements {
     group: SVGGElement;
     segments: Array<{ triangles: SVGPolygonElement[] }>;
+    label: SVGTextElement;
 }
 
 export class SVGRenderer {
@@ -489,6 +490,14 @@ export class SVGRenderer {
                 segments.push({ triangles: [] });
             }
 
+            // Create label for plan
+            const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            label.style.pointerEvents = "none";
+            label.style.fontSize = `${FONT_SIZE}px`;
+            label.style.fontFamily = "monospace";
+            label.style.userSelect = "none";
+            group.appendChild(label);
+
             // Insert after edges but before nodes
             const firstNode = this.nodeElements.values().next().value;
             if (firstNode) {
@@ -497,7 +506,7 @@ export class SVGRenderer {
                 this.svg.appendChild(group);
             }
 
-            elements = { group, segments };
+            elements = { group, segments, label };
             this.planPathElements.set(planId, elements);
         }
 
@@ -591,6 +600,56 @@ export class SVGRenderer {
             }
 
             cumulativeScreenDistance += segmentLength;
+        }
+
+        // Update plan label along first segment
+        if (positions.length >= 2) {
+            const startPos = positions[0];
+            const endPos = positions[1];
+            const [x1, y1] = worldToScreen(startPos, transform);
+            const [x2, y2] = worldToScreen(endPos, transform);
+
+            // Calculate segment angle and perpendicular
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            let angle = Math.atan2(dy, dx);
+            let angleDeg = (angle * 180) / Math.PI;
+
+            // Flip text if upside down (angle > 90° or < -90°)
+            let flipped = false;
+            if (angleDeg > 90 || angleDeg < -90) {
+                angleDeg += 180;
+                angle += Math.PI;
+                flipped = true;
+            }
+
+            // Perpendicular direction (rotate 90 degrees)
+            const perpAngle = angle + Math.PI / 2;
+            const perpX = Math.cos(perpAngle);
+            const perpY = Math.sin(perpAngle);
+
+            // Choose upper side (negative Y in screen space)
+            const offsetDistance = 15 * SCALE;
+            const upperPerpX = perpY < 0 ? perpX : -perpX;
+            const upperPerpY = perpY < 0 ? perpY : -perpY;
+
+            // Always position at start of segment
+            const labelX = x1 + upperPerpX * offsetDistance;
+            const labelY = y1 + upperPerpY * offsetDistance;
+
+            elements.label.setAttribute("x", labelX.toString());
+            elements.label.setAttribute("y", labelY.toString());
+            elements.label.setAttribute("fill", color);
+            elements.label.setAttribute("opacity", plan.opacity.toString());
+            elements.label.setAttribute("text-anchor", flipped ? "end" : "start");
+            elements.label.setAttribute("dominant-baseline", "middle");
+
+            // Rotate text to be parallel with segment
+            elements.label.setAttribute("transform", `rotate(${angleDeg}, ${labelX}, ${labelY})`);
+
+            // Set label text: "ID: text" or just "ID" if no text
+            const labelText = plan.text ? `${plan.data.id}: ${plan.text}` : plan.data.id;
+            elements.label.textContent = labelText;
         }
     }
 

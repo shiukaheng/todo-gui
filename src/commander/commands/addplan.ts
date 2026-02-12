@@ -1,15 +1,15 @@
 /**
- * CreatePlan command - create a new plan with a sequence of tasks.
+ * AddPlan command - create a new plan with a sequence of tasks.
  */
 
 import { CommandDefinition } from '../types';
 import { useTodoStore } from '../../stores/todoStore';
 import { output } from '../output';
 
-export const createplanCommand: CommandDefinition = {
-    name: 'createplan',
+export const addplanCommand: CommandDefinition = {
+    name: 'addplan',
     description: 'Create a new plan with a sequence of tasks',
-    aliases: ['cp'],
+    aliases: ['ap'],
     positionals: [
         {
             name: 'planId',
@@ -35,7 +35,7 @@ export const createplanCommand: CommandDefinition = {
         const nodeSequence = args._.slice(1) as string[];
 
         if (!planId || nodeSequence.length === 0) {
-            output.error('usage: createplan <planId> <nodeId1> <nodeId2> ... [--text <text>]');
+            output.error('usage: addplan <planId> <nodeId1> <nodeId2> ... [--text <text>]');
             return;
         }
 

@@ -18,8 +18,9 @@ import { unlinkCommand } from './unlink';
 import { flipCommand } from './flip';
 import { setnavmodeCommand } from './setnavmode';
 import { setsimmodeCommand } from './setsimmode';
-import { createplanCommand } from './createplan';
+import { addplanCommand } from './addplan';
 import { deleteplanCommand } from './deleteplan';
+import { pushtoplanCommand } from './pushtoplan';
 
 /** Register all built-in commands */
 export function registerBuiltinCommands(): void {
@@ -38,6 +39,7 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(flipCommand);
     commandRegistry.register(setnavmodeCommand);
     commandRegistry.register(setsimmodeCommand);
-    commandRegistry.register(createplanCommand);
+    commandRegistry.register(addplanCommand);
     commandRegistry.register(deleteplanCommand);
+    commandRegistry.register(pushtoplanCommand);
 }
