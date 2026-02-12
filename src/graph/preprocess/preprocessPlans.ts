@@ -30,21 +30,21 @@ export function preprocessPlans(
     for (const [planId, plan] of Object.entries(plansDict)) {
         // Sort steps by order and filter out steps referencing non-existent nodes
         const validSteps = plan.steps
-            .filter(step => validNodeIds.has(step.node_id))
+            .filter(step => validNodeIds.has(step.nodeId))
             .sort((a, b) => a.order - b.order);
 
         plans[planId] = {
             id: plan.id,
             text: plan.text,
-            steps: validSteps.map(s => ({ nodeId: s.node_id, order: s.order })),
+            steps: validSteps.map(s => ({ nodeId: s.nodeId, order: s.order })),
             created_at: plan.created_at,
             updated_at: plan.updated_at,
         };
 
         // Build reverse index for quick "which plans contain this node?" lookups
         for (const step of validSteps) {
-            const existing = nodeToPlans.get(step.node_id) || [];
-            nodeToPlans.set(step.node_id, [...existing, planId]);
+            const existing = nodeToPlans.get(step.nodeId) || [];
+            nodeToPlans.set(step.nodeId, [...existing, planId]);
         }
     }
 

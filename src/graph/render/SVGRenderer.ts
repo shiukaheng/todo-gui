@@ -56,10 +56,16 @@ interface EdgeElements {
     line: SVGLineElement;
 }
 
+interface PlanPathElements {
+    group: SVGGElement;
+    segments: Array<{ triangles: SVGPolygonElement[] }>;
+}
+
 export class SVGRenderer {
     private svg: SVGSVGElement;
     private nodeElements: Map<string, NodeElements> = new Map();
     private edgeElements: Map<string, EdgeElements> = new Map();
+    private planPathElements: Map<string, PlanPathElements> = new Map();
     private offScreenIndicator: SVGPolygonElement | null = null;
 
     constructor(svg: SVGSVGElement) {
@@ -80,13 +86,21 @@ export class SVGRenderer {
     render(data: RenderGraphData, transform: ViewTransform, backgroundColor: Color = [0, 0, 0]): void {
         const currentNodeIds = new Set(Object.keys(data.tasks));
         const currentEdgeIds = new Set(Object.keys(data.dependencies));
-        // Plans available in data.plans, but not rendered yet
+        const currentPlanIds = new Set(Object.keys(data.plans));
 
         // Remove stale edges
         for (const [id, elements] of this.edgeElements) {
             if (!currentEdgeIds.has(id)) {
                 elements.line.remove();
                 this.edgeElements.delete(id);
+            }
+        }
+
+        // Remove stale plan paths
+        for (const [id, elements] of this.planPathElements) {
+            if (!currentPlanIds.has(id)) {
+                elements.group.remove();
+                this.planPathElements.delete(id);
             }
         }
 
@@ -105,6 +119,11 @@ export class SVGRenderer {
             if (from && to) {
                 this.reconcileEdge(id, edge, from.position, to.position, transform);
             }
+        }
+
+        // Update or create plan paths
+        for (const [id, plan] of Object.entries(data.plans)) {
+            this.reconcilePlanPath(id, plan, data.tasks, transform);
         }
 
         // Update or create nodes
@@ -416,6 +435,140 @@ export class SVGRenderer {
         return { line };
     }
 
+    private reconcilePlanPath(
+        planId: string,
+        plan: RenderGraphData['plans'][string],
+        tasks: RenderGraphData['tasks'],
+        transform: ViewTransform
+    ): void {
+        // Get positions for all steps in the plan
+        const positions: Vec2[] = [];
+        for (const step of plan.steps) {
+            const task = tasks[step.nodeId];
+            if (task && task.position) {
+                positions.push(task.position);
+            }
+        }
+
+        // Need at least 2 positions to draw a path
+        if (positions.length < 2) {
+            // Remove if it exists
+            const existing = this.planPathElements.get(planId);
+            if (existing) {
+                existing.group.remove();
+                this.planPathElements.delete(planId);
+            }
+            return;
+        }
+
+        // Get or create plan path elements
+        let elements = this.planPathElements.get(planId);
+        const needsRecreate = !elements || elements.segments.length !== positions.length - 1;
+
+        if (needsRecreate) {
+            // Remove old elements
+            if (elements) {
+                elements.group.remove();
+            }
+
+            // Create new group
+            const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            group.dataset.planId = planId;
+
+            const segments: PlanPathElements['segments'] = [];
+
+            // Create segments for each consecutive pair
+            // We'll determine the number of triangles based on segment length during update
+            for (let i = 0; i < positions.length - 1; i++) {
+                segments.push({ triangles: [] });
+            }
+
+            // Insert after edges but before nodes
+            const firstNode = this.nodeElements.values().next().value;
+            if (firstNode) {
+                this.svg.insertBefore(group, firstNode.group);
+            } else {
+                this.svg.appendChild(group);
+            }
+
+            elements = { group, segments };
+            this.planPathElements.set(planId, elements);
+        }
+
+        // Update positions and appearance
+        const color = colorToCSS(plan.color);
+        const opacity = plan.opacity.toString();
+
+        // Triangle and gap sizes
+        const triangleSize = 4 * SCALE;  // Side length of equilateral triangle
+        const gapSize = triangleSize;    // Gap same length as triangle
+        const patternSize = triangleSize + gapSize;
+
+        for (let i = 0; i < elements.segments.length; i++) {
+            const segment = elements.segments[i];
+            const from = positions[i];
+            const to = positions[i + 1];
+
+            const [x1, y1] = worldToScreen(from, transform);
+            const [x2, y2] = worldToScreen(to, transform);
+
+            // Calculate segment length and angle
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const segmentLength = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+
+            // Calculate how many triangles fit
+            const numTriangles = Math.floor(segmentLength / patternSize);
+
+            // Adjust triangle count if needed
+            while (segment.triangles.length < numTriangles) {
+                const triangle = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                triangle.style.pointerEvents = "none";
+                segment.triangles.push(triangle);
+                elements.group.appendChild(triangle);
+            }
+            while (segment.triangles.length > numTriangles) {
+                const triangle = segment.triangles.pop();
+                if (triangle) triangle.remove();
+            }
+
+            // Position each triangle
+            for (let j = 0; j < numTriangles; j++) {
+                const triangle = segment.triangles[j];
+
+                // Position at start of this pattern unit
+                const distanceAlongSegment = j * patternSize + triangleSize / 2;
+                const t = distanceAlongSegment / segmentLength;
+                const centerX = x1 + dx * t;
+                const centerY = y1 + dy * t;
+
+                // Equilateral triangle pointing in direction of travel
+                // Height from center to tip: h = (triangleSize * sqrt(3)) / 3
+                // Height from center to base: h = (triangleSize * sqrt(3)) / 6
+                const h1 = (triangleSize * Math.sqrt(3)) / 3;  // center to tip
+                const h2 = (triangleSize * Math.sqrt(3)) / 6;  // center to base
+                const halfBase = triangleSize / 2;
+
+                // Tip (pointing forward)
+                const tipX = centerX + h1 * Math.cos(angle);
+                const tipY = centerY + h1 * Math.sin(angle);
+
+                // Base left (perpendicular to direction)
+                const baseLeftX = centerX - h2 * Math.cos(angle) + halfBase * Math.cos(angle + Math.PI / 2);
+                const baseLeftY = centerY - h2 * Math.sin(angle) + halfBase * Math.sin(angle + Math.PI / 2);
+
+                // Base right (perpendicular to direction)
+                const baseRightX = centerX - h2 * Math.cos(angle) - halfBase * Math.cos(angle + Math.PI / 2);
+                const baseRightY = centerY - h2 * Math.sin(angle) - halfBase * Math.sin(angle + Math.PI / 2);
+
+                triangle.setAttribute("points", `${tipX},${tipY} ${baseLeftX},${baseLeftY} ${baseRightX},${baseRightY}`);
+                triangle.setAttribute("fill", color);
+                triangle.setAttribute("opacity", opacity);
+            }
+        }
+    }
+
     clear(): void {
         for (const elements of this.nodeElements.values()) {
             elements.group.remove();
@@ -423,8 +576,12 @@ export class SVGRenderer {
         for (const elements of this.edgeElements.values()) {
             elements.line.remove();
         }
+        for (const elements of this.planPathElements.values()) {
+            elements.group.remove();
+        }
         this.nodeElements.clear();
         this.edgeElements.clear();
+        this.planPathElements.clear();
         if (this.offScreenIndicator) {
             this.offScreenIndicator.remove();
             this.offScreenIndicator = null;

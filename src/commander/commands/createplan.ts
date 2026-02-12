@@ -60,7 +60,7 @@ export const createplanCommand: CommandDefinition = {
 
         // Build steps with float ordering (1.0, 2.0, 3.0, ...)
         const steps = nodeSequence.map((nodeId, index) => ({
-            node_id: nodeId,
+            nodeId: nodeId,  // camelCase for TypeScript client
             order: (index + 1) * 1.0,
         }));
 
