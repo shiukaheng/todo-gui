@@ -3,13 +3,14 @@
  * Owns simulation, navigation, and rendering.
  */
 
-import { TaskListOut } from "todo-client";
+import { AppState } from "todo-client";
 import { CursorNeighbors, computeCursorNeighbors, cursorNeighborsEqual, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
 import { GraphNavigationHandle, DEFAULT_NAV_MAPPING } from "./graphNavigation/types";
 import { GraphNavigationController } from "./graphNavigation/GraphNavigationController";
 import { navigationStyleGraphData } from "./preprocess/navigationStyleGraphData";
 import { cursorStyleGraphData } from "./preprocess/styleGraphData";
 import { preprocessGraph, ProcessedGraphData } from "./preprocess/pipeline";
+import { preprocessPlans, ProcessedPlansData, EMPTY_PLANS_DATA } from "./preprocess/preprocessPlans";
 import {
     SimulationEngine,
     SimulationState,
@@ -51,7 +52,7 @@ export abstract class AbstractGraphViewerEngine {
         protected setNavInfoText: (text: string | null) => void
     ) {}
 
-    abstract setGraph(taskList: TaskListOut): void;
+    abstract updateState(appState: AppState): void;
     abstract getNavigationHandle(): GraphNavigationHandle;
     abstract getFlyNavigationHandle(): FlyNavigationHandle | null;
     abstract destroy(): void;
@@ -64,6 +65,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private svg: SVGSVGElement;
 
     private graphData: ProcessedGraphData | null = null;
+    private plansData: ProcessedPlansData = EMPTY_PLANS_DATA;
     private simulationEngine: SimulationEngine;
     private simulationState: SimulationState = EMPTY_SIMULATION_STATE;
     private navigationEngine: NavigationEngine;
@@ -154,13 +156,22 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         this.startLoop();
     }
 
-    setGraph(taskList: TaskListOut): void {
-        const graphData = preprocessGraph(taskList);
+    updateState(appState: AppState): void {
+        // Preprocess graph data (tasks + dependencies)
+        const graphData = preprocessGraph({
+            tasks: appState.tasks,
+            dependencies: appState.dependencies,
+            hasCycles: appState.hasCycles,
+        });
         this.graphData = graphData;
+
+        // Preprocess plans data
+        const validNodeIds = new Set(Object.keys(graphData.tasks));
+        this.plansData = preprocessPlans(appState.plans, validNodeIds);
 
         // TEMPORARY: Load and validate saved positions when graph is set
         const savedPositions = this.positionPersistence.loadPositions();
-        const currentNodeIds = new Set(Object.keys(graphData.tasks));
+        const currentNodeIds = validNodeIds;
 
         // Filter out positions for nodes that no longer exist
         const validPositions: Record<string, { x: number; y: number }> = {};
@@ -239,9 +250,9 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         switch (mode) {
             case 'force':
                 return new ForceDirectedEngine({
-                    linkDistance: 100,
-                    linkStrength: 0.5,
-                    chargeStrength: -300,
+                    desiredEdgeLength: 100,
+                    repulsionStrength: 5000,
+                    tensionStrength: 0.05,
                 });
             case 'cola':
             default:

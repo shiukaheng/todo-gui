@@ -64,7 +64,7 @@ export function useGraphViewerEngine(
     // Push data when graphData changes
     useEffect(() => {
         if (graphData) {
-            engineRef.current?.setGraph(graphData);
+            engineRef.current?.updateState(graphData);
         }
     }, [graphData]);
 
