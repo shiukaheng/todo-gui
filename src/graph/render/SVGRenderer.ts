@@ -530,7 +530,6 @@ export class SVGRenderer {
             const stepNodeId = plan.steps[i].nodeId;
             const stepTask = tasks[stepNodeId];
             const isStepCompleted = stepTask?.data?.calculatedValue === true;
-            const completionOpacityMultiplier = isStepCompleted ? 0.1 : 1.0;
 
             const [x1, y1] = worldToScreen(from, transform);
             const [x2, y2] = worldToScreen(to, transform);
@@ -600,9 +599,15 @@ export class SVGRenderer {
                 // Phase as function of screen distance and time
                 const phase = (totalScreenDistanceToTriangle / wavelength - currentTime / period) % 1.0;
 
-                // Opacity from phase (cosine wave: 0.3 to 1.0)
-                const waveOpacity = 0.3 + 0.7 * (Math.cos(phase * Math.PI * 2) * 0.5 + 0.5);
-                triangle.setAttribute("opacity", (plan.opacity * waveOpacity * completionOpacityMultiplier).toString());
+                // Opacity: fixed 25% for completed, animated wave for incomplete
+                let triangleOpacity: number;
+                if (isStepCompleted) {
+                    triangleOpacity = plan.opacity * 0.25;
+                } else {
+                    const waveOpacity = 0.3 + 0.7 * (Math.cos(phase * Math.PI * 2) * 0.5 + 0.5);
+                    triangleOpacity = plan.opacity * waveOpacity;
+                }
+                triangle.setAttribute("opacity", triangleOpacity.toString());
             }
 
             cumulativeScreenDistance += segmentLength;
