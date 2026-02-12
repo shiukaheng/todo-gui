@@ -530,7 +530,7 @@ export class SVGRenderer {
             const stepNodeId = plan.steps[i].nodeId;
             const stepTask = tasks[stepNodeId];
             const isStepCompleted = stepTask?.data?.calculatedValue === true;
-            const completionOpacityMultiplier = isStepCompleted ? 0.5 : 1.0;
+            const completionOpacityMultiplier = isStepCompleted ? 0.1 : 1.0;
 
             const [x1, y1] = worldToScreen(from, transform);
             const [x2, y2] = worldToScreen(to, transform);
