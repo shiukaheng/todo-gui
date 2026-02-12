@@ -22,6 +22,7 @@ import { addplanCommand } from './addplan';
 import { deleteplanCommand } from './deleteplan';
 import { pushtoplanCommand } from './pushtoplan';
 import { popfromplanCommand } from './popfromplan';
+import { renameplanCommand } from './renameplan';
 
 /** Register all built-in commands */
 export function registerBuiltinCommands(): void {
@@ -44,4 +45,5 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(deleteplanCommand);
     commandRegistry.register(pushtoplanCommand);
     commandRegistry.register(popfromplanCommand);
+    commandRegistry.register(renameplanCommand);
 }
