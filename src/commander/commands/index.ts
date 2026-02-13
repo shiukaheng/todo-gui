@@ -23,6 +23,8 @@ import { deleteplanCommand } from './deleteplan';
 import { pushtoplanCommand } from './pushtoplan';
 import { popfromplanCommand } from './popfromplan';
 import { renameplanCommand } from './renameplan';
+import { filterCommand } from './filter';
+import { clearfilterCommand } from './clearfilter';
 
 /** Register all built-in commands */
 export function registerBuiltinCommands(): void {
@@ -46,4 +48,6 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(pushtoplanCommand);
     commandRegistry.register(popfromplanCommand);
     commandRegistry.register(renameplanCommand);
+    commandRegistry.register(filterCommand);
+    commandRegistry.register(clearfilterCommand);
 }

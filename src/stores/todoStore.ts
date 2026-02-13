@@ -36,6 +36,9 @@ interface TodoStore {
     // Command plane state
     commandPlaneVisible: boolean;
 
+    // Client-side filter state
+    filterNodeIds: string[] | null;
+
     // Actions
     setCursor: (nodeId: string | null) => void;
     setNavInfoText: (text: string | null) => void;
@@ -43,6 +46,8 @@ interface TodoStore {
     setSimulationMode: (mode: SimulationMode) => void;
     showCommandPlane: () => void;
     hideCommandPlane: () => void;
+    setFilter: (nodeIds: string[]) => void;
+    clearFilter: () => void;
     subscribe: (baseUrl: string) => () => void;
     disconnect: () => void;
 }
@@ -60,6 +65,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     api: null,
     unsubscribe: null,
     commandPlaneVisible: false,
+    filterNodeIds: null,
 
     setCursor: (nodeId) => set({ cursor: nodeId }),
     setNavInfoText: (text) => set({ navInfoText: text }),
@@ -67,6 +73,8 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     setSimulationMode: (mode) => set({ simulationMode: mode }),
     showCommandPlane: () => set({ commandPlaneVisible: true }),
     hideCommandPlane: () => set({ commandPlaneVisible: false }),
+    setFilter: (nodeIds) => set({ filterNodeIds: nodeIds }),
+    clearFilter: () => set({ filterNodeIds: null }),
 
     disconnect: () => {
         get().unsubscribe?.();

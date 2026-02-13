@@ -3,7 +3,7 @@
  * Owns simulation, navigation, and rendering.
  */
 
-import { AppState } from "todo-client";
+import { AppState, NodeListOut } from "todo-client";
 import { CursorNeighbors, computeCursorNeighbors, cursorNeighborsEqual, EMPTY_CURSOR_NEIGHBORS } from "./GraphViewerEngineState";
 import { GraphNavigationHandle, DEFAULT_NAV_MAPPING } from "./graphNavigation/types";
 import { GraphNavigationController } from "./graphNavigation/GraphNavigationController";
@@ -66,6 +66,8 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private svg: SVGSVGElement;
 
     private graphData: ProcessedGraphData | null = null;
+    private lastAppState: AppState | null = null;
+    private currentFilterNodeIds: string[] | null = null;
     private plansData: ProcessedPlansData = EMPTY_PLANS_DATA;
     private styledPlansData: StyledPlansData = { plans: {} };
     private simulationEngine: SimulationEngine;
@@ -123,7 +125,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         this.currentNavigationMode = useTodoStore.getState().navigationMode;
         this.navigationEngine = this.createNavigationEngine(this.currentNavigationMode);
 
-        // Subscribe to mode changes
+        // Subscribe to mode and filter changes
         this.storeUnsubscribe = useTodoStore.subscribe(
             (state) => {
                 if (state.navigationMode !== this.currentNavigationMode) {
@@ -133,6 +135,10 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
                 if (state.simulationMode !== this.currentSimulationMode) {
                     this.currentSimulationMode = state.simulationMode;
                     this.setSimulationEngine(this.createSimulationEngine(state.simulationMode));
+                }
+                if (state.filterNodeIds !== this.currentFilterNodeIds) {
+                    this.onFilterChange(this.currentFilterNodeIds, state.filterNodeIds);
+                    this.currentFilterNodeIds = state.filterNodeIds;
                 }
             }
         );
@@ -166,12 +172,24 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     }
 
     updateState(appState: AppState): void {
-        // Preprocess graph data (tasks + dependencies)
-        const graphData = preprocessGraph({
+        this.lastAppState = appState;
+        this.processGraphData(appState, !this.currentFilterNodeIds);
+    }
+
+    /**
+     * Process app state into graph data, optionally applying the active filter.
+     * @param restorePositions - Whether to restore saved positions from storage
+     */
+    private processGraphData(appState: AppState, restorePositions: boolean): void {
+        // Apply client-side filter if active
+        const taskList = this.applyFilter({
             tasks: appState.tasks,
             dependencies: appState.dependencies,
             hasCycles: appState.hasCycles,
         });
+
+        // Preprocess graph data (tasks + dependencies)
+        const graphData = preprocessGraph(taskList);
         this.graphData = graphData;
 
         // Preprocess and style plans data
@@ -182,8 +200,16 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         this.styledPlansData = stylePlans(this.plansData);
 
         // TEMPORARY: Load and validate saved positions when graph is set
+        if (restorePositions) {
+            this.restorePositionsFromStorage(validNodeIds);
+        }
+    }
+
+    /**
+     * Load saved positions from localStorage and apply if coverage is sufficient.
+     */
+    private restorePositionsFromStorage(currentNodeIds: Set<string>): void {
         const savedPositions = this.positionPersistence.loadPositions();
-        const currentNodeIds = validNodeIds;
 
         // Filter out positions for nodes that no longer exist
         const validPositions: Record<string, { x: number; y: number }> = {};
@@ -205,9 +231,91 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         const coverageRatio = Object.keys(validPositions).length / currentNodeIds.size;
         if (coverageRatio > 0.5 && Object.keys(validPositions).length > 0) {
             this.simulationState = { positions: validPositions };
-            // console.log(`[GraphViewer] Restored ${Object.keys(validPositions).length} node positions`);
         } else if (Object.keys(savedPositions).length > 0) {
             console.log('[GraphViewer] Insufficient coverage, starting fresh layout');
+        }
+    }
+
+    /**
+     * Apply client-side filter: keep only filter root nodes and their recursive children.
+     * Returns the input unchanged if no filter is active.
+     */
+    private applyFilter(taskList: NodeListOut): NodeListOut {
+        const filterNodeIds = this.currentFilterNodeIds;
+        if (!filterNodeIds || filterNodeIds.length === 0) {
+            return taskList;
+        }
+
+        // Build parent → children adjacency from dependencies
+        // Edge semantics: fromId is parent, toId is child
+        const childrenMap = new Map<string, string[]>();
+        for (const dep of Object.values(taskList.dependencies)) {
+            const fromId = dep.fromId;
+            const toId = dep.toId;
+            if (!childrenMap.has(fromId)) childrenMap.set(fromId, []);
+            childrenMap.get(fromId)!.push(toId);
+        }
+
+        // BFS from filter roots to collect all visible nodes
+        const visible = new Set<string>();
+        const queue = [...filterNodeIds];
+
+        while (queue.length > 0) {
+            const nodeId = queue.shift()!;
+            if (visible.has(nodeId)) continue;
+            if (!taskList.tasks[nodeId]) continue;
+            visible.add(nodeId);
+
+            const children = childrenMap.get(nodeId) || [];
+            for (const childId of children) {
+                if (!visible.has(childId)) {
+                    queue.push(childId);
+                }
+            }
+        }
+
+        // Filter tasks
+        const filteredTasks: typeof taskList.tasks = {};
+        for (const [id, task] of Object.entries(taskList.tasks)) {
+            if (visible.has(id)) {
+                filteredTasks[id] = task;
+            }
+        }
+
+        // Filter dependencies: keep only edges where both ends are visible
+        const filteredDeps: typeof taskList.dependencies = {};
+        for (const [id, dep] of Object.entries(taskList.dependencies)) {
+            if (visible.has(dep.fromId) && visible.has(dep.toId)) {
+                filteredDeps[id] = dep;
+            }
+        }
+
+        return {
+            tasks: filteredTasks,
+            dependencies: filteredDeps,
+            hasCycles: taskList.hasCycles,
+        };
+    }
+
+    /**
+     * Handle filter state changes: save/restore positions and reprocess graph.
+     */
+    private onFilterChange(prevFilter: string[] | null, newFilter: string[] | null): void {
+        if (newFilter !== null && prevFilter === null) {
+            // Filter activated: save current positions, pause persistence
+            this.positionPersistence.savePositionsNow();
+            this.positionPersistence.setPaused(true);
+        } else if (newFilter === null && prevFilter !== null) {
+            // Filter cleared: resume persistence
+            this.positionPersistence.setPaused(false);
+        }
+
+        // Re-process graph data with new filter state
+        if (this.lastAppState) {
+            // When clearing filter, restore saved positions
+            const shouldRestore = newFilter === null;
+            this.currentFilterNodeIds = newFilter;
+            this.processGraphData(this.lastAppState, shouldRestore);
         }
     }
 

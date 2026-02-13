@@ -61,6 +61,7 @@ export class PositionPersistenceManager {
 
     private lastPositions: Record<string, Position> | null = null;
     private isCurrentlySettled = false;
+    private paused = false;
 
     /**
      * Callback to get current simulation state.
@@ -169,6 +170,21 @@ export class PositionPersistenceManager {
     }
 
     /**
+     * Pause or resume position saving.
+     * When paused, settlement detection and saving are skipped.
+     */
+    setPaused(paused: boolean): void {
+        this.paused = paused;
+        if (paused) {
+            // Cancel any pending save
+            if (this.saveTimeoutId !== null) {
+                window.clearTimeout(this.saveTimeoutId);
+                this.saveTimeoutId = null;
+            }
+        }
+    }
+
+    /**
      * Clear persisted positions from storage.
      */
     clearPersistedPositions(): void {
@@ -189,7 +205,7 @@ export class PositionPersistenceManager {
      * Called by interval timer.
      */
     private checkPositions(): void {
-        if (!this.getSimulationState) return;
+        if (!this.getSimulationState || this.paused) return;
 
         const state = this.getSimulationState();
         const currentPositions = state.positions;
