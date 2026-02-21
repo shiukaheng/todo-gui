@@ -58,12 +58,15 @@ export const addblockCommand: CommandDefinition = {
 
         try {
             // Create a new task that depends on the cursor (cursor blocks new task)
-            await api.addTaskApiTasksPost({
-                nodeCreate: {
-                    id: taskId,
-                    text: args.text as string | undefined,
-                    completed: args.completed as boolean,
-                    depends: [cursor],
+            await api.batchOperationsApiBatchPost({
+                batchRequest: {
+                    operations: [{
+                        op: 'create_node',
+                        id: taskId,
+                        text: args.text as string | undefined,
+                        completed: args.completed as boolean,
+                        depends: [cursor],
+                    }],
                 },
             });
             useTodoStore.getState().setCursor(taskId);

@@ -61,10 +61,13 @@ export const popfromplanCommand: CommandDefinition = {
         const stepsToKeep = sortedSteps.slice(0, -1);
 
         try {
-            await api.updatePlanApiPlansPlanIdPatch({
-                planId,
-                planUpdate: {
-                    steps: stepsToKeep.map(s => ({ nodeId: s.nodeId, order: s.order })),
+            await api.batchOperationsApiBatchPost({
+                batchRequest: {
+                    operations: [{
+                        op: 'update_plan',
+                        id: planId,
+                        steps: stepsToKeep.map(s => ({ nodeId: s.nodeId, order: s.order })),
+                    }],
                 },
             });
 

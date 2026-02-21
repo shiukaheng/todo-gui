@@ -74,11 +74,14 @@ export const addplanCommand: CommandDefinition = {
         }));
 
         try {
-            await api.createPlanApiPlansPost({
-                planCreate: {
-                    id: planId,
-                    text: args.text as string | undefined,
-                    steps,
+            await api.batchOperationsApiBatchPost({
+                batchRequest: {
+                    operations: [{
+                        op: 'create_plan',
+                        id: planId,
+                        text: args.text as string | undefined,
+                        steps,
+                    }],
                 },
             });
             output.success(`created plan: ${planId} with ${steps.length} steps`);

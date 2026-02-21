@@ -78,7 +78,11 @@ export const removeCommand: CommandDefinition = {
         }
 
         try {
-            await api.removeTaskApiTasksTaskIdDelete({ taskId });
+            await api.batchOperationsApiBatchPost({
+                batchRequest: {
+                    operations: [{ op: 'delete_node', id: taskId }],
+                },
+            });
             output.success(`removed task: ${taskId}`);
 
             // Move cursor to next reasonable node

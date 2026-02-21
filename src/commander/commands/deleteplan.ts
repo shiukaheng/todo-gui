@@ -47,7 +47,11 @@ export const deleteplanCommand: CommandDefinition = {
         }
 
         try {
-            await api.deletePlanApiPlansPlanIdDelete({ planId });
+            await api.batchOperationsApiBatchPost({
+                batchRequest: {
+                    operations: [{ op: 'delete_plan', id: planId }],
+                },
+            });
             output.success(`deleted plan: ${planId}`);
         } catch (err) {
             output.error(`failed to delete plan: ${err instanceof Error ? err.message : String(err)}`);

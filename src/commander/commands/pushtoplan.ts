@@ -96,10 +96,13 @@ export const pushtoplanCommand: CommandDefinition = {
                 ];
 
                 // Update plan
-                await api.updatePlanApiPlansPlanIdPatch({
-                    planId,
-                    planUpdate: {
-                        steps: allSteps,
+                await api.batchOperationsApiBatchPost({
+                    batchRequest: {
+                        operations: [{
+                            op: 'update_plan',
+                            id: planId,
+                            steps: allSteps,
+                        }],
                     },
                 });
 
@@ -111,10 +114,13 @@ export const pushtoplanCommand: CommandDefinition = {
                     order: (index + 1) * 1.0,
                 }));
 
-                await api.createPlanApiPlansPost({
-                    planCreate: {
-                        id: planId,
-                        steps,
+                await api.batchOperationsApiBatchPost({
+                    batchRequest: {
+                        operations: [{
+                            op: 'create_plan',
+                            id: planId,
+                            steps,
+                        }],
                     },
                 });
 

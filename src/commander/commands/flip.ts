@@ -91,20 +91,24 @@ export const flipCommand: CommandDefinition = {
         try {
             if (aDependsOnB) {
                 // A depends on B, flip to B depends on A
-                await api.unlinkTasksApiLinksDelete({
-                    linkRequest: { fromId: taskA, toId: taskB },
-                });
-                await api.linkTasksApiLinksPost({
-                    linkRequest: { fromId: taskB, toId: taskA },
+                await api.batchOperationsApiBatchPost({
+                    batchRequest: {
+                        operations: [
+                            { op: 'unlink', fromId: taskA, toId: taskB },
+                            { op: 'link', fromId: taskB, toId: taskA },
+                        ],
+                    },
                 });
                 output.success(`flipped: ${taskB} now depends on ${taskA}`);
             } else {
                 // B depends on A, flip to A depends on B
-                await api.unlinkTasksApiLinksDelete({
-                    linkRequest: { fromId: taskB, toId: taskA },
-                });
-                await api.linkTasksApiLinksPost({
-                    linkRequest: { fromId: taskA, toId: taskB },
+                await api.batchOperationsApiBatchPost({
+                    batchRequest: {
+                        operations: [
+                            { op: 'unlink', fromId: taskB, toId: taskA },
+                            { op: 'link', fromId: taskA, toId: taskB },
+                        ],
+                    },
                 });
                 output.success(`flipped: ${taskA} now depends on ${taskB}`);
             }

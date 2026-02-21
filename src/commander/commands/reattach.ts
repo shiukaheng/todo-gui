@@ -7,6 +7,7 @@
 import { CommandDefinition } from '../types';
 import { useTodoStore } from '../../stores/todoStore';
 import { output } from '../output';
+import type { BatchOperation } from 'todo-client';
 
 export const reattachCommand: CommandDefinition = {
     name: 'reattach',
@@ -104,22 +105,16 @@ export const reattachCommand: CommandDefinition = {
         }
 
         try {
+            const operations: BatchOperation[] = [];
             // Detach from old parent (if any)
             if (oldParentId) {
-                await api.unlinkTasksApiLinksDelete({
-                    linkRequest: {
-                        fromId: oldParentId,
-                        toId: nodeId,
-                    },
-                });
+                operations.push({ op: 'unlink', fromId: oldParentId, toId: nodeId });
             }
-
             // Attach to new parent
-            await api.linkTasksApiLinksPost({
-                linkRequest: {
-                    fromId: newParentId,
-                    toId: nodeId,
-                },
+            operations.push({ op: 'link', fromId: newParentId, toId: nodeId });
+
+            await api.batchOperationsApiBatchPost({
+                batchRequest: { operations },
             });
 
             if (oldParentId) {

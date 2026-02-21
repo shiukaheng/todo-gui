@@ -77,24 +77,27 @@ export function NodeDetailOverlay() {
 
         try {
             if (edit.field === 'id') {
-                await api.renameTaskApiTasksTaskIdRenamePost({
-                    taskId: task.id,
-                    renameRequest: { newId: edit.value },
+                await api.batchOperationsApiBatchPost({
+                    batchRequest: {
+                        operations: [{ op: 'rename_node', id: task.id, newId: edit.value }],
+                    },
                 });
                 // Update cursor to new ID
                 useTodoStore.getState().setCursor(edit.value);
             } else {
-                const update: Record<string, any> = {};
+                const op: Record<string, any> = { op: 'update_node', id: task.id };
                 if (edit.field === 'text') {
-                    update.text = edit.value;
+                    op.text = edit.value;
                 } else if (edit.field === 'due') {
                     if (edit.parsedDate) {
-                        update.due = Math.floor(edit.parsedDate.getTime() / 1000);
+                        op.due = Math.floor(edit.parsedDate.getTime() / 1000);
                     } else {
-                        update.due = null;
+                        op.due = null;
                     }
                 }
-                await api.setTaskApiTasksTaskIdPatch({ taskId: task.id, nodeUpdate: update });
+                await api.batchOperationsApiBatchPost({
+                    batchRequest: { operations: [op as any] },
+                });
             }
             setEdit({ field: null, value: '' });
         } catch (err) {
@@ -133,7 +136,9 @@ export function NodeDetailOverlay() {
             } else {
                 update.due = null;
             }
-            await api.setTaskApiTasksTaskIdPatch({ taskId: task.id, nodeUpdate: update });
+            await api.batchOperationsApiBatchPost({
+                batchRequest: { operations: [{ op: 'update_node', id: task.id, ...update } as any] },
+            });
             setEdit({ field: null, value: '' });
         } catch (err) {
             console.error("Failed to update task:", err);
@@ -177,9 +182,10 @@ export function NodeDetailOverlay() {
     const toggleCompletion = useCallback(async () => {
         if (!task || !api || task.nodeType !== "Task" || isBlocked) return;
         try {
-            await api.setTaskApiTasksTaskIdPatch({
-                taskId: task.id,
-                nodeUpdate: { completed: !task.completed },
+            await api.batchOperationsApiBatchPost({
+                batchRequest: {
+                    operations: [{ op: 'update_node', id: task.id, completed: !task.completed }],
+                },
             });
         } catch (err) {
             console.error("Failed to toggle completion:", err);
@@ -192,9 +198,10 @@ export function NodeDetailOverlay() {
         const currentIndex = types.indexOf(task.nodeType || 'Task');
         const nextType = types[(currentIndex + 1) % types.length];
         try {
-            await api.setTaskApiTasksTaskIdPatch({
-                taskId: task.id,
-                nodeUpdate: { nodeType: nextType },
+            await api.batchOperationsApiBatchPost({
+                batchRequest: {
+                    operations: [{ op: 'update_node', id: task.id, nodeType: nextType as any }],
+                },
             });
         } catch (err) {
             console.error("Failed to change node type:", err);
@@ -299,7 +306,11 @@ export function NodeDetailOverlay() {
     const clearDue = async () => {
         if (!api || !task) return;
         try {
-            await api.setTaskApiTasksTaskIdPatch({ taskId: task.id, nodeUpdate: { due: null } });
+            await api.batchOperationsApiBatchPost({
+                batchRequest: {
+                    operations: [{ op: 'update_node', id: task.id, due: null }],
+                },
+            });
             setEdit({ field: null, value: '' });
         } catch (err) {
             console.error("Failed to clear due date:", err);

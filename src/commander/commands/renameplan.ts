@@ -47,9 +47,10 @@ export const renameplanCommand: CommandDefinition = {
         }
 
         try {
-            await api.renamePlanApiPlansPlanIdRenamePost({
-                planId: oldId,
-                renameRequest: { new_id: newId },
+            await api.batchOperationsApiBatchPost({
+                batchRequest: {
+                    operations: [{ op: 'rename_plan', id: oldId, newId: newId }],
+                },
             });
             output.success(`renamed plan: ${oldId} → ${newId}`);
         } catch (err) {

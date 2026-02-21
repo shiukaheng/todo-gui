@@ -71,13 +71,16 @@ export const addCommand: CommandDefinition = {
             : undefined;
 
         try {
-            await api.addTaskApiTasksPost({
-                nodeCreate: {
-                    id: taskId,
-                    text: args.text as string | undefined,
-                    completed: args.completed as boolean,
-                    depends,
-                    blocks,
+            await api.batchOperationsApiBatchPost({
+                batchRequest: {
+                    operations: [{
+                        op: 'create_node',
+                        id: taskId,
+                        text: args.text as string | undefined,
+                        completed: args.completed as boolean,
+                        depends,
+                        blocks,
+                    }],
                 },
             });
             useTodoStore.getState().setCursor(taskId);
