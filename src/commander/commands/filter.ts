@@ -62,9 +62,9 @@ export const filterCommand: CommandDefinition = {
                 displayBatchRequest: {
                     operations: [{
                         op: 'update_view',
-                        viewId: currentViewId,
+                        view_id: currentViewId,
                         whitelist: nodeIds,
-                    }],
+                    } as any],
                 },
             }).catch(err => {
                 console.error('Failed to persist whitelist:', err);

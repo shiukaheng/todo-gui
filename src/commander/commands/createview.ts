@@ -52,18 +52,18 @@ export const createviewCommand: CommandDefinition = {
                     displayBatchRequest: {
                         operations: [{
                             op: 'update_view',
-                            viewId,
+                            view_id: viewId,
                             positions: sourceView.positions,
                             whitelist: sourceView.whitelist,
                             blacklist: sourceView.blacklist,
-                        }],
+                        } as any],
                     },
                 });
             } else {
                 // Upsert empty view
                 await api.displayBatch({
                     displayBatchRequest: {
-                        operations: [{ op: 'update_view', viewId }],
+                        operations: [{ op: 'update_view', view_id: viewId } as any],
                     },
                 });
             }

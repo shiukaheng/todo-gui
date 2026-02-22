@@ -153,9 +153,9 @@ export class PositionPersistenceManager {
                 displayBatchRequest: {
                     operations: [{
                         op: 'update_view',
-                        viewId: currentViewId,
+                        view_id: currentViewId,
                         positions: serverPositions,
-                    }],
+                    } as any],
                 },
             }).catch(err => {
                 console.error("[PositionPersistence] Failed to save to server:", err);

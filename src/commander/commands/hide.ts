@@ -64,9 +64,9 @@ export const hideCommand: CommandDefinition = {
                 displayBatchRequest: {
                     operations: [{
                         op: 'update_view',
-                        viewId: currentViewId,
+                        view_id: currentViewId,
                         blacklist: merged,
-                    }],
+                    } as any],
                 },
             }).catch(err => {
                 console.error('Failed to persist blacklist:', err);

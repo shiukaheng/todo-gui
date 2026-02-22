@@ -27,9 +27,9 @@ export const clearfilterCommand: CommandDefinition = {
                 displayBatchRequest: {
                     operations: [{
                         op: 'update_view',
-                        viewId: currentViewId,
+                        view_id: currentViewId,
                         whitelist: [],
-                    }],
+                    } as any],
                 },
             }).catch(err => {
                 console.error('Failed to clear whitelist:', err);
