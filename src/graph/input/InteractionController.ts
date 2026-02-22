@@ -42,8 +42,10 @@ export interface InteractionControllerDeps {
 /** Minimum velocity before momentum stops (pixels per second) */
 const MOMENTUM_MIN_VELOCITY = 10;
 
-/** Number of recent positions to track for velocity calculation */
-const VELOCITY_SAMPLE_COUNT = 5;
+/** Number of recent positions to track for velocity calculation.
+ *  Need at least 4 positions to compute 3 velocity samples for the
+ *  iOS-style weighted average. */
+const VELOCITY_SAMPLE_COUNT = 20;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // INTERACTION CONTROLLER
@@ -355,6 +357,18 @@ export class InteractionController {
         }
     }
 
+    /**
+     * iOS-style weighted velocity estimation.
+     *
+     * Compute instantaneous velocity between each consecutive pair of samples,
+     * then take the 3 most recent and blend them with weights that favour
+     * the sample from ~2 frames ago (the finger is often decelerating right
+     * at lift-off, so the most-recent sample gets very little weight).
+     *
+     * Weights from Flutter's IOSScrollViewFlingVelocityTracker which
+     * reverse-engineers UIScrollView behaviour:
+     *   v[-2] * 0.6  +  v[-1] * 0.35  +  v[0] * 0.05
+     */
     private calculateVelocity(): { vx: number; vy: number } | null {
         if (this.velocitySamples.length < 2) return null;
 
@@ -365,34 +379,45 @@ export class InteractionController {
             return null;
         }
 
-        // Use peak velocity across recent samples for snappy flings.
-        // Native apps (e.g. Apple Maps) feel fast because they capture the
-        // fastest part of the gesture, not the tail end where the finger
-        // may have slowed down right before lifting.
-        let bestVx = 0;
-        let bestVy = 0;
-        let bestSpeed = 0;
-
+        // Compute per-interval velocities
+        const velocities: { vx: number; vy: number }[] = [];
         for (let i = 1; i < this.velocitySamples.length; i++) {
             const prev = this.velocitySamples[i - 1];
             const curr = this.velocitySamples[i];
             const dt = (curr.time - prev.time) / 1000;
             if (dt < 0.001) continue;
-
-            const vx = (curr.position.x - prev.position.x) / dt;
-            const vy = (curr.position.y - prev.position.y) / dt;
-            const speed = Math.sqrt(vx * vx + vy * vy);
-
-            if (speed > bestSpeed) {
-                bestSpeed = speed;
-                bestVx = vx;
-                bestVy = vy;
-            }
+            velocities.push({
+                vx: (curr.position.x - prev.position.x) / dt,
+                vy: (curr.position.y - prev.position.y) / dt,
+            });
         }
 
-        if (bestSpeed < MOMENTUM_MIN_VELOCITY) return null;
+        if (velocities.length === 0) return null;
 
-        return { vx: bestVx, vy: bestVy };
+        // Weighted average of the last 3 velocity samples (iOS-style).
+        // If fewer samples exist, fall back gracefully.
+        let vx: number;
+        let vy: number;
+        if (velocities.length >= 3) {
+            const v0 = velocities[velocities.length - 1]; // most recent
+            const v1 = velocities[velocities.length - 2];
+            const v2 = velocities[velocities.length - 3];
+            vx = v2.vx * 0.6 + v1.vx * 0.35 + v0.vx * 0.05;
+            vy = v2.vy * 0.6 + v1.vy * 0.35 + v0.vy * 0.05;
+        } else if (velocities.length === 2) {
+            const v0 = velocities[velocities.length - 1];
+            const v1 = velocities[velocities.length - 2];
+            vx = v1.vx * 0.6 + v0.vx * 0.4;
+            vy = v1.vy * 0.6 + v0.vy * 0.4;
+        } else {
+            vx = velocities[0].vx;
+            vy = velocities[0].vy;
+        }
+
+        const speed = Math.sqrt(vx * vx + vy * vy);
+        if (speed < MOMENTUM_MIN_VELOCITY) return null;
+
+        return { vx, vy };
     }
 
     // ═══════════════════════════════════════════════════════════════════════
