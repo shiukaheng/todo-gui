@@ -443,8 +443,11 @@ export class InteractionController {
             this.startNodeDrag(target.nodeId, screen);
         }
 
-        // If we now have 2+ fingers, stop any momentum and establish baseline
+        // If we now have 2+ fingers, cancel any node drag and switch to pinch-zoom
         if (this.activeFingers.size >= 2) {
+            if (this.draggingNodeId) {
+                this.endNodeDrag();
+            }
             const nav = this.deps.getNavigationEngine();
             if (isManualNavigationEngine(nav)) {
                 nav.stopMomentum();
