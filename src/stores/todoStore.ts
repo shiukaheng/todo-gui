@@ -76,6 +76,13 @@ function deriveViewFilters(displayData: ViewListOut | null, viewId: string): {
     };
 }
 
+function logViewTrace(event: string, details: Record<string, unknown>): void {
+    console.log(`[ViewTrace][Store] ${event}`, {
+        ts: Date.now(),
+        ...details,
+    });
+}
+
 export const useTodoStore = create<TodoStore>((set, get) => ({
     graphData: null,
     cursor: null,
@@ -106,8 +113,14 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     setBlacklist: (nodeIds) => set({ blacklistNodeIds: nodeIds }),
     clearBlacklist: () => set({ blacklistNodeIds: null }),
     switchView: (viewId) => {
-        const { displayData } = get();
+        const { displayData, currentViewId } = get();
         const { filterNodeIds, blacklistNodeIds } = deriveViewFilters(displayData, viewId);
+        logViewTrace('switchView', {
+            fromViewId: currentViewId,
+            toViewId: viewId,
+            whitelistCount: filterNodeIds?.length ?? 0,
+            blacklistCount: blacklistNodeIds?.length ?? 0,
+        });
         set({ currentViewId: viewId, filterNodeIds, blacklistNodeIds });
     },
 
@@ -123,6 +136,12 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
             (data) => {
                 const currentViewId = get().currentViewId;
                 const { filterNodeIds, blacklistNodeIds } = deriveViewFilters(data, currentViewId);
+                logViewTrace('displaySSE:update', {
+                    currentViewId,
+                    viewCount: Object.keys(data.views || {}).length,
+                    whitelistCount: filterNodeIds?.length ?? 0,
+                    blacklistCount: blacklistNodeIds?.length ?? 0,
+                });
                 set({ displayData: data, filterNodeIds, blacklistNodeIds });
             },
             {
@@ -203,6 +222,12 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
             (data) => {
                 const currentViewId = get().currentViewId;
                 const { filterNodeIds, blacklistNodeIds } = deriveViewFilters(data, currentViewId);
+                logViewTrace('displaySSE:update', {
+                    currentViewId,
+                    viewCount: Object.keys(data.views || {}).length,
+                    whitelistCount: filterNodeIds?.length ?? 0,
+                    blacklistCount: blacklistNodeIds?.length ?? 0,
+                });
                 set({ displayData: data, filterNodeIds, blacklistNodeIds });
             },
             {

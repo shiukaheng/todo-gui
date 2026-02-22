@@ -6,7 +6,7 @@ import { CommandDefinition } from '../types';
 import { output } from '../output';
 import { useTodoStore } from '../../stores/todoStore';
 
-const DEFAULT_URL = 'http://workstation.local:8000';
+const DEFAULT_URL = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
 
 export const connectCommand: CommandDefinition = {
     name: 'connect',

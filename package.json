@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:prod": "API_PROXY_TARGET=http://100.83.86.3 vite",
+    "dev:local": "API_PROXY_TARGET=http://localhost:8000 vite",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint --ext .ts,.tsx ."

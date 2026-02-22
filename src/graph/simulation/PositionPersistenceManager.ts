@@ -109,6 +109,11 @@ export class PositionPersistenceManager {
      */
     loadPositions(): Record<string, Position> {
         const { displayData, currentViewId } = useTodoStore.getState();
+        console.log("[ViewTrace][Position] loadPositions:start", {
+            ts: Date.now(),
+            currentViewId,
+            viewCount: Object.keys(displayData?.views || {}).length,
+        });
         if (displayData?.views?.[currentViewId]) {
             const view = displayData.views[currentViewId];
             const positions: Record<string, Position> = {};
@@ -120,9 +125,19 @@ export class PositionPersistenceManager {
             if (Object.keys(positions).length > 0) {
                 console.log(`[PositionPersistence] Loaded ${Object.keys(positions).length} positions from view '${currentViewId}'`);
             }
+            console.log("[ViewTrace][Position] loadPositions:done", {
+                ts: Date.now(),
+                currentViewId,
+                loadedCount: Object.keys(positions).length,
+            });
             return positions;
         }
 
+        console.log("[ViewTrace][Position] loadPositions:done", {
+            ts: Date.now(),
+            currentViewId,
+            loadedCount: 0,
+        });
         return {};
     }
 
@@ -130,7 +145,7 @@ export class PositionPersistenceManager {
      * Manually save current positions to server.
      * Normally called automatically when graph settles.
      */
-    savePositionsNow(): void {
+    savePositionsNow(viewIdOverride?: string): void {
         if (!this.getSimulationState) {
             console.warn("[PositionPersistence] Cannot save, not started");
             return;
@@ -144,16 +159,23 @@ export class PositionPersistenceManager {
         }
 
         const { api, currentViewId } = useTodoStore.getState();
+        const targetViewId = viewIdOverride ?? currentViewId;
         if (api) {
             const serverPositions: { [key: string]: Array<number> } = {};
             for (const [nodeId, pos] of Object.entries(positions)) {
                 serverPositions[nodeId] = [pos.x, pos.y];
             }
+            console.log("[ViewTrace][Position] savePositionsNow", {
+                ts: Date.now(),
+                currentViewId,
+                targetViewId,
+                positionCount: Object.keys(serverPositions).length,
+            });
             api.displayBatch({
                 displayBatchRequest: {
                     operations: [{
                         op: 'update_view',
-                        view_id: currentViewId,
+                        view_id: targetViewId,
                         positions: serverPositions,
                     } as any],
                 },
@@ -169,6 +191,10 @@ export class PositionPersistenceManager {
      */
     setPaused(paused: boolean): void {
         this.paused = paused;
+        console.log("[ViewTrace][Position] setPaused", {
+            ts: Date.now(),
+            paused,
+        });
         if (paused) {
             // Cancel any pending save
             if (this.saveTimeoutId !== null) {

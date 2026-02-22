@@ -24,6 +24,18 @@ npm run dev
 
 Opens at http://localhost:3000
 
+Use fast local iteration against your deployed backend (via Vite proxy):
+
+```bash
+npm run dev:prod   # proxies /api -> http://100.83.86.3/todo/api
+```
+
+Override target if needed:
+
+```bash
+API_PROXY_TARGET=http://<host-or-ip> npm run dev
+```
+
 ## Build
 
 ```bash
@@ -51,11 +63,11 @@ Open command palette with [Enter] and you can manipulate the graph with the foll
 
 ### API Server
 
-Default server: `http://workstation.local:8000`
+Default server for `connect`: current origin (works with Vite proxy in dev and nginx in prod).
 
 Change via the `connect` command:
 ```
-connect http://localhost:8000
+connect http://<host-or-ip>
 ```
 
 ### Content Security Policy
