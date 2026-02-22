@@ -5,9 +5,9 @@ import {
     type ViewListOut,
     DefaultApi,
     Configuration,
-    subscribeToState,
     subscribeToDisplay,
 } from 'todo-client';
+import { OptimisticTodoClient, type TodoApi } from '../client/OptimisticTodoClient';
 import { viewTrace } from '../utils/viewTrace';
 
 /** Navigation mode for the graph viewer */
@@ -34,7 +34,7 @@ interface TodoStore {
     lastDataReceived: number | null;
 
     // API client (set after subscribe)
-    api: DefaultApi | null;
+    api: TodoApi | null;
     unsubscribe: (() => void) | null;
 
     // Command plane state
@@ -175,9 +175,10 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
             lastError: null,
         });
 
-        const api = new DefaultApi(new Configuration({ basePath: baseUrl }));
+        const rawApi = new DefaultApi(new Configuration({ basePath: baseUrl }));
+        const client = new OptimisticTodoClient(rawApi);
 
-        const unsubscribe = subscribeToState(
+        const unsubscribe = client.subscribeToState(
             (data) => {
                 viewTrace('Store', 'stateSSE:update', {
                     taskCount: Object.keys(data.tasks || {}).length,
@@ -209,7 +210,7 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
         );
 
         // Also subscribe to display layer
-        const displayUnsubscribe = subscribeToDisplay(
+        const displayUnsubscribe = client.subscribeToDisplay(
             (data) => {
                 const { activeView } = get();
                 viewTrace('Store', 'displaySSE:update', {
@@ -226,7 +227,7 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
             }
         );
 
-        set({ api, unsubscribe, displayUnsubscribe });
+        set({ api: client, unsubscribe, displayUnsubscribe });
 
         return () => {
             get().unsubscribe?.();
