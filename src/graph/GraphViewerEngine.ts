@@ -40,6 +40,7 @@ import { PerformanceMonitor } from "./render/PerformanceMonitor";
 import { InputHandler, InteractionController } from "./input";
 import { PositionedGraphData } from "./simulation/utils";
 import { useTodoStore, NavigationMode, SimulationMode } from "../stores/todoStore";
+import { viewTrace } from "../utils/viewTrace";
 
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
@@ -89,16 +90,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
     private positionPersistence: PositionPersistenceManager;
 
-    private logViewTrace(event: string, details: Record<string, unknown>): void {
-        console.log(`[ViewTrace][Graph] ${event}`, {
-            ts: Date.now(),
-            viewId: this.currentViewId,
-            filterCount: this.currentFilterNodeIds?.length ?? 0,
-            blacklistCount: this.currentBlacklistNodeIds?.length ?? 0,
-            ...details,
-        });
-    }
-
     constructor(
         container: HTMLDivElement,
         getCursor: () => string | null,
@@ -127,7 +118,8 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         this.positionPersistence = new PositionPersistenceManager();
 
         // Initialize view ID
-        this.currentViewId = useTodoStore.getState().currentViewId;
+        const initialStoreState = useTodoStore.getState();
+        this.currentViewId = initialStoreState.currentViewId;
 
         // Initialize simulation engine based on store mode
         this.currentSimulationMode = useTodoStore.getState().simulationMode;
@@ -153,7 +145,13 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
                     const nextViewId = state.currentViewId;
                     const nextFilter = state.filterNodeIds;
                     const nextBlacklist = state.blacklistNodeIds;
-                    this.onViewChange(prevViewId, nextViewId, nextFilter, nextBlacklist);
+                    viewTrace('Graph', 'viewChange:detected', {
+                        prevViewId,
+                        nextViewId,
+                        nextFilterCount: nextFilter?.length ?? 0,
+                        nextBlacklistCount: nextBlacklist?.length ?? 0,
+                    });
+                    this.onViewChange(prevViewId, nextFilter, nextBlacklist);
                     this.currentViewId = nextViewId;
                     this.currentFilterNodeIds = nextFilter;
                     this.currentBlacklistNodeIds = nextBlacklist;
@@ -201,9 +199,10 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
     updateState(appState: AppState): void {
         this.lastAppState = appState;
-        this.logViewTrace('updateState', {
-            totalTasks: Object.keys(appState.tasks).length,
-            totalDeps: Object.keys(appState.dependencies).length,
+        viewTrace('Graph', 'updateState:process', {
+            viewId: this.currentViewId,
+            taskCount: Object.keys(appState.tasks).length,
+            depCount: Object.keys(appState.dependencies).length,
         });
         this.processGraphData(appState, !this.currentFilterNodeIds);
     }
@@ -213,10 +212,13 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
      * @param restorePositions - Whether to restore saved positions from storage
      */
     private processGraphData(appState: AppState, restorePositions: boolean): void {
-        this.logViewTrace('processGraphData:start', {
+        viewTrace('Graph', 'processGraphData:start', {
+            viewId: this.currentViewId,
             restorePositions,
             inputTasks: Object.keys(appState.tasks).length,
             inputDeps: Object.keys(appState.dependencies).length,
+            filterCount: this.currentFilterNodeIds?.length ?? 0,
+            blacklistCount: this.currentBlacklistNodeIds?.length ?? 0,
         });
         // Apply client-side filter if active
         const taskList = this.applyFilter({
@@ -240,7 +242,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         if (restorePositions) {
             this.restorePositionsFromStorage(validNodeIds);
         }
-        this.logViewTrace('processGraphData:done', {
+        viewTrace('Graph', 'processGraphData:done', {
             outputTasks: Object.keys(graphData.tasks).length,
             outputDeps: Object.keys(graphData.dependencies).length,
         });
@@ -270,12 +272,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
         // Only use saved positions if we have good coverage of current nodes
         const coverageRatio = Object.keys(validPositions).length / currentNodeIds.size;
-        this.logViewTrace('restorePositions', {
-            savedCount: Object.keys(savedPositions).length,
-            validCount: Object.keys(validPositions).length,
-            currentNodeCount: currentNodeIds.size,
-            coverageRatio,
-        });
         if (coverageRatio > 0.5 && Object.keys(validPositions).length > 0) {
             this.simulationState = { positions: validPositions };
         } else if (Object.keys(savedPositions).length > 0) {
@@ -296,10 +292,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         const hasBlacklist = blacklistNodeIds && blacklistNodeIds.length > 0;
 
         if (!hasWhitelist && !hasBlacklist) {
-            this.logViewTrace('applyFilter:passthrough', {
-                visibleTasks: Object.keys(taskList.tasks).length,
-                visibleDeps: Object.keys(taskList.dependencies).length,
-            });
             return taskList;
         }
 
@@ -352,13 +344,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             }
         }
 
-        this.logViewTrace('applyFilter:filtered', {
-            whitelistCount: filterNodeIds?.length ?? 0,
-            blacklistCount: blacklistNodeIds?.length ?? 0,
-            visibleTasks: Object.keys(filteredTasks).length,
-            visibleDeps: Object.keys(filteredDeps).length,
-        });
-
         return {
             tasks: filteredTasks,
             dependencies: filteredDeps,
@@ -370,18 +355,16 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
      * Handle filter state changes: save/restore positions and reprocess graph.
      */
     private onFilterChange(prevFilter: string[] | null, newFilter: string[] | null): void {
-        this.logViewTrace('onFilterChange', {
-            prevFilterCount: prevFilter?.length ?? 0,
-            newFilterCount: newFilter?.length ?? 0,
+        viewTrace('Graph', 'filterChange', {
+            prevCount: prevFilter?.length ?? 0,
+            nextCount: newFilter?.length ?? 0,
+            viewId: this.currentViewId,
         });
         if (newFilter !== null && prevFilter === null) {
             // Filter activated: save current positions, pause persistence
             this.positionPersistence.savePositionsNow();
-            this.positionPersistence.setPaused(true);
-        } else if (newFilter === null && prevFilter !== null) {
-            // Filter cleared: resume persistence
-            this.positionPersistence.setPaused(false);
         }
+        this.updatePersistencePause();
 
         // Re-process graph data with new filter state
         if (this.lastAppState) {
@@ -397,30 +380,37 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
      */
     private onViewChange(
         prevViewId: string,
-        newViewId: string,
         newFilter: string[] | null,
         newBlacklist: string[] | null,
     ): void {
-        this.logViewTrace('onViewChange:start', {
-            fromViewId: prevViewId,
-            toViewId: newViewId,
-            nextFilterCount: newFilter?.length ?? 0,
-            nextBlacklistCount: newBlacklist?.length ?? 0,
+        viewTrace('Graph', 'viewChange:start', {
+            prevViewId,
+            newViewId: this.currentViewId,
+            newFilterCount: newFilter?.length ?? 0,
+            newBlacklistCount: newBlacklist?.length ?? 0,
         });
-
         // Persist the current graph state into the previous view before switching.
         this.positionPersistence.savePositionsNow(prevViewId);
 
         this.currentFilterNodeIds = newFilter;
         this.currentBlacklistNodeIds = newBlacklist;
-        this.positionPersistence.setPaused(newFilter !== null);
+        this.updatePersistencePause();
 
         if (this.lastAppState) {
             this.processGraphData(this.lastAppState, true);
         }
-        this.logViewTrace('onViewChange:done', {
-            toViewId: newViewId,
+        viewTrace('Graph', 'viewChange:done', {
+            prevViewId,
         });
+    }
+
+    private updatePersistencePause(): void {
+        const shouldPause = this.currentFilterNodeIds !== null;
+        viewTrace('Graph', 'persistencePause', {
+            shouldPause,
+            filterCount: this.currentFilterNodeIds?.length ?? 0,
+        });
+        this.positionPersistence.setPaused(shouldPause);
     }
 
     getNavigationHandle(): GraphNavigationHandle {

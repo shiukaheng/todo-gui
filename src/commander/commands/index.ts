@@ -29,6 +29,7 @@ import { reattachCommand } from './reattach';
 import { deleteviewCommand } from './deleteview';
 import { setviewCommand } from './setview';
 import { listviewsCommand } from './listviews';
+import { currentviewCommand } from './currentview';
 import { hideCommand } from './hide';
 import { unhideCommand } from './unhide';
 
@@ -60,6 +61,7 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(setviewCommand);
     commandRegistry.register(deleteviewCommand);
     commandRegistry.register(listviewsCommand);
+    commandRegistry.register(currentviewCommand);
     commandRegistry.register(hideCommand);
     commandRegistry.register(unhideCommand);
 }

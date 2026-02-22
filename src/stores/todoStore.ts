@@ -7,6 +7,7 @@ import {
     subscribeToState,
     subscribeToDisplay,
 } from 'todo-client';
+import { viewTrace } from '../utils/viewTrace';
 
 /** Navigation mode for the graph viewer */
 export type NavigationMode = 'auto' | 'manual' | 'follow' | 'fly';
@@ -69,18 +70,25 @@ function deriveViewFilters(displayData: ViewListOut | null, viewId: string): {
     filterNodeIds: string[] | null;
     blacklistNodeIds: string[] | null;
 } {
-    const viewData = displayData?.views?.[viewId];
-    return {
-        filterNodeIds: viewData?.whitelist?.length ? viewData.whitelist : null,
-        blacklistNodeIds: viewData?.blacklist?.length ? viewData.blacklist : null,
-    };
-}
+    if (!displayData) {
+        return {
+            filterNodeIds: null,
+            blacklistNodeIds: null,
+        };
+    }
 
-function logViewTrace(event: string, details: Record<string, unknown>): void {
-    console.log(`[ViewTrace][Store] ${event}`, {
-        ts: Date.now(),
-        ...details,
-    });
+    const viewData = displayData.views?.[viewId];
+    if (!viewData) {
+        return {
+            filterNodeIds: null,
+            blacklistNodeIds: null,
+        };
+    }
+
+    return {
+        filterNodeIds: viewData.whitelist?.length ? viewData.whitelist : null,
+        blacklistNodeIds: viewData.blacklist?.length ? viewData.blacklist : null,
+    };
 }
 
 export const useTodoStore = create<TodoStore>((set, get) => ({
@@ -115,13 +123,17 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     switchView: (viewId) => {
         const { displayData, currentViewId } = get();
         const { filterNodeIds, blacklistNodeIds } = deriveViewFilters(displayData, viewId);
-        logViewTrace('switchView', {
+        viewTrace('Store', 'switchView', {
             fromViewId: currentViewId,
             toViewId: viewId,
             whitelistCount: filterNodeIds?.length ?? 0,
             blacklistCount: blacklistNodeIds?.length ?? 0,
         });
-        set({ currentViewId: viewId, filterNodeIds, blacklistNodeIds });
+        set({
+            currentViewId: viewId,
+            filterNodeIds,
+            blacklistNodeIds,
+        });
     },
 
     disconnectDisplay: () => {
@@ -131,18 +143,23 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
 
     subscribeDisplay: (baseUrl: string) => {
         get().displayUnsubscribe?.();
+        viewTrace('Store', 'subscribeDisplay:start', { baseUrl });
 
         const unsubscribe = subscribeToDisplay(
             (data) => {
-                const currentViewId = get().currentViewId;
+                const { currentViewId } = get();
                 const { filterNodeIds, blacklistNodeIds } = deriveViewFilters(data, currentViewId);
-                logViewTrace('displaySSE:update', {
+                viewTrace('Store', 'displaySSE:update', {
                     currentViewId,
                     viewCount: Object.keys(data.views || {}).length,
                     whitelistCount: filterNodeIds?.length ?? 0,
                     blacklistCount: blacklistNodeIds?.length ?? 0,
                 });
-                set({ displayData: data, filterNodeIds, blacklistNodeIds });
+                set({
+                    displayData: data,
+                    filterNodeIds,
+                    blacklistNodeIds,
+                });
             },
             {
                 baseUrl,
@@ -179,6 +196,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     subscribe: (baseUrl: string) => {
         // Clean up existing subscription
         get().unsubscribe?.();
+        viewTrace('Store', 'subscribe:start', { baseUrl });
 
         set({
             connectionStatus: 'connecting',
@@ -190,6 +208,10 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
 
         const unsubscribe = subscribeToState(
             (data) => {
+                viewTrace('Store', 'stateSSE:update', {
+                    taskCount: Object.keys(data.tasks || {}).length,
+                    depCount: Object.keys(data.dependencies || {}).length,
+                });
                 set({
                     graphData: data,
                     connectionStatus: 'connected',
@@ -220,15 +242,19 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
         // Also subscribe to display layer
         const displayUnsubscribe = subscribeToDisplay(
             (data) => {
-                const currentViewId = get().currentViewId;
+                const { currentViewId } = get();
                 const { filterNodeIds, blacklistNodeIds } = deriveViewFilters(data, currentViewId);
-                logViewTrace('displaySSE:update', {
+                viewTrace('Store', 'displaySSE:update', {
                     currentViewId,
                     viewCount: Object.keys(data.views || {}).length,
                     whitelistCount: filterNodeIds?.length ?? 0,
                     blacklistCount: blacklistNodeIds?.length ?? 0,
                 });
-                set({ displayData: data, filterNodeIds, blacklistNodeIds });
+                set({
+                    displayData: data,
+                    filterNodeIds,
+                    blacklistNodeIds,
+                });
             },
             {
                 baseUrl,

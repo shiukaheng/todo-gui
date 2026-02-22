@@ -18,8 +18,7 @@ import {
     PinStatus,
 } from "../types";
 import { NestedGraphData } from "../../preprocess/nestGraphData";
-// MODULAR: Edge crossing detector (delete this line + 1 function call to remove)
-import { hasGoodLayout } from "../edgeCrossingDetector";
+import { viewTrace } from "../../../utils/viewTrace";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CUSTOM LAYOUT WITH EXPOSED TICK
@@ -288,27 +287,36 @@ export class WebColaEngine implements SimulationEngine {
             this.initialized = true;
 
             if (isFirstInit) {
-                // MODULAR: Check if saved positions are high quality (few edge crossings)
-                // DELETE these 5 lines to always use two-phase init:
+                // Temporarily disable quality-check and unconstrained first phase.
+                // Keep first init deterministic: always build constrained layout.
+                viewTrace('WebCola', 'savedLayoutQuality:disabled', {
+                    reason: 'temporary',
+                    decision: 'force-constrained-init',
+                    edgeCount: Object.keys(graph.dependencies).length,
+                });
+
+                /*
+                // Previous approach (temporarily disabled):
                 const edges = Object.values(graph.dependencies).map(dep => ({
                     fromId: dep.data.fromId,
                     toId: dep.data.toId
                 }));
-                const hasGoodSavedLayout = hasGoodLayout(prevState.positions, edges);
+                const report = evaluateLayoutQuality(prevState.positions, edges);
+                const hasGoodSavedLayout = report.good;
 
                 if (hasGoodSavedLayout) {
-                    // Saved positions are good quality - skip unconstrained phase
-                    console.log("[WebCola] Preserved saved positions (good layout detected)");
                     this.constraintsApplied = true;
                     this.lastMutationTime = null;
                     this.rebuildLayout(true);
                 } else {
-                    // Saved positions are poor quality or missing - do two-phase init
-                    console.log("[WebCola] Starting two-phase init (edge crossings detected or no saved positions)");
                     this.lastMutationTime = performance.now();
                     this.constraintsApplied = false;
                     this.rebuildLayout(false);
                 }
+                */
+                this.constraintsApplied = true;
+                this.lastMutationTime = null;
+                this.rebuildLayout(true);
             } else {
                 // Subsequent changes: go straight to constrained layout
                 this.constraintsApplied = true;

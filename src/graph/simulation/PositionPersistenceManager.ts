@@ -13,6 +13,7 @@
 
 import { SimulationState, Position } from "./types";
 import { useTodoStore } from "../../stores/todoStore";
+import { viewTrace } from "../../utils/viewTrace";
 
 /**
  * Configuration for the position persistence manager.
@@ -109,8 +110,7 @@ export class PositionPersistenceManager {
      */
     loadPositions(): Record<string, Position> {
         const { displayData, currentViewId } = useTodoStore.getState();
-        console.log("[ViewTrace][Position] loadPositions:start", {
-            ts: Date.now(),
+        viewTrace('Position', 'loadPositions:start', {
             currentViewId,
             viewCount: Object.keys(displayData?.views || {}).length,
         });
@@ -125,19 +125,14 @@ export class PositionPersistenceManager {
             if (Object.keys(positions).length > 0) {
                 console.log(`[PositionPersistence] Loaded ${Object.keys(positions).length} positions from view '${currentViewId}'`);
             }
-            console.log("[ViewTrace][Position] loadPositions:done", {
-                ts: Date.now(),
+            viewTrace('Position', 'loadPositions:done', {
                 currentViewId,
                 loadedCount: Object.keys(positions).length,
             });
             return positions;
         }
 
-        console.log("[ViewTrace][Position] loadPositions:done", {
-            ts: Date.now(),
-            currentViewId,
-            loadedCount: 0,
-        });
+        viewTrace('Position', 'loadPositions:missing-view', { currentViewId });
         return {};
     }
 
@@ -165,11 +160,10 @@ export class PositionPersistenceManager {
             for (const [nodeId, pos] of Object.entries(positions)) {
                 serverPositions[nodeId] = [pos.x, pos.y];
             }
-            console.log("[ViewTrace][Position] savePositionsNow", {
-                ts: Date.now(),
+            viewTrace('Position', 'savePositionsNow:send', {
                 currentViewId,
                 targetViewId,
-                positionCount: Object.keys(serverPositions).length,
+                count: Object.keys(serverPositions).length,
             });
             api.displayBatch({
                 displayBatchRequest: {
@@ -190,11 +184,8 @@ export class PositionPersistenceManager {
      * When paused, settlement detection and saving are skipped.
      */
     setPaused(paused: boolean): void {
+        viewTrace('Position', 'setPaused', { paused });
         this.paused = paused;
-        console.log("[ViewTrace][Position] setPaused", {
-            ts: Date.now(),
-            paused,
-        });
         if (paused) {
             // Cancel any pending save
             if (this.saveTimeoutId !== null) {

@@ -47,6 +47,16 @@ export interface EdgeCrossingConfig {
     sampleSize?: number;
 }
 
+export interface EdgeCrossingReport {
+    good: boolean;
+    ratio: number;
+    threshold: number;
+    mode: "exact" | "sampled" | "trivial";
+    crossings: number;
+    checkedPairs: number;
+    edgeCount: number;
+}
+
 const DEFAULT_CONFIG: Required<EdgeCrossingConfig> = {
     threshold: 0.05,
     samplingThreshold: 100,
@@ -66,24 +76,45 @@ export function hasGoodLayout(
     edges: EdgeForCrossing[],
     config: EdgeCrossingConfig = {}
 ): boolean {
+    return evaluateLayoutQuality(positions, edges, config).good;
+}
+
+export function evaluateLayoutQuality(
+    positions: Record<string, Position>,
+    edges: EdgeForCrossing[],
+    config: EdgeCrossingConfig = {}
+): EdgeCrossingReport {
     const cfg = { ...DEFAULT_CONFIG, ...config };
 
     if (edges.length < 2) {
-        // Trivial graph - no crossings possible
-        return true;
+        return {
+            good: true,
+            ratio: 0,
+            threshold: cfg.threshold,
+            mode: "trivial",
+            crossings: 0,
+            checkedPairs: 0,
+            edgeCount: edges.length,
+        };
     }
 
-    // Choose strategy based on graph size
-    let crossingRatio: number;
+    let result: { ratio: number; crossings: number; checkedPairs: number; mode: "exact" | "sampled" };
     if (edges.length <= cfg.samplingThreshold) {
-        // Small graph - check all pairs precisely
-        crossingRatio = calculateExactCrossingRatio(positions, edges);
+        result = calculateExactCrossingRatio(positions, edges);
     } else {
-        // Large graph - use sampling for speed
-        crossingRatio = estimateCrossingRatio(positions, edges, cfg.sampleSize);
+        result = estimateCrossingRatio(positions, edges, cfg.sampleSize);
     }
 
-    return crossingRatio < cfg.threshold;
+    const hasSignal = result.checkedPairs > 0;
+    return {
+        good: hasSignal && result.ratio < cfg.threshold,
+        ratio: result.ratio,
+        threshold: cfg.threshold,
+        mode: result.mode,
+        crossings: result.crossings,
+        checkedPairs: result.checkedPairs,
+        edgeCount: edges.length,
+    };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -99,7 +130,7 @@ export function hasGoodLayout(
 function calculateExactCrossingRatio(
     positions: Record<string, Position>,
     edges: EdgeForCrossing[]
-): number {
+): { ratio: number; crossings: number; checkedPairs: number; mode: "exact" } {
     let crossings = 0;
     let validPairs = 0;
 
@@ -131,7 +162,12 @@ function calculateExactCrossingRatio(
         }
     }
 
-    return validPairs > 0 ? crossings / validPairs : 0;
+    return {
+        ratio: validPairs > 0 ? crossings / validPairs : 0,
+        crossings,
+        checkedPairs: validPairs,
+        mode: "exact",
+    };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -148,7 +184,7 @@ function estimateCrossingRatio(
     positions: Record<string, Position>,
     edges: EdgeForCrossing[],
     sampleSize: number
-): number {
+): { ratio: number; crossings: number; checkedPairs: number; mode: "sampled" } {
     let crossings = 0;
     let validSamples = 0;
     const maxSamples = Math.min(sampleSize, edges.length * (edges.length - 1) / 2);
@@ -180,7 +216,12 @@ function estimateCrossingRatio(
         }
     }
 
-    return validSamples > 0 ? crossings / validSamples : 0;
+    return {
+        ratio: validSamples > 0 ? crossings / validSamples : 0,
+        crossings,
+        checkedPairs: validSamples,
+        mode: "sampled",
+    };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
