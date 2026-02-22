@@ -4,7 +4,6 @@
  * ===================================================================
  *
  * Persists node positions to the backend display layer (Views API).
- * Falls back to localStorage when no view is active.
  *
  * Monitors simulation positions and saves them when the graph settles.
  * On initialization, loads saved positions to restore previous layout.
@@ -27,23 +26,17 @@ export interface PositionPersistenceConfig {
 
     /** Debounce duration for saving to storage (ms). Default: 2000 (2 seconds) */
     saveDebounce?: number;
-
-    /** LocalStorage key for persisted positions (fallback). Default: "graph-positions" */
-    storageKey?: string;
 }
 
 const DEFAULT_CONFIG: Required<PositionPersistenceConfig> = {
     pollInterval: 1000,
     settlementThreshold: 0.5,
     saveDebounce: 2000,
-    storageKey: "graph-positions",
 };
 
 /**
  * Manages automatic persistence of node positions.
- *
- * When a view is active, saves to server via display batch API.
- * Falls back to localStorage otherwise.
+ * Saves to server via display batch API (update_view upsert).
  */
 export class PositionPersistenceManager {
     private config: Required<PositionPersistenceConfig>;
@@ -110,15 +103,13 @@ export class PositionPersistenceManager {
     }
 
     /**
-     * Load persisted positions from storage.
-     * Prefers server-backed view positions when available.
+     * Load persisted positions from the current view's server data.
      *
      * @returns Loaded positions, or empty object if none exist
      */
     loadPositions(): Record<string, Position> {
-        // Try server-backed view first
         const { displayData, currentViewId } = useTodoStore.getState();
-        if (currentViewId && displayData?.views?.[currentViewId]) {
+        if (displayData?.views?.[currentViewId]) {
             const view = displayData.views[currentViewId];
             const positions: Record<string, Position> = {};
             for (const [nodeId, coords] of Object.entries(view.positions)) {
@@ -128,27 +119,15 @@ export class PositionPersistenceManager {
             }
             if (Object.keys(positions).length > 0) {
                 console.log(`[PositionPersistence] Loaded ${Object.keys(positions).length} positions from view '${currentViewId}'`);
-                return positions;
             }
+            return positions;
         }
 
-        // Fallback to localStorage
-        try {
-            const stored = localStorage.getItem(this.config.storageKey);
-            if (!stored) {
-                return {};
-            }
-
-            const parsed = JSON.parse(stored) as Record<string, Position>;
-            return parsed;
-        } catch (err) {
-            console.error("[PositionPersistence] Failed to load positions:", err);
-            return {};
-        }
+        return {};
     }
 
     /**
-     * Manually save current positions to storage.
+     * Manually save current positions to server.
      * Normally called automatically when graph settles.
      */
     savePositionsNow(): void {
@@ -164,7 +143,6 @@ export class PositionPersistenceManager {
             return;
         }
 
-        // Save to server via upsert (creates view if not exists)
         const { api, currentViewId } = useTodoStore.getState();
         if (api) {
             const serverPositions: { [key: string]: Array<number> } = {};
@@ -182,16 +160,6 @@ export class PositionPersistenceManager {
             }).catch(err => {
                 console.error("[PositionPersistence] Failed to save to server:", err);
             });
-            return;
-        }
-
-        // Fallback to localStorage
-        try {
-            localStorage.setItem(this.config.storageKey, JSON.stringify(positions));
-            const count = Object.keys(positions).length;
-            console.log(`[PositionPersistence] Saved ${count} node positions to localStorage`);
-        } catch (err) {
-            console.error("[PositionPersistence] Failed to save positions:", err);
         }
     }
 
@@ -207,18 +175,6 @@ export class PositionPersistenceManager {
                 window.clearTimeout(this.saveTimeoutId);
                 this.saveTimeoutId = null;
             }
-        }
-    }
-
-    /**
-     * Clear persisted positions from storage.
-     */
-    clearPersistedPositions(): void {
-        try {
-            localStorage.removeItem(this.config.storageKey);
-            console.log("[PositionPersistence] Cleared persisted positions");
-        } catch (err) {
-            console.error("[PositionPersistence] Failed to clear positions:", err);
         }
     }
 

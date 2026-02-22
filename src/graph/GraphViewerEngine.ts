@@ -217,7 +217,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     }
 
     /**
-     * Load saved positions from localStorage and apply if coverage is sufficient.
+     * Load saved positions from server and apply if coverage is sufficient.
      */
     private restorePositionsFromStorage(currentNodeIds: Set<string>): void {
         const savedPositions = this.positionPersistence.loadPositions();
