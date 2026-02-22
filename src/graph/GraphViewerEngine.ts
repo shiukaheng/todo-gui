@@ -73,6 +73,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private lastFilterKey = '';
     private initialPositionsFetched = false;
     private _positionState: 'undefined' | 'ready' = 'undefined';
+    private _coreGraphPaused = true;
     private plansData: ProcessedPlansData = EMPTY_PLANS_DATA;
     private styledPlansData: StyledPlansData = { plans: {} };
     private simulationEngine: SimulationEngine;
@@ -97,6 +98,33 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         if (next !== this._positionState) {
             console.log(`[PosState] ${this._positionState} → ${next}`);
             this._positionState = next;
+        }
+    }
+
+    /**
+     * Pause core graph updates. While paused, incoming state from updateState()
+     * is saved to lastAppState but processGraphData() is deferred.
+     * The render loop continues with whatever graphData was last set.
+     */
+    private pauseCoreGraphUpdates(): void {
+        if (!this._coreGraphPaused) {
+            console.log('[CoreGraph] paused');
+            this._coreGraphPaused = true;
+        }
+    }
+
+    /**
+     * Unpause and flush: reprocesses graph with latest appState and current filters.
+     */
+    private unpauseCoreGraphUpdates(): void {
+        if (this._coreGraphPaused) {
+            this._coreGraphPaused = false;
+            if (this.lastAppState) {
+                console.log(`[CoreGraph] unpaused, flushing (${Object.keys(this.lastAppState.tasks).length} tasks, filter=${this.currentFilterNodeIds?.length ?? 'none'})`);
+                this.processGraphData(this.lastAppState);
+            } else {
+                console.log('[CoreGraph] unpaused, nothing to flush');
+            }
         }
     }
 
@@ -215,12 +243,21 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
     updateState(appState: AppState): void {
         this.lastAppState = appState;
-        viewTrace('Graph', 'updateState:process', {
-            viewId: this.lastActiveView,
-            taskCount: Object.keys(appState.tasks).length,
-            depCount: Object.keys(appState.dependencies).length,
-        });
-        this.processGraphData(appState);
+
+        if (!this._coreGraphPaused) {
+            viewTrace('Graph', 'updateState:process', {
+                viewId: this.lastActiveView,
+                taskCount: Object.keys(appState.tasks).length,
+                depCount: Object.keys(appState.dependencies).length,
+            });
+            this.processGraphData(appState);
+        } else {
+            console.log(`[CoreGraph] updateState buffered (${Object.keys(appState.tasks).length} tasks held)`);
+            viewTrace('Graph', 'updateState:buffered', {
+                viewId: this.lastActiveView,
+                taskCount: Object.keys(appState.tasks).length,
+            });
+        }
 
         // Fetch initial positions on first update (baseUrl is now guaranteed set)
         if (!this.initialPositionsFetched) {
@@ -228,6 +265,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             const viewId = this.lastActiveView ?? 'default';
             console.log(`[View] INIT fetching positions for '${viewId}'`);
             this.positionPersistence.fetchPositions(viewId).then((positions) => {
+                this.unpauseCoreGraphUpdates();
                 if (positions) {
                     console.log(`[View] INIT got ${Object.keys(positions).length} positions, applying...`);
                     this.applyFetchedPositions(positions);
@@ -427,23 +465,32 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         // Note: no auto-save on view switch. Use 'savepos' command.
         this.setPositionState('undefined');
 
+        // Pause core graph updates — the render loop keeps showing the old view
+        // while we fetch positions for the new one.
+        this.pauseCoreGraphUpdates();
+
         this.currentFilterNodeIds = newFilter;
         this.currentHideNodeIds = newHide;
         this.updatePersistencePause();
 
-        if (this.lastAppState) {
-            this.processGraphData(this.lastAppState);
-        }
-
         // Fetch positions for the new view async
         console.log(`[View] fetching positions for next view '${nextViewId}'...`);
         this.positionPersistence.fetchPositions(nextViewId).then((positions) => {
+            // Unpause first: flushes buffered state → processGraphData runs
+            // with new view's filters, producing correct graphData.
+            this.unpauseCoreGraphUpdates();
+
+            // Now apply fetched positions on top of the new graphData.
             if (positions) {
                 console.log(`[View] got ${Object.keys(positions).length} positions for '${nextViewId}', applying...`);
                 this.applyFetchedPositions(positions);
             } else {
                 console.log(`[View] no positions returned for '${nextViewId}'`);
             }
+            this.setPositionState('ready');
+        }).catch((err) => {
+            console.error('[View] position fetch failed:', err);
+            this.unpauseCoreGraphUpdates();
             this.setPositionState('ready');
         });
     }
