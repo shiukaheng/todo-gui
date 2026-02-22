@@ -231,10 +231,9 @@ export class PositionPersistenceManager {
         // Check if settled
         const settled = this.isGraphSettled(this.lastPositions, currentPositions);
 
-        // Detect transition: unsettled → settled
+        // Detect transition: unsettled → settled (auto-save disabled, use savepos command)
         if (!this.isCurrentlySettled && settled) {
-            console.log(`[Pos] SETTLED — scheduling save (debounce=${this.config.saveDebounce}ms)`);
-            this.scheduleSave();
+            console.log(`[Pos] SETTLED (auto-save disabled — use 'savepos' command)`);
         }
 
         // Update state

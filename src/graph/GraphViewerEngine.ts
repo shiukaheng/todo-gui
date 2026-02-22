@@ -70,6 +70,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private currentFilterNodeIds: string[] | null = null;
     private currentHideNodeIds: string[] | null = null;
     private lastActiveView: string | null = null;
+    private initialPositionsFetched = false;
     private plansData: ProcessedPlansData = EMPTY_PLANS_DATA;
     private styledPlansData: StyledPlansData = { plans: {} };
     private simulationEngine: SimulationEngine;
@@ -129,16 +130,8 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         this.currentNavigationMode = useTodoStore.getState().navigationMode;
         this.navigationEngine = this.createNavigationEngine(this.currentNavigationMode);
 
-        // Fetch initial positions for the active view
-        console.log(`[View] INIT fetching positions for activeView='${initialStoreState.activeView}'`);
-        this.positionPersistence.fetchPositions(initialStoreState.activeView).then((positions) => {
-            if (positions) {
-                console.log(`[View] INIT got ${Object.keys(positions).length} positions, applying...`);
-                this.applyFetchedPositions(positions);
-            } else {
-                console.log(`[View] INIT no positions for '${initialStoreState.activeView}'`);
-            }
-        });
+        // Initial position fetch happens on first updateState() call,
+        // when baseUrl is guaranteed to be set (SSE is already connected).
 
         // Subscribe to mode and filter changes
         this.storeUnsubscribe = useTodoStore.subscribe(
@@ -203,6 +196,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         this.inputHandler.setCallback((event) => this.interactionController.handleEvent(event));
 
         this.positionPersistence.start(() => this.simulationState);
+        useTodoStore.setState({ savePositionsCallback: () => this.positionPersistence.savePositionsNow() });
 
         this.lastFrameTime = performance.now();
         this.startLoop();
@@ -216,6 +210,21 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             depCount: Object.keys(appState.dependencies).length,
         });
         this.processGraphData(appState);
+
+        // Fetch initial positions on first update (baseUrl is now guaranteed set)
+        if (!this.initialPositionsFetched) {
+            this.initialPositionsFetched = true;
+            const viewId = this.lastActiveView ?? 'default';
+            console.log(`[View] INIT fetching positions for '${viewId}'`);
+            this.positionPersistence.fetchPositions(viewId).then((positions) => {
+                if (positions) {
+                    console.log(`[View] INIT got ${Object.keys(positions).length} positions, applying...`);
+                    this.applyFetchedPositions(positions);
+                } else {
+                    console.log(`[View] INIT no positions for '${viewId}'`);
+                }
+            });
+        }
     }
 
     /**
@@ -646,6 +655,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             this.animationFrameId = null;
         }
         this.positionPersistence.stop();
+        useTodoStore.setState({ savePositionsCallback: null });
         this.storeUnsubscribe?.();
         this.storeUnsubscribe = null;
         this.inputHandler.destroy();

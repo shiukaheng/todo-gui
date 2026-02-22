@@ -48,6 +48,9 @@ interface TodoStore {
     activeView: string;
     displayUnsubscribe: (() => void) | null;
 
+    // Engine callbacks (set by GraphViewerEngine)
+    savePositionsCallback: (() => void) | null;
+
     // Actions
     setCursor: (nodeId: string | null) => void;
     setNavInfoText: (text: string | null) => void;
@@ -109,6 +112,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     displayData: null,
     activeView: 'default',
     displayUnsubscribe: null,
+    savePositionsCallback: null,
 
     setCursor: (nodeId) => set({ cursor: nodeId }),
     setNavInfoText: (text) => set({ navInfoText: text }),
