@@ -20,38 +20,37 @@ export type SimulationMode = 'cola' | 'force';
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 interface TodoStore {
-    // State
+    // ── Server-authoritative state (global graph) ────────────────────
+    // Pushed via SSE; never persisted locally.
     graphData: AppState | null;
+
+    // ── Server-authoritative state (display / views) ─────────────────
+    // Pushed via display SSE; never persisted locally.
+    displayData: ViewListOut | null;
+
+    // ── Local persisted state (survives refresh via localStorage) ─────
+    // See `partialize` at the bottom for what gets persisted.
+    activeView: string;
+
+    // ── Transient UI state (lost on refresh) ─────────────────────────
     cursor: string | null;
+    pendingCursors: string[];
     navInfoText: string | null;
     navigationMode: NavigationMode;
     simulationMode: SimulationMode;
+    commandPlaneVisible: boolean;
+    savePositionsCallback: (() => void) | null;
 
-    // Connection state
+    // ── Connection / runtime (lost on refresh) ───────────────────────
     connectionStatus: ConnectionStatus;
     baseUrl: string | null;
     lastError: string | null;
     lastDataReceived: number | null;
-
-    // API client (set after subscribe)
     api: TodoApi | null;
     unsubscribe: (() => void) | null;
-
-    // Command plane state
-    commandPlaneVisible: boolean;
-
-    // Display layer state (server-authoritative)
-    displayData: ViewListOut | null;
-    activeView: string;
     displayUnsubscribe: (() => void) | null;
 
-    // Engine callbacks (set by GraphViewerEngine)
-    savePositionsCallback: (() => void) | null;
-
-    // Internal pending cursor queue
-    pendingCursors: string[];
-
-    // Actions
+    // ── Actions ──────────────────────────────────────────────────────
     setCursor: (nodeId: string | null) => void;
     queueCursor: (nodeId: string) => void;
     setNavInfoText: (text: string | null) => void;
@@ -105,23 +104,30 @@ function resolvePendingCursors(
 }
 
 export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
+    // ── Server-authoritative ─────────────────────────────────────────
     graphData: null,
+    displayData: null,
+
+    // ── Local persisted ──────────────────────────────────────────────
+    activeView: 'default',
+
+    // ── Transient UI ─────────────────────────────────────────────────
     cursor: null,
+    pendingCursors: [],
     navInfoText: null,
-    navigationMode: 'auto',
-    simulationMode: 'cola',
-    connectionStatus: 'disconnected',
+    navigationMode: 'auto' as NavigationMode,
+    simulationMode: 'cola' as SimulationMode,
+    commandPlaneVisible: false,
+    savePositionsCallback: null,
+
+    // ── Connection / runtime ─────────────────────────────────────────
+    connectionStatus: 'disconnected' as ConnectionStatus,
     baseUrl: null,
     lastError: null,
     lastDataReceived: null,
     api: null,
     unsubscribe: null,
-    commandPlaneVisible: false,
-    displayData: null,
-    activeView: 'default',
     displayUnsubscribe: null,
-    savePositionsCallback: null,
-    pendingCursors: [],
 
     setCursor: (nodeId) => set({ cursor: nodeId }),
     queueCursor: (nodeId) => {

@@ -33,6 +33,7 @@ import { currentviewCommand } from './currentview';
 import { hideCommand } from './hide';
 import { unhideCommand } from './unhide';
 import { saveposCommand } from './savepos';
+import { mergeCommand } from './merge';
 
 /** Register all built-in commands */
 export function registerBuiltinCommands(): void {
@@ -66,4 +67,5 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(hideCommand);
     commandRegistry.register(unhideCommand);
     commandRegistry.register(saveposCommand);
+    commandRegistry.register(mergeCommand);
 }
