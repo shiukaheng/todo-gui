@@ -109,7 +109,7 @@ const DEFAULT_CONFIG: Required<WebColaConfig> = {
     symmetricDiffLinkLengths: false,
     convergenceThreshold: 0.01,
     constraints: [],
-    virtualRoot: true,
+    virtualRoot: false,
     componentGrouping: false,
     componentPadding: 20,
 };
