@@ -164,9 +164,9 @@ export class PositionPersistenceManager {
             return;
         }
 
-        // Try server-backed save
+        // Save to server via upsert (creates view if not exists)
         const { api, currentViewId } = useTodoStore.getState();
-        if (api && currentViewId) {
+        if (api) {
             const serverPositions: { [key: string]: Array<number> } = {};
             for (const [nodeId, pos] of Object.entries(positions)) {
                 serverPositions[nodeId] = [pos.x, pos.y];
@@ -174,7 +174,7 @@ export class PositionPersistenceManager {
             api.displayBatch({
                 displayBatchRequest: {
                     operations: [{
-                        op: 'update_positions',
+                        op: 'update_view',
                         viewId: currentViewId,
                         positions: serverPositions,
                     }],

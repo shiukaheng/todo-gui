@@ -30,6 +30,8 @@ import { createviewCommand } from './createview';
 import { deleteviewCommand } from './deleteview';
 import { switchviewCommand } from './switchview';
 import { listviewsCommand } from './listviews';
+import { hideCommand } from './hide';
+import { unhideCommand } from './unhide';
 
 /** Register all built-in commands */
 export function registerBuiltinCommands(): void {
@@ -60,4 +62,6 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(deleteviewCommand);
     commandRegistry.register(switchviewCommand);
     commandRegistry.register(listviewsCommand);
+    commandRegistry.register(hideCommand);
+    commandRegistry.register(unhideCommand);
 }

@@ -31,14 +31,14 @@ export const switchviewCommand: CommandDefinition = {
             return;
         }
 
-        const { displayData, setCurrentView } = useTodoStore.getState();
+        const { displayData, switchView } = useTodoStore.getState();
 
         if (!displayData?.views?.[viewId]) {
             output.error(`view not found: ${viewId}`);
             return;
         }
 
-        setCurrentView(viewId);
+        switchView(viewId);
         output.success(`switched to view: ${viewId}`);
     },
 };

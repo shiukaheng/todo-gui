@@ -40,10 +40,11 @@ interface TodoStore {
 
     // Client-side filter state
     filterNodeIds: string[] | null;
+    blacklistNodeIds: string[] | null;
 
     // Display layer state
     displayData: ViewListOut | null;
-    currentViewId: string | null;
+    currentViewId: string;
     displayUnsubscribe: (() => void) | null;
 
     // Actions
@@ -55,7 +56,9 @@ interface TodoStore {
     hideCommandPlane: () => void;
     setFilter: (nodeIds: string[]) => void;
     clearFilter: () => void;
-    setCurrentView: (viewId: string | null) => void;
+    setBlacklist: (nodeIds: string[]) => void;
+    clearBlacklist: () => void;
+    switchView: (viewId: string) => void;
     subscribeDisplay: (baseUrl: string) => () => void;
     disconnectDisplay: () => void;
     subscribe: (baseUrl: string) => () => void;
@@ -76,8 +79,9 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     unsubscribe: null,
     commandPlaneVisible: false,
     filterNodeIds: null,
+    blacklistNodeIds: null,
     displayData: null,
-    currentViewId: null,
+    currentViewId: 'default',
     displayUnsubscribe: null,
 
     setCursor: (nodeId) => set({ cursor: nodeId }),
@@ -88,7 +92,19 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     hideCommandPlane: () => set({ commandPlaneVisible: false }),
     setFilter: (nodeIds) => set({ filterNodeIds: nodeIds }),
     clearFilter: () => set({ filterNodeIds: null }),
-    setCurrentView: (viewId) => set({ currentViewId: viewId }),
+    setBlacklist: (nodeIds) => set({ blacklistNodeIds: nodeIds }),
+    clearBlacklist: () => set({ blacklistNodeIds: null }),
+    switchView: (viewId) => {
+        const { displayData } = get();
+        const viewData = displayData?.views?.[viewId];
+        const filterNodeIds = viewData?.whitelist?.length
+            ? viewData.whitelist
+            : null;
+        const blacklistNodeIds = viewData?.blacklist?.length
+            ? viewData.blacklist
+            : null;
+        set({ currentViewId: viewId, filterNodeIds, blacklistNodeIds });
+    },
 
     disconnectDisplay: () => {
         get().displayUnsubscribe?.();
@@ -128,6 +144,9 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
             connectionStatus: 'disconnected',
             graphData: null,
             displayData: null,
+            currentViewId: 'default',
+            filterNodeIds: null,
+            blacklistNodeIds: null,
         });
     },
 

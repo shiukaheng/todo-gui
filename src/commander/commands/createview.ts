@@ -17,6 +17,14 @@ export const createviewCommand: CommandDefinition = {
             required: true,
         },
     ],
+    options: [
+        {
+            name: 'fork',
+            alias: 'f',
+            description: 'Fork from existing view (copies positions, whitelist, blacklist)',
+            type: 'string',
+        },
+    ],
     handler: async (args) => {
         const viewId = args._[0] as string | undefined;
         if (!viewId) {
@@ -24,20 +32,44 @@ export const createviewCommand: CommandDefinition = {
             return;
         }
 
-        const api = useTodoStore.getState().api;
+        const { api, displayData, switchView } = useTodoStore.getState();
         if (!api) {
             output.error('not connected to server');
             return;
         }
 
+        const forkFrom = args.fork as string | undefined;
+
         try {
-            await api.displayBatch({
-                displayBatchRequest: {
-                    operations: [{ op: 'create_view', id: viewId }],
-                },
-            });
-            useTodoStore.getState().setCurrentView(viewId);
-            output.success(`created view: ${viewId}`);
+            if (forkFrom) {
+                const sourceView = displayData?.views?.[forkFrom];
+                if (!sourceView) {
+                    output.error(`source view not found: ${forkFrom}`);
+                    return;
+                }
+                // Upsert new view with source's data
+                await api.displayBatch({
+                    displayBatchRequest: {
+                        operations: [{
+                            op: 'update_view',
+                            viewId,
+                            positions: sourceView.positions,
+                            whitelist: sourceView.whitelist,
+                            blacklist: sourceView.blacklist,
+                        }],
+                    },
+                });
+            } else {
+                // Upsert empty view
+                await api.displayBatch({
+                    displayBatchRequest: {
+                        operations: [{ op: 'update_view', viewId }],
+                    },
+                });
+            }
+
+            switchView(viewId);
+            output.success(`created view: ${viewId}${forkFrom ? ` (forked from ${forkFrom})` : ''}`);
         } catch (err) {
             output.error(`failed to create view: ${err instanceof Error ? err.message : String(err)}`);
         }

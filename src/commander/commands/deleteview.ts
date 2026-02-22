@@ -31,21 +31,28 @@ export const deleteviewCommand: CommandDefinition = {
             return;
         }
 
-        const { api, currentViewId, setCurrentView } = useTodoStore.getState();
+        if (viewId === 'default') {
+            output.error('cannot delete the default view');
+            return;
+        }
+
+        const { api, currentViewId, switchView } = useTodoStore.getState();
         if (!api) {
             output.error('not connected to server');
             return;
         }
 
         try {
+            // If deleting the current view, switch to default first
+            if (currentViewId === viewId) {
+                switchView('default');
+            }
+
             await api.displayBatch({
                 displayBatchRequest: {
                     operations: [{ op: 'delete_view', id: viewId }],
                 },
             });
-            if (currentViewId === viewId) {
-                setCurrentView(null);
-            }
             output.success(`deleted view: ${viewId}`);
         } catch (err) {
             output.error(`failed to delete view: ${err instanceof Error ? err.message : String(err)}`);

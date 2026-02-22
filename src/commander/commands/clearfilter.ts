@@ -20,15 +20,15 @@ export const clearfilterCommand: CommandDefinition = {
 
         clearFilter();
 
-        // Clear whitelist on server if connected
+        // Clear whitelist on server (upserts view if needed)
         const { api, currentViewId } = useTodoStore.getState();
-        if (api && currentViewId) {
+        if (api) {
             api.displayBatch({
                 displayBatchRequest: {
                     operations: [{
-                        op: 'set_whitelist',
+                        op: 'update_view',
                         viewId: currentViewId,
-                        nodeIds: [],
+                        whitelist: [],
                     }],
                 },
             }).catch(err => {

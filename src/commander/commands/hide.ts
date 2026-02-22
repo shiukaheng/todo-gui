@@ -1,42 +1,37 @@
 /**
- * Filter command - client-side filter to show only specified nodes and their recursive children.
+ * Hide command - hide specific nodes from the graph (blacklist).
  */
 
 import { CommandDefinition } from '../types';
 import { useTodoStore } from '../../stores/todoStore';
 import { output } from '../output';
 
-export const filterCommand: CommandDefinition = {
-    name: 'filter',
-    description: 'Filter graph to show only specified nodes and their children',
-    aliases: ['f'],
+export const hideCommand: CommandDefinition = {
+    name: 'hide',
+    description: 'Hide specific nodes from the graph',
     positionals: [
         {
             name: 'nodeIds',
-            description: 'Node IDs to filter on (uses cursor if omitted)',
+            description: 'Node IDs to hide (uses cursor if omitted)',
             required: false,
             complete: (partial) => {
                 const graphData = useTodoStore.getState().graphData;
                 if (!graphData?.tasks) return [];
-
-                const taskIds = Object.keys(graphData.tasks);
-                return taskIds.filter(id =>
+                return Object.keys(graphData.tasks).filter(id =>
                     id.toLowerCase().startsWith(partial.toLowerCase())
                 );
             },
         },
     ],
     handler: (args) => {
-        const { graphData, cursor, setFilter } = useTodoStore.getState();
+        const { graphData, cursor, blacklistNodeIds, setBlacklist } = useTodoStore.getState();
 
         if (!graphData?.tasks) {
             output.error('no graph data available');
             return;
         }
 
-        // Collect node IDs: all positional args, or cursor if none provided
         let nodeIds = args._ as string[];
-
         if (nodeIds.length === 0) {
             if (!cursor) {
                 output.error('no nodes specified and no cursor set');
@@ -53,9 +48,16 @@ export const filterCommand: CommandDefinition = {
             }
         }
 
-        setFilter(nodeIds);
+        // Merge with existing blacklist
+        const current = new Set(blacklistNodeIds || []);
+        for (const id of nodeIds) {
+            current.add(id);
+        }
+        const merged = Array.from(current);
 
-        // Persist whitelist to current view (upserts view if needed)
+        setBlacklist(merged);
+
+        // Persist blacklist to current view (upserts view if needed)
         const { api, currentViewId } = useTodoStore.getState();
         if (api) {
             api.displayBatch({
@@ -63,14 +65,14 @@ export const filterCommand: CommandDefinition = {
                     operations: [{
                         op: 'update_view',
                         viewId: currentViewId,
-                        whitelist: nodeIds,
+                        blacklist: merged,
                     }],
                 },
             }).catch(err => {
-                console.error('Failed to persist whitelist:', err);
+                console.error('Failed to persist blacklist:', err);
             });
         }
 
-        output.success(`filter active: ${nodeIds.join(', ')}`);
+        output.success(`hidden: ${nodeIds.join(', ')}`);
     },
 };

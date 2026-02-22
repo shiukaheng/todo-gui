@@ -67,6 +67,8 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private graphData: ProcessedGraphData | null = null;
     private lastAppState: AppState | null = null;
     private currentFilterNodeIds: string[] | null = null;
+    private currentBlacklistNodeIds: string[] | null = null;
+    private currentViewId: string;
     private plansData: ProcessedPlansData = EMPTY_PLANS_DATA;
     private styledPlansData: StyledPlansData = { plans: {} };
     private simulationEngine: SimulationEngine;
@@ -114,6 +116,9 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
         this.positionPersistence = new PositionPersistenceManager();
 
+        // Initialize view ID
+        this.currentViewId = useTodoStore.getState().currentViewId;
+
         // Initialize simulation engine based on store mode
         this.currentSimulationMode = useTodoStore.getState().simulationMode;
         this.simulationEngine = this.createSimulationEngine(this.currentSimulationMode);
@@ -136,6 +141,16 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
                 if (state.filterNodeIds !== this.currentFilterNodeIds) {
                     this.onFilterChange(this.currentFilterNodeIds, state.filterNodeIds);
                     this.currentFilterNodeIds = state.filterNodeIds;
+                }
+                if (state.blacklistNodeIds !== this.currentBlacklistNodeIds) {
+                    this.currentBlacklistNodeIds = state.blacklistNodeIds;
+                    if (this.lastAppState) {
+                        this.processGraphData(this.lastAppState, false);
+                    }
+                }
+                if (state.currentViewId !== this.currentViewId) {
+                    this.onViewChange(state.currentViewId);
+                    this.currentViewId = state.currentViewId;
                 }
             }
         );
@@ -233,40 +248,51 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     }
 
     /**
-     * Apply client-side filter: keep only filter root nodes and their recursive children.
-     * Returns the input unchanged if no filter is active.
+     * Apply client-side filter (whitelist) and blacklist.
+     * Whitelist: keep only filter root nodes and their recursive children.
+     * Blacklist: remove specific nodes.
+     * Returns the input unchanged if neither is active.
      */
     private applyFilter(taskList: NodeListOut): NodeListOut {
         const filterNodeIds = this.currentFilterNodeIds;
-        if (!filterNodeIds || filterNodeIds.length === 0) {
+        const blacklistNodeIds = this.currentBlacklistNodeIds;
+        const hasWhitelist = filterNodeIds && filterNodeIds.length > 0;
+        const hasBlacklist = blacklistNodeIds && blacklistNodeIds.length > 0;
+
+        if (!hasWhitelist && !hasBlacklist) {
             return taskList;
         }
 
-        // Build parent → children adjacency from dependencies
-        // Edge semantics: fromId is parent, toId is child
-        const childrenMap = new Map<string, string[]>();
-        for (const dep of Object.values(taskList.dependencies)) {
-            const fromId = dep.fromId;
-            const toId = dep.toId;
-            if (!childrenMap.has(fromId)) childrenMap.set(fromId, []);
-            childrenMap.get(fromId)!.push(toId);
+        // Start with all nodes visible
+        let visible = new Set<string>(Object.keys(taskList.tasks));
+
+        // Apply whitelist: restrict to filter roots + recursive children
+        if (hasWhitelist) {
+            // Build parent → children adjacency from dependencies
+            const childrenMap = new Map<string, string[]>();
+            for (const dep of Object.values(taskList.dependencies)) {
+                if (!childrenMap.has(dep.fromId)) childrenMap.set(dep.fromId, []);
+                childrenMap.get(dep.fromId)!.push(dep.toId);
+            }
+
+            // BFS from filter roots
+            visible = new Set<string>();
+            const queue = [...filterNodeIds];
+            while (queue.length > 0) {
+                const nodeId = queue.shift()!;
+                if (visible.has(nodeId)) continue;
+                if (!taskList.tasks[nodeId]) continue;
+                visible.add(nodeId);
+                for (const childId of childrenMap.get(nodeId) || []) {
+                    if (!visible.has(childId)) queue.push(childId);
+                }
+            }
         }
 
-        // BFS from filter roots to collect all visible nodes
-        const visible = new Set<string>();
-        const queue = [...filterNodeIds];
-
-        while (queue.length > 0) {
-            const nodeId = queue.shift()!;
-            if (visible.has(nodeId)) continue;
-            if (!taskList.tasks[nodeId]) continue;
-            visible.add(nodeId);
-
-            const children = childrenMap.get(nodeId) || [];
-            for (const childId of children) {
-                if (!visible.has(childId)) {
-                    queue.push(childId);
-                }
+        // Apply blacklist: remove hidden nodes
+        if (hasBlacklist) {
+            for (const nodeId of blacklistNodeIds) {
+                visible.delete(nodeId);
             }
         }
 
@@ -312,6 +338,16 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             const shouldRestore = newFilter === null;
             this.currentFilterNodeIds = newFilter;
             this.processGraphData(this.lastAppState, shouldRestore);
+        }
+    }
+
+    /**
+     * Handle view switch: save current positions, then reload from new view.
+     */
+    private onViewChange(newViewId: string): void {
+        this.positionPersistence.savePositionsNow();
+        if (this.lastAppState) {
+            this.processGraphData(this.lastAppState, true);
         }
     }
 
