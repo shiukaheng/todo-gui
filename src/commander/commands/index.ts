@@ -24,7 +24,7 @@ import { pushtoplanCommand } from './pushtoplan';
 import { popfromplanCommand } from './popfromplan';
 import { renameplanCommand } from './renameplan';
 import { filterCommand } from './filter';
-import { clearfilterCommand } from './clearfilter';
+import { resetviewCommand } from './resetview';
 import { reattachCommand } from './reattach';
 import { deleteviewCommand } from './deleteview';
 import { setviewCommand } from './setview';
@@ -57,7 +57,7 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(popfromplanCommand);
     commandRegistry.register(renameplanCommand);
     commandRegistry.register(filterCommand);
-    commandRegistry.register(clearfilterCommand);
+    commandRegistry.register(resetviewCommand);
     commandRegistry.register(reattachCommand);
     commandRegistry.register(setviewCommand);
     commandRegistry.register(deleteviewCommand);

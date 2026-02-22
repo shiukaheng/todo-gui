@@ -385,7 +385,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
     /**
      * Handle filter/hide changes (derived from displayData).
-     * Reprocesses graph and fetches positions when filter is cleared.
+     * Reprocesses graph and fetches positions when view is reset.
      */
     private onFilterChange(prevFilter: string[] | null, newFilter: string[] | null): void {
         viewTrace('Graph', 'filterChange', {
@@ -398,7 +398,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         if (this.lastAppState) {
             this.processGraphData(this.lastAppState);
 
-            // When clearing filter, restore saved positions from server
+            // When filter removed (e.g. resetview), restore saved positions from server
             if (newFilter === null && prevFilter !== null) {
                 const viewId = this.lastActiveView;
                 if (viewId) {

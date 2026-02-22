@@ -1,5 +1,5 @@
 /**
- * Clearfilter command - clear whitelist on current view (server-side).
+ * Resetview command - clear all filters and hides on the current view (server-side).
  * The display SSE will push the update back, triggering graph reprocessing.
  */
 
@@ -7,16 +7,16 @@ import { CommandDefinition } from '../types';
 import { useTodoStore, deriveViewFilters } from '../../stores/todoStore';
 import { output } from '../output';
 
-export const clearfilterCommand: CommandDefinition = {
-    name: 'clearfilter',
-    description: 'Clear the active graph filter',
-    aliases: ['cf'],
+export const resetviewCommand: CommandDefinition = {
+    name: 'resetview',
+    description: 'Reset current view (clear filter and hidden nodes)',
+    aliases: ['rv'],
     handler: () => {
         const { displayData, activeView, api } = useTodoStore.getState();
-        const { filterNodeIds } = deriveViewFilters(displayData, activeView);
+        const { filterNodeIds, hideNodeIds } = deriveViewFilters(displayData, activeView);
 
-        if (filterNodeIds === null) {
-            output.error('no filter is active');
+        if (filterNodeIds === null && (hideNodeIds === null || hideNodeIds.length === 0)) {
+            output.error('view already has no filter or hidden nodes');
             return;
         }
 
@@ -31,12 +31,13 @@ export const clearfilterCommand: CommandDefinition = {
                     op: 'update_view',
                     view_id: activeView,
                     whitelist: [],
+                    blacklist: [],
                 } as any],
             },
         }).catch(err => {
-            output.error(`failed to clear filter: ${err}`);
+            output.error(`failed to reset view: ${err}`);
         });
 
-        output.success('filter cleared');
+        output.success('view reset');
     },
 };
