@@ -14,7 +14,7 @@ interface Task {
     isActionable?: boolean;
     calculatedDue?: number | null;
     due?: number | null;
-    completed?: boolean;
+    completed?: number | null;
     children?: string[];
     parents?: string[];
 }
@@ -184,7 +184,7 @@ export function NodeDetailOverlay() {
         try {
             await api.batchOperationsApiBatchPost({
                 batchRequest: {
-                    operations: [{ op: 'update_node', id: task.id, completed: !task.completed }],
+                    operations: [{ op: 'update_node', id: task.id, completed: task.completed != null ? null : Math.floor(Date.now() / 1000) }],
                 },
             });
         } catch (err) {

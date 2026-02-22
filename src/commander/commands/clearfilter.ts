@@ -19,6 +19,23 @@ export const clearfilterCommand: CommandDefinition = {
         }
 
         clearFilter();
+
+        // Clear whitelist on server if connected
+        const { api, currentViewId } = useTodoStore.getState();
+        if (api && currentViewId) {
+            api.displayBatch({
+                displayBatchRequest: {
+                    operations: [{
+                        op: 'set_whitelist',
+                        viewId: currentViewId,
+                        nodeIds: [],
+                    }],
+                },
+            }).catch(err => {
+                console.error('Failed to clear whitelist:', err);
+            });
+        }
+
         output.success('filter cleared');
     },
 };

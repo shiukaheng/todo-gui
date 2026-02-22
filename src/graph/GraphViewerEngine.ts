@@ -20,7 +20,6 @@ import {
     WebColaEngine,
     ForceDirectedEngine,
 } from "./simulation";
-// TEMPORARY: Position persistence until backend storage exists (remove this line to disable)
 import { PositionPersistenceManager } from "./simulation/PositionPersistenceManager";
 import {
     NavigationEngine,
@@ -86,7 +85,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private currentSimulationMode: SimulationMode;
     private storeUnsubscribe: (() => void) | null = null;
 
-    // TEMPORARY: Position persistence manager (remove this line to disable)
     private positionPersistence: PositionPersistenceManager;
 
     constructor(
@@ -114,7 +112,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         // Subsystems
         this.renderer = new SVGRenderer(this.svg);
 
-        // TEMPORARY: Initialize position persistence
         this.positionPersistence = new PositionPersistenceManager();
 
         // Initialize simulation engine based on store mode
@@ -164,7 +161,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         });
         this.inputHandler.setCallback((event) => this.interactionController.handleEvent(event));
 
-        // TEMPORARY: Start position persistence monitoring
         this.positionPersistence.start(() => this.simulationState);
 
         this.lastFrameTime = performance.now();
@@ -199,7 +195,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         // Style plans once (no need to do per-frame)
         this.styledPlansData = stylePlans(this.plansData);
 
-        // TEMPORARY: Load and validate saved positions when graph is set
+        // Load and validate saved positions when graph is set
         if (restorePositions) {
             this.restorePositionsFromStorage(validNodeIds);
         }
@@ -523,7 +519,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
         }
-        // TEMPORARY: Stop position persistence monitoring
         this.positionPersistence.stop();
         this.storeUnsubscribe?.();
         this.storeUnsubscribe = null;

@@ -54,6 +54,23 @@ export const filterCommand: CommandDefinition = {
         }
 
         setFilter(nodeIds);
+
+        // Persist whitelist to current view if connected
+        const { api, currentViewId } = useTodoStore.getState();
+        if (api && currentViewId) {
+            api.displayBatch({
+                displayBatchRequest: {
+                    operations: [{
+                        op: 'set_whitelist',
+                        viewId: currentViewId,
+                        nodeIds,
+                    }],
+                },
+            }).catch(err => {
+                console.error('Failed to persist whitelist:', err);
+            });
+        }
+
         output.success(`filter active: ${nodeIds.join(', ')}`);
     },
 };

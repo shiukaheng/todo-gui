@@ -26,6 +26,10 @@ import { renameplanCommand } from './renameplan';
 import { filterCommand } from './filter';
 import { clearfilterCommand } from './clearfilter';
 import { reattachCommand } from './reattach';
+import { createviewCommand } from './createview';
+import { deleteviewCommand } from './deleteview';
+import { switchviewCommand } from './switchview';
+import { listviewsCommand } from './listviews';
 
 /** Register all built-in commands */
 export function registerBuiltinCommands(): void {
@@ -52,4 +56,8 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(filterCommand);
     commandRegistry.register(clearfilterCommand);
     commandRegistry.register(reattachCommand);
+    commandRegistry.register(createviewCommand);
+    commandRegistry.register(deleteviewCommand);
+    commandRegistry.register(switchviewCommand);
+    commandRegistry.register(listviewsCommand);
 }

@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import {
     type AppState,
+    type ViewListOut,
     DefaultApi,
     Configuration,
     subscribeToState,
+    subscribeToDisplay,
 } from 'todo-client';
 
 /** Navigation mode for the graph viewer */
@@ -39,6 +41,11 @@ interface TodoStore {
     // Client-side filter state
     filterNodeIds: string[] | null;
 
+    // Display layer state
+    displayData: ViewListOut | null;
+    currentViewId: string | null;
+    displayUnsubscribe: (() => void) | null;
+
     // Actions
     setCursor: (nodeId: string | null) => void;
     setNavInfoText: (text: string | null) => void;
@@ -48,6 +55,9 @@ interface TodoStore {
     hideCommandPlane: () => void;
     setFilter: (nodeIds: string[]) => void;
     clearFilter: () => void;
+    setCurrentView: (viewId: string | null) => void;
+    subscribeDisplay: (baseUrl: string) => () => void;
+    disconnectDisplay: () => void;
     subscribe: (baseUrl: string) => () => void;
     disconnect: () => void;
 }
@@ -66,6 +76,9 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     unsubscribe: null,
     commandPlaneVisible: false,
     filterNodeIds: null,
+    displayData: null,
+    currentViewId: null,
+    displayUnsubscribe: null,
 
     setCursor: (nodeId) => set({ cursor: nodeId }),
     setNavInfoText: (text) => set({ navInfoText: text }),
@@ -75,14 +88,46 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     hideCommandPlane: () => set({ commandPlaneVisible: false }),
     setFilter: (nodeIds) => set({ filterNodeIds: nodeIds }),
     clearFilter: () => set({ filterNodeIds: null }),
+    setCurrentView: (viewId) => set({ currentViewId: viewId }),
+
+    disconnectDisplay: () => {
+        get().displayUnsubscribe?.();
+        set({ displayUnsubscribe: null, displayData: null });
+    },
+
+    subscribeDisplay: (baseUrl: string) => {
+        get().displayUnsubscribe?.();
+
+        const unsubscribe = subscribeToDisplay(
+            (data) => {
+                set({ displayData: data });
+            },
+            {
+                baseUrl,
+                onError: (err) => {
+                    console.error('Display SSE connection error:', err);
+                },
+            }
+        );
+
+        set({ displayUnsubscribe: unsubscribe });
+
+        return () => {
+            get().displayUnsubscribe?.();
+            set({ displayUnsubscribe: null });
+        };
+    },
 
     disconnect: () => {
         get().unsubscribe?.();
+        get().displayUnsubscribe?.();
         set({
             unsubscribe: null,
+            displayUnsubscribe: null,
             api: null,
             connectionStatus: 'disconnected',
             graphData: null,
+            displayData: null,
         });
     },
 
@@ -127,11 +172,25 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
             }
         );
 
-        set({ api, unsubscribe });
+        // Also subscribe to display layer
+        const displayUnsubscribe = subscribeToDisplay(
+            (data) => {
+                set({ displayData: data });
+            },
+            {
+                baseUrl,
+                onError: (err) => {
+                    console.error('Display SSE connection error:', err);
+                },
+            }
+        );
+
+        set({ api, unsubscribe, displayUnsubscribe });
 
         return () => {
             get().unsubscribe?.();
-            set({ unsubscribe: null, connectionStatus: 'disconnected' });
+            get().displayUnsubscribe?.();
+            set({ unsubscribe: null, displayUnsubscribe: null, connectionStatus: 'disconnected' });
         };
     },
 }));

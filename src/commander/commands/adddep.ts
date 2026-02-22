@@ -64,7 +64,7 @@ export const adddepCommand: CommandDefinition = {
                         op: 'create_node',
                         id: taskId,
                         text: args.text as string | undefined,
-                        completed: args.completed as boolean,
+                        completed: args.completed ? Math.floor(Date.now() / 1000) : undefined,
                         blocks: [cursor],
                     }],
                 },
