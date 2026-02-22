@@ -15,49 +15,49 @@ export const unhideCommand: CommandDefinition = {
             description: 'Node IDs to unhide (clears all if omitted)',
             required: false,
             complete: (partial) => {
-                const blacklist = useTodoStore.getState().blacklistNodeIds;
-                if (!blacklist) return [];
-                return blacklist.filter(id =>
+                const hideList = useTodoStore.getState().hideNodeIds;
+                if (!hideList) return [];
+                return hideList.filter(id =>
                     id.toLowerCase().startsWith(partial.toLowerCase())
                 );
             },
         },
     ],
     handler: (args) => {
-        const { blacklistNodeIds, setBlacklist, clearBlacklist } = useTodoStore.getState();
+        const { hideNodeIds, setHide, clearHide } = useTodoStore.getState();
 
-        if (!blacklistNodeIds || blacklistNodeIds.length === 0) {
+        if (!hideNodeIds || hideNodeIds.length === 0) {
             output.error('no nodes are hidden');
             return;
         }
 
         const nodeIds = args._ as string[];
 
-        let newBlacklist: string[];
+        let newHideList: string[];
         if (nodeIds.length === 0) {
-            // Clear entire blacklist
-            clearBlacklist();
-            newBlacklist = [];
+            // Clear entire hide list
+            clearHide();
+            newHideList = [];
         } else {
-            // Remove specific nodes from blacklist
+            // Remove specific nodes from hide list
             const toRemove = new Set(nodeIds);
-            newBlacklist = blacklistNodeIds.filter(id => !toRemove.has(id));
-            if (newBlacklist.length === 0) {
-                clearBlacklist();
+            newHideList = hideNodeIds.filter(id => !toRemove.has(id));
+            if (newHideList.length === 0) {
+                clearHide();
             } else {
-                setBlacklist(newBlacklist);
+                setHide(newHideList);
             }
         }
 
         // Persist to server
-        const { api, currentViewId } = useTodoStore.getState();
+        const { api, activeView } = useTodoStore.getState();
         if (api) {
             api.displayBatch({
                 displayBatchRequest: {
                     operations: [{
                         op: 'update_view',
-                        view_id: currentViewId,
-                        blacklist: newBlacklist,
+                        view_id: activeView,
+                        blacklist: newHideList,
                     } as any],
                 },
             }).catch(err => {

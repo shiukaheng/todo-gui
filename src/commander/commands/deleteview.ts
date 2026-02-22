@@ -36,7 +36,7 @@ export const deleteviewCommand: CommandDefinition = {
             return;
         }
 
-        const { api, currentViewId, switchView } = useTodoStore.getState();
+        const { api, activeView, setActiveView } = useTodoStore.getState();
         if (!api) {
             output.error('not connected to server');
             return;
@@ -44,8 +44,8 @@ export const deleteviewCommand: CommandDefinition = {
 
         try {
             // If deleting the current view, switch to default first
-            if (currentViewId === viewId) {
-                switchView('default');
+            if (activeView === viewId) {
+                setActiveView('default');
             }
 
             await api.displayBatch({

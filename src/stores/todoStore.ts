@@ -41,11 +41,11 @@ interface TodoStore {
 
     // Client-side filter state
     filterNodeIds: string[] | null;
-    blacklistNodeIds: string[] | null;
+    hideNodeIds: string[] | null;
 
     // Display layer state
     displayData: ViewListOut | null;
-    currentViewId: string;
+    activeView: string;
     displayUnsubscribe: (() => void) | null;
 
     // Actions
@@ -57,9 +57,9 @@ interface TodoStore {
     hideCommandPlane: () => void;
     setFilter: (nodeIds: string[]) => void;
     clearFilter: () => void;
-    setBlacklist: (nodeIds: string[]) => void;
-    clearBlacklist: () => void;
-    switchView: (viewId: string) => void;
+    setHide: (nodeIds: string[]) => void;
+    clearHide: () => void;
+    setActiveView: (viewId: string) => void;
     subscribeDisplay: (baseUrl: string) => () => void;
     disconnectDisplay: () => void;
     subscribe: (baseUrl: string) => () => void;
@@ -68,12 +68,12 @@ interface TodoStore {
 
 function deriveViewFilters(displayData: ViewListOut | null, viewId: string): {
     filterNodeIds: string[] | null;
-    blacklistNodeIds: string[] | null;
+    hideNodeIds: string[] | null;
 } {
     if (!displayData) {
         return {
             filterNodeIds: null,
-            blacklistNodeIds: null,
+            hideNodeIds: null,
         };
     }
 
@@ -81,13 +81,13 @@ function deriveViewFilters(displayData: ViewListOut | null, viewId: string): {
     if (!viewData) {
         return {
             filterNodeIds: null,
-            blacklistNodeIds: null,
+            hideNodeIds: null,
         };
     }
 
     return {
         filterNodeIds: viewData.whitelist?.length ? viewData.whitelist : null,
-        blacklistNodeIds: viewData.blacklist?.length ? viewData.blacklist : null,
+        hideNodeIds: viewData.blacklist?.length ? viewData.blacklist : null,
     };
 }
 
@@ -105,9 +105,9 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     unsubscribe: null,
     commandPlaneVisible: false,
     filterNodeIds: null,
-    blacklistNodeIds: null,
+    hideNodeIds: null,
     displayData: null,
-    currentViewId: 'default',
+    activeView: 'default',
     displayUnsubscribe: null,
 
     setCursor: (nodeId) => set({ cursor: nodeId }),
@@ -118,21 +118,21 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     hideCommandPlane: () => set({ commandPlaneVisible: false }),
     setFilter: (nodeIds) => set({ filterNodeIds: nodeIds }),
     clearFilter: () => set({ filterNodeIds: null }),
-    setBlacklist: (nodeIds) => set({ blacklistNodeIds: nodeIds }),
-    clearBlacklist: () => set({ blacklistNodeIds: null }),
-    switchView: (viewId) => {
-        const { displayData, currentViewId } = get();
-        const { filterNodeIds, blacklistNodeIds } = deriveViewFilters(displayData, viewId);
-        viewTrace('Store', 'switchView', {
-            fromViewId: currentViewId,
+    setHide: (nodeIds) => set({ hideNodeIds: nodeIds }),
+    clearHide: () => set({ hideNodeIds: null }),
+    setActiveView: (viewId) => {
+        const { displayData, activeView } = get();
+        const { filterNodeIds, hideNodeIds } = deriveViewFilters(displayData, viewId);
+        viewTrace('Store', 'setActiveView', {
+            fromViewId: activeView,
             toViewId: viewId,
             whitelistCount: filterNodeIds?.length ?? 0,
-            blacklistCount: blacklistNodeIds?.length ?? 0,
+            blacklistCount: hideNodeIds?.length ?? 0,
         });
         set({
-            currentViewId: viewId,
+            activeView: viewId,
             filterNodeIds,
-            blacklistNodeIds,
+            hideNodeIds,
         });
     },
 
@@ -147,18 +147,18 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
 
         const unsubscribe = subscribeToDisplay(
             (data) => {
-                const { currentViewId } = get();
-                const { filterNodeIds, blacklistNodeIds } = deriveViewFilters(data, currentViewId);
+                const { activeView } = get();
+                const { filterNodeIds, hideNodeIds } = deriveViewFilters(data, activeView);
                 viewTrace('Store', 'displaySSE:update', {
-                    currentViewId,
+                    activeView,
                     viewCount: Object.keys(data.views || {}).length,
                     whitelistCount: filterNodeIds?.length ?? 0,
-                    blacklistCount: blacklistNodeIds?.length ?? 0,
+                    blacklistCount: hideNodeIds?.length ?? 0,
                 });
                 set({
                     displayData: data,
                     filterNodeIds,
-                    blacklistNodeIds,
+                    hideNodeIds,
                 });
             },
             {
@@ -187,9 +187,9 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
             connectionStatus: 'disconnected',
             graphData: null,
             displayData: null,
-            currentViewId: 'default',
+            activeView: 'default',
             filterNodeIds: null,
-            blacklistNodeIds: null,
+            hideNodeIds: null,
         });
     },
 
@@ -242,18 +242,18 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
         // Also subscribe to display layer
         const displayUnsubscribe = subscribeToDisplay(
             (data) => {
-                const { currentViewId } = get();
-                const { filterNodeIds, blacklistNodeIds } = deriveViewFilters(data, currentViewId);
+                const { activeView } = get();
+                const { filterNodeIds, hideNodeIds } = deriveViewFilters(data, activeView);
                 viewTrace('Store', 'displaySSE:update', {
-                    currentViewId,
+                    activeView,
                     viewCount: Object.keys(data.views || {}).length,
                     whitelistCount: filterNodeIds?.length ?? 0,
-                    blacklistCount: blacklistNodeIds?.length ?? 0,
+                    blacklistCount: hideNodeIds?.length ?? 0,
                 });
                 set({
                     displayData: data,
                     filterNodeIds,
-                    blacklistNodeIds,
+                    hideNodeIds,
                 });
             },
             {

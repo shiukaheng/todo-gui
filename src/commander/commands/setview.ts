@@ -31,7 +31,7 @@ export const setviewCommand: CommandDefinition = {
             return;
         }
 
-        const { api, displayData, switchView } = useTodoStore.getState();
+        const { api, displayData, setActiveView } = useTodoStore.getState();
         if (!api) {
             output.error('not connected to server');
             return;
@@ -48,7 +48,7 @@ export const setviewCommand: CommandDefinition = {
                 });
             }
 
-            switchView(viewId);
+            setActiveView(viewId);
             output.success(`${exists ? 'switched to' : 'created and switched to'} view: ${viewId}`);
         } catch (err) {
             output.error(`failed to set view: ${err instanceof Error ? err.message : String(err)}`);

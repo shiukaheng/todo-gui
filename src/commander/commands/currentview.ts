@@ -11,16 +11,14 @@ export const currentviewCommand: CommandDefinition = {
     description: 'Show the currently active display view',
     aliases: ['cv'],
     handler: () => {
-        const { currentViewId, displayData, filterNodeIds, blacklistNodeIds } = useTodoStore.getState();
-        const view = displayData?.views?.[currentViewId];
-        const posCount = view ? Object.keys(view.positions || {}).length : 0;
+        const { activeView, displayData, filterNodeIds, hideNodeIds } = useTodoStore.getState();
+        const view = displayData?.views?.[activeView];
 
         output.print([
-            `view: ${currentViewId}`,
+            `view: ${activeView}`,
             `exists: ${view ? 'yes' : 'no'}`,
-            `positions: ${posCount}`,
             `whitelist: ${filterNodeIds?.length ?? 0}`,
-            `blacklist: ${blacklistNodeIds?.length ?? 0}`,
+            `blacklist: ${hideNodeIds?.length ?? 0}`,
         ].join('\n'));
     },
 };

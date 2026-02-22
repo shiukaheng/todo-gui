@@ -24,7 +24,7 @@ export const hideCommand: CommandDefinition = {
         },
     ],
     handler: (args) => {
-        const { graphData, cursor, blacklistNodeIds, setBlacklist } = useTodoStore.getState();
+        const { graphData, cursor, hideNodeIds, setHide } = useTodoStore.getState();
 
         if (!graphData?.tasks) {
             output.error('no graph data available');
@@ -48,23 +48,23 @@ export const hideCommand: CommandDefinition = {
             }
         }
 
-        // Merge with existing blacklist
-        const current = new Set(blacklistNodeIds || []);
+        // Merge with existing hide list
+        const current = new Set(hideNodeIds || []);
         for (const id of nodeIds) {
             current.add(id);
         }
         const merged = Array.from(current);
 
-        setBlacklist(merged);
+        setHide(merged);
 
-        // Persist blacklist to current view (upserts view if needed)
-        const { api, currentViewId } = useTodoStore.getState();
+        // Persist hide list to current view (upserts view if needed)
+        const { api, activeView } = useTodoStore.getState();
         if (api) {
             api.displayBatch({
                 displayBatchRequest: {
                     operations: [{
                         op: 'update_view',
-                        view_id: currentViewId,
+                        view_id: activeView,
                         blacklist: merged,
                     } as any],
                 },

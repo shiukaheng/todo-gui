@@ -11,7 +11,7 @@ export const listviewsCommand: CommandDefinition = {
     description: 'List available display views',
     aliases: ['lv'],
     handler: () => {
-        const { displayData, currentViewId } = useTodoStore.getState();
+        const { displayData, activeView } = useTodoStore.getState();
 
         if (!displayData?.views || Object.keys(displayData.views).length === 0) {
             output.print('no views available');
@@ -19,10 +19,9 @@ export const listviewsCommand: CommandDefinition = {
         }
 
         const lines: string[] = [];
-        for (const [id, view] of Object.entries(displayData.views)) {
-            const marker = id === currentViewId ? ' *' : '';
-            const posCount = Object.keys(view.positions).length;
-            lines.push(`${id}${marker} (${posCount} positions)`);
+        for (const [id] of Object.entries(displayData.views)) {
+            const marker = id === activeView ? ' *' : '';
+            lines.push(`${id}${marker}`);
         }
         output.print(lines.join('\n'));
     },

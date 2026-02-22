@@ -56,13 +56,13 @@ export const filterCommand: CommandDefinition = {
         setFilter(nodeIds);
 
         // Persist whitelist to current view (upserts view if needed)
-        const { api, currentViewId } = useTodoStore.getState();
+        const { api, activeView } = useTodoStore.getState();
         if (api) {
             api.displayBatch({
                 displayBatchRequest: {
                     operations: [{
                         op: 'update_view',
-                        view_id: currentViewId,
+                        view_id: activeView,
                         whitelist: nodeIds,
                     } as any],
                 },

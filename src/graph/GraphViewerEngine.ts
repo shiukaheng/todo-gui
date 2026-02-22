@@ -68,8 +68,8 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private graphData: ProcessedGraphData | null = null;
     private lastAppState: AppState | null = null;
     private currentFilterNodeIds: string[] | null = null;
-    private currentBlacklistNodeIds: string[] | null = null;
-    private currentViewId: string;
+    private currentHideNodeIds: string[] | null = null;
+    private lastActiveView: string | null = null;
     private plansData: ProcessedPlansData = EMPTY_PLANS_DATA;
     private styledPlansData: StyledPlansData = { plans: {} };
     private simulationEngine: SimulationEngine;
@@ -117,9 +117,9 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
         this.positionPersistence = new PositionPersistenceManager();
 
-        // Initialize view ID
+        // Initialize from store
         const initialStoreState = useTodoStore.getState();
-        this.currentViewId = initialStoreState.currentViewId;
+        this.lastActiveView = initialStoreState.activeView;
 
         // Initialize simulation engine based on store mode
         this.currentSimulationMode = useTodoStore.getState().simulationMode;
@@ -128,6 +128,17 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         // Initialize navigation engine based on store mode
         this.currentNavigationMode = useTodoStore.getState().navigationMode;
         this.navigationEngine = this.createNavigationEngine(this.currentNavigationMode);
+
+        // Fetch initial positions for the active view
+        console.log(`[View] INIT fetching positions for activeView='${initialStoreState.activeView}'`);
+        this.positionPersistence.fetchPositions(initialStoreState.activeView).then((positions) => {
+            if (positions) {
+                console.log(`[View] INIT got ${Object.keys(positions).length} positions, applying...`);
+                this.applyFetchedPositions(positions);
+            } else {
+                console.log(`[View] INIT no positions for '${initialStoreState.activeView}'`);
+            }
+        });
 
         // Subscribe to mode and filter changes
         this.storeUnsubscribe = useTodoStore.subscribe(
@@ -140,31 +151,31 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
                     this.currentSimulationMode = state.simulationMode;
                     this.setSimulationEngine(this.createSimulationEngine(state.simulationMode));
                 }
-                if (state.currentViewId !== this.currentViewId) {
-                    const prevViewId = this.currentViewId;
-                    const nextViewId = state.currentViewId;
+                if (state.activeView !== this.lastActiveView) {
+                    const prevViewId = this.lastActiveView!;
+                    const nextViewId = state.activeView;
                     const nextFilter = state.filterNodeIds;
-                    const nextBlacklist = state.blacklistNodeIds;
+                    const nextHide = state.hideNodeIds;
                     viewTrace('Graph', 'viewChange:detected', {
                         prevViewId,
                         nextViewId,
                         nextFilterCount: nextFilter?.length ?? 0,
-                        nextBlacklistCount: nextBlacklist?.length ?? 0,
+                        nextHideCount: nextHide?.length ?? 0,
                     });
-                    this.onViewChange(prevViewId, nextFilter, nextBlacklist);
-                    this.currentViewId = nextViewId;
+                    this.onViewChange(prevViewId, nextViewId, nextFilter, nextHide);
+                    this.lastActiveView = nextViewId;
                     this.currentFilterNodeIds = nextFilter;
-                    this.currentBlacklistNodeIds = nextBlacklist;
+                    this.currentHideNodeIds = nextHide;
                     return;
                 }
                 if (state.filterNodeIds !== this.currentFilterNodeIds) {
                     this.onFilterChange(this.currentFilterNodeIds, state.filterNodeIds);
                     this.currentFilterNodeIds = state.filterNodeIds;
                 }
-                if (state.blacklistNodeIds !== this.currentBlacklistNodeIds) {
-                    this.currentBlacklistNodeIds = state.blacklistNodeIds;
+                if (state.hideNodeIds !== this.currentHideNodeIds) {
+                    this.currentHideNodeIds = state.hideNodeIds;
                     if (this.lastAppState) {
-                        this.processGraphData(this.lastAppState, false);
+                        this.processGraphData(this.lastAppState);
                     }
                 }
             }
@@ -200,25 +211,23 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     updateState(appState: AppState): void {
         this.lastAppState = appState;
         viewTrace('Graph', 'updateState:process', {
-            viewId: this.currentViewId,
+            viewId: this.lastActiveView,
             taskCount: Object.keys(appState.tasks).length,
             depCount: Object.keys(appState.dependencies).length,
         });
-        this.processGraphData(appState, !this.currentFilterNodeIds);
+        this.processGraphData(appState);
     }
 
     /**
-     * Process app state into graph data, optionally applying the active filter.
-     * @param restorePositions - Whether to restore saved positions from storage
+     * Process app state into graph data. Positions are handled separately via REST.
      */
-    private processGraphData(appState: AppState, restorePositions: boolean): void {
+    private processGraphData(appState: AppState): void {
         viewTrace('Graph', 'processGraphData:start', {
-            viewId: this.currentViewId,
-            restorePositions,
+            viewId: this.lastActiveView,
             inputTasks: Object.keys(appState.tasks).length,
             inputDeps: Object.keys(appState.dependencies).length,
             filterCount: this.currentFilterNodeIds?.length ?? 0,
-            blacklistCount: this.currentBlacklistNodeIds?.length ?? 0,
+            hideCount: this.currentHideNodeIds?.length ?? 0,
         });
         // Apply client-side filter if active
         const taskList = this.applyFilter({
@@ -238,10 +247,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         // Style plans once (no need to do per-frame)
         this.styledPlansData = stylePlans(this.plansData);
 
-        // Load and validate saved positions when graph is set
-        if (restorePositions) {
-            this.restorePositionsFromStorage(validNodeIds);
-        }
         viewTrace('Graph', 'processGraphData:done', {
             outputTasks: Object.keys(graphData.tasks).length,
             outputDeps: Object.keys(graphData.dependencies).length,
@@ -249,33 +254,36 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     }
 
     /**
-     * Load saved positions from server and apply if coverage is sufficient.
+     * Apply fetched positions to the simulation state if coverage is sufficient.
      */
-    private restorePositionsFromStorage(currentNodeIds: Set<string>): void {
-        const savedPositions = this.positionPersistence.loadPositions();
+    private applyFetchedPositions(positions: Record<string, { x: number; y: number }>): void {
+        const currentNodeIds = this.graphData ? new Set(Object.keys(this.graphData.tasks)) : null;
+        const fetchedCount = Object.keys(positions).length;
 
-        // Filter out positions for nodes that no longer exist
-        const validPositions: Record<string, { x: number; y: number }> = {};
-        let invalidCount = 0;
-
-        for (const [nodeId, pos] of Object.entries(savedPositions)) {
-            if (currentNodeIds.has(nodeId)) {
-                validPositions[nodeId] = pos;
-            } else {
-                invalidCount++;
+        if (currentNodeIds && currentNodeIds.size > 0) {
+            // Filter out positions for nodes that no longer exist
+            const validPositions: Record<string, { x: number; y: number }> = {};
+            for (const [nodeId, pos] of Object.entries(positions)) {
+                if (currentNodeIds.has(nodeId)) {
+                    validPositions[nodeId] = pos;
+                }
             }
-        }
 
-        if (invalidCount > 0) {
-            console.log(`[GraphViewer] Removed ${invalidCount} stale node positions`);
-        }
-
-        // Only use saved positions if we have good coverage of current nodes
-        const coverageRatio = Object.keys(validPositions).length / currentNodeIds.size;
-        if (coverageRatio > 0.5 && Object.keys(validPositions).length > 0) {
-            this.simulationState = { positions: validPositions };
-        } else if (Object.keys(savedPositions).length > 0) {
-            console.log('[GraphViewer] Insufficient coverage, starting fresh layout');
+            const validCount = Object.keys(validPositions).length;
+            const coverageRatio = validCount / currentNodeIds.size;
+            console.log(`[Pos] APPLY fetched=${fetchedCount} valid=${validCount} graphNodes=${currentNodeIds.size} coverage=${(coverageRatio * 100).toFixed(1)}%`);
+            if (coverageRatio > 0.5 && validCount > 0) {
+                console.log(`[Pos] APPLY accepted — setting simulationState`);
+                this.simulationState = { positions: validPositions };
+            } else {
+                console.log(`[Pos] APPLY rejected — coverage too low, keeping current simulation`);
+            }
+        } else {
+            // No graph data yet, apply all positions
+            console.log(`[Pos] APPLY no graphData yet, applying all ${fetchedCount} positions`);
+            if (fetchedCount > 0) {
+                this.simulationState = { positions };
+            }
         }
     }
 
@@ -287,9 +295,9 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
      */
     private applyFilter(taskList: NodeListOut): NodeListOut {
         const filterNodeIds = this.currentFilterNodeIds;
-        const blacklistNodeIds = this.currentBlacklistNodeIds;
+        const hideNodeIds = this.currentHideNodeIds;
         const hasWhitelist = filterNodeIds && filterNodeIds.length > 0;
-        const hasBlacklist = blacklistNodeIds && blacklistNodeIds.length > 0;
+        const hasBlacklist = hideNodeIds && hideNodeIds.length > 0;
 
         if (!hasWhitelist && !hasBlacklist) {
             return taskList;
@@ -323,7 +331,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
         // Apply blacklist: remove hidden nodes
         if (hasBlacklist) {
-            for (const nodeId of blacklistNodeIds) {
+            for (const nodeId of hideNodeIds) {
                 visible.delete(nodeId);
             }
         }
@@ -358,7 +366,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         viewTrace('Graph', 'filterChange', {
             prevCount: prevFilter?.length ?? 0,
             nextCount: newFilter?.length ?? 0,
-            viewId: this.currentViewId,
+            viewId: this.lastActiveView,
         });
         if (newFilter !== null && prevFilter === null) {
             // Filter activated: save current positions, pause persistence
@@ -368,39 +376,56 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
         // Re-process graph data with new filter state
         if (this.lastAppState) {
-            // When clearing filter, restore saved positions
-            const shouldRestore = newFilter === null;
             this.currentFilterNodeIds = newFilter;
-            this.processGraphData(this.lastAppState, shouldRestore);
+            this.processGraphData(this.lastAppState);
+
+            // When clearing filter, restore saved positions from server
+            if (newFilter === null) {
+                const viewId = this.lastActiveView;
+                if (viewId) {
+                    this.positionPersistence.fetchPositions(viewId).then((positions) => {
+                        if (positions) {
+                            this.applyFetchedPositions(positions);
+                        }
+                    });
+                }
+            }
         }
     }
 
     /**
-     * Handle view switch: save current positions, then reload from new view.
+     * Handle view switch: save current positions, then fetch new view positions async.
      */
     private onViewChange(
         prevViewId: string,
+        nextViewId: string,
         newFilter: string[] | null,
-        newBlacklist: string[] | null,
+        newHide: string[] | null,
     ): void {
-        viewTrace('Graph', 'viewChange:start', {
-            prevViewId,
-            newViewId: this.currentViewId,
-            newFilterCount: newFilter?.length ?? 0,
-            newBlacklistCount: newBlacklist?.length ?? 0,
-        });
+        const simPosCount = Object.keys(this.simulationState.positions).length;
+        console.log(`[View] SWITCH '${prevViewId}' → '${nextViewId}' (simPositions=${simPosCount}, filter=${newFilter?.length ?? 'none'}, hide=${newHide?.length ?? 'none'})`);
+
         // Persist the current graph state into the previous view before switching.
+        console.log(`[View] saving positions for prev view '${prevViewId}'...`);
         this.positionPersistence.savePositionsNow(prevViewId);
 
         this.currentFilterNodeIds = newFilter;
-        this.currentBlacklistNodeIds = newBlacklist;
+        this.currentHideNodeIds = newHide;
         this.updatePersistencePause();
 
         if (this.lastAppState) {
-            this.processGraphData(this.lastAppState, true);
+            this.processGraphData(this.lastAppState);
         }
-        viewTrace('Graph', 'viewChange:done', {
-            prevViewId,
+
+        // Fetch positions for the new view async
+        console.log(`[View] fetching positions for next view '${nextViewId}'...`);
+        this.positionPersistence.fetchPositions(nextViewId).then((positions) => {
+            if (positions) {
+                console.log(`[View] got ${Object.keys(positions).length} positions for '${nextViewId}', applying...`);
+                this.applyFetchedPositions(positions);
+            } else {
+                console.log(`[View] no positions returned for '${nextViewId}'`);
+            }
         });
     }
 

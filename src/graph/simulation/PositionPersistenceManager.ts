@@ -1,12 +1,13 @@
 /**
  * ===================================================================
- * Position Persistence Manager - Server-backed
+ * Position Persistence Manager - REST-backed
  * ===================================================================
  *
- * Persists node positions to the backend display layer (Views API).
+ * Persists node positions to the backend via dedicated REST endpoints
+ * (GET/PUT /api/views/{viewId}/positions).
  *
  * Monitors simulation positions and saves them when the graph settles.
- * On initialization, loads saved positions to restore previous layout.
+ * Positions are fetched async on view switch via fetchPositions().
  *
  * ===================================================================
  */
@@ -37,7 +38,8 @@ const DEFAULT_CONFIG: Required<PositionPersistenceConfig> = {
 
 /**
  * Manages automatic persistence of node positions.
- * Saves to server via display batch API (update_view upsert).
+ * Saves to server via PUT /api/views/{viewId}/positions.
+ * Loads via GET /api/views/{viewId}/positions.
  */
 export class PositionPersistenceManager {
     private config: Required<PositionPersistenceConfig>;
@@ -104,79 +106,85 @@ export class PositionPersistenceManager {
     }
 
     /**
-     * Load persisted positions from the current view's server data.
+     * Fetch positions for a view from the server via REST.
      *
-     * @returns Loaded positions, or empty object if none exist
+     * @returns Loaded positions, or null if view doesn't exist
      */
-    loadPositions(): Record<string, Position> {
-        const { displayData, currentViewId } = useTodoStore.getState();
-        viewTrace('Position', 'loadPositions:start', {
-            currentViewId,
-            viewCount: Object.keys(displayData?.views || {}).length,
-        });
-        if (displayData?.views?.[currentViewId]) {
-            const view = displayData.views[currentViewId];
-            const positions: Record<string, Position> = {};
-            for (const [nodeId, coords] of Object.entries(view.positions)) {
-                if (Array.isArray(coords) && coords.length >= 2) {
-                    positions[nodeId] = { x: coords[0], y: coords[1] };
-                }
-            }
-            if (Object.keys(positions).length > 0) {
-                console.log(`[PositionPersistence] Loaded ${Object.keys(positions).length} positions from view '${currentViewId}'`);
-            }
-            viewTrace('Position', 'loadPositions:done', {
-                currentViewId,
-                loadedCount: Object.keys(positions).length,
-            });
-            return positions;
+    async fetchPositions(viewId: string): Promise<Record<string, Position> | null> {
+        const { baseUrl } = useTodoStore.getState();
+        if (!baseUrl) {
+            console.log(`[Pos] FETCH skip — no baseUrl`);
+            return null;
         }
 
-        viewTrace('Position', 'loadPositions:missing-view', { currentViewId });
-        return {};
+        console.log(`[Pos] FETCH start view='${viewId}'`);
+
+        try {
+            const response = await fetch(`${baseUrl}/api/views/${encodeURIComponent(viewId)}/positions`);
+            if (response.status === 404) {
+                console.log(`[Pos] FETCH 404 view='${viewId}' — view does not exist on server`);
+                return null;
+            }
+            if (!response.ok) {
+                console.error(`[Pos] FETCH FAIL view='${viewId}' status=${response.status}`);
+                return null;
+            }
+            const data = await response.json();
+            const rawPositions = data.positions || {};
+            const positions: Record<string, Position> = {};
+            for (const [nodeId, coords] of Object.entries(rawPositions)) {
+                if (Array.isArray(coords) && coords.length >= 2) {
+                    positions[nodeId] = { x: (coords as number[])[0], y: (coords as number[])[1] };
+                }
+            }
+            console.log(`[Pos] FETCH done view='${viewId}' count=${Object.keys(positions).length}`);
+            return positions;
+        } catch (err) {
+            console.error(`[Pos] FETCH error view='${viewId}'`, err);
+            return null;
+        }
     }
 
     /**
-     * Manually save current positions to server.
+     * Manually save current positions to server via PUT.
      * Normally called automatically when graph settles.
      */
     savePositionsNow(viewIdOverride?: string): void {
         if (!this.getSimulationState) {
-            console.warn("[PositionPersistence] Cannot save, not started");
+            console.log(`[Pos] SAVE skip — not started`);
             return;
         }
 
         const state = this.getSimulationState();
         const positions = state.positions;
+        const count = Object.keys(positions).length;
 
-        if (Object.keys(positions).length === 0) {
+        if (count === 0) {
+            console.log(`[Pos] SAVE skip — 0 positions in simulation`);
             return;
         }
 
-        const { api, currentViewId } = useTodoStore.getState();
-        const targetViewId = viewIdOverride ?? currentViewId;
-        if (api) {
-            const serverPositions: { [key: string]: Array<number> } = {};
-            for (const [nodeId, pos] of Object.entries(positions)) {
-                serverPositions[nodeId] = [pos.x, pos.y];
-            }
-            viewTrace('Position', 'savePositionsNow:send', {
-                currentViewId,
-                targetViewId,
-                count: Object.keys(serverPositions).length,
-            });
-            api.displayBatch({
-                displayBatchRequest: {
-                    operations: [{
-                        op: 'update_view',
-                        view_id: targetViewId,
-                        positions: serverPositions,
-                    } as any],
-                },
-            }).catch(err => {
-                console.error("[PositionPersistence] Failed to save to server:", err);
-            });
+        const { baseUrl, activeView } = useTodoStore.getState();
+        const targetViewId = viewIdOverride ?? activeView;
+        if (!baseUrl) {
+            console.log(`[Pos] SAVE skip — no baseUrl`);
+            return;
         }
+
+        const serverPositions: { [key: string]: Array<number> } = {};
+        for (const [nodeId, pos] of Object.entries(positions)) {
+            serverPositions[nodeId] = [pos.x, pos.y];
+        }
+        console.log(`[Pos] SAVE view='${targetViewId}' count=${count} (activeView='${activeView}', override=${viewIdOverride ?? 'none'})`);
+        fetch(`${baseUrl}/api/views/${encodeURIComponent(targetViewId)}/positions`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ positions: serverPositions }),
+        }).then(() => {
+            console.log(`[Pos] SAVE ok view='${targetViewId}'`);
+        }).catch(err => {
+            console.error(`[Pos] SAVE FAIL view='${targetViewId}'`, err);
+        });
     }
 
     /**
@@ -225,7 +233,7 @@ export class PositionPersistenceManager {
 
         // Detect transition: unsettled → settled
         if (!this.isCurrentlySettled && settled) {
-            console.log("[PositionPersistence] Graph settled, scheduling save...");
+            console.log(`[Pos] SETTLED — scheduling save (debounce=${this.config.saveDebounce}ms)`);
             this.scheduleSave();
         }
 
