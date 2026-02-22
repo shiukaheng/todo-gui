@@ -1,9 +1,10 @@
 /**
- * Hide command - hide specific nodes from the graph (blacklist).
+ * Hide command - add nodes to blacklist on current view (server-side).
+ * The display SSE will push the update back, triggering graph reprocessing.
  */
 
 import { CommandDefinition } from '../types';
-import { useTodoStore } from '../../stores/todoStore';
+import { useTodoStore, deriveViewFilters } from '../../stores/todoStore';
 import { output } from '../output';
 
 export const hideCommand: CommandDefinition = {
@@ -24,7 +25,7 @@ export const hideCommand: CommandDefinition = {
         },
     ],
     handler: (args) => {
-        const { graphData, cursor, hideNodeIds, setHide } = useTodoStore.getState();
+        const { graphData, cursor, api, activeView, displayData } = useTodoStore.getState();
 
         if (!graphData?.tasks) {
             output.error('no graph data available');
@@ -40,7 +41,6 @@ export const hideCommand: CommandDefinition = {
             nodeIds = [cursor];
         }
 
-        // Validate all node IDs exist
         for (const id of nodeIds) {
             if (!graphData.tasks[id]) {
                 output.error(`node not found: ${id}`);
@@ -48,30 +48,30 @@ export const hideCommand: CommandDefinition = {
             }
         }
 
-        // Merge with existing hide list
+        if (!api) {
+            output.error('not connected');
+            return;
+        }
+
+        // Merge with existing hide list from server state
+        const { hideNodeIds } = deriveViewFilters(displayData, activeView);
         const current = new Set(hideNodeIds || []);
         for (const id of nodeIds) {
             current.add(id);
         }
         const merged = Array.from(current);
 
-        setHide(merged);
-
-        // Persist hide list to current view (upserts view if needed)
-        const { api, activeView } = useTodoStore.getState();
-        if (api) {
-            api.displayBatch({
-                displayBatchRequest: {
-                    operations: [{
-                        op: 'update_view',
-                        view_id: activeView,
-                        blacklist: merged,
-                    } as any],
-                },
-            }).catch(err => {
-                console.error('Failed to persist blacklist:', err);
-            });
-        }
+        api.displayBatch({
+            displayBatchRequest: {
+                operations: [{
+                    op: 'update_view',
+                    view_id: activeView,
+                    blacklist: merged,
+                } as any],
+            },
+        }).catch(err => {
+            output.error(`failed to persist blacklist: ${err}`);
+        });
 
         output.success(`hidden: ${nodeIds.join(', ')}`);
     },

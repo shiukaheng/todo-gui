@@ -1,9 +1,10 @@
 /**
- * Unhide command - remove nodes from the blacklist, or clear it entirely.
+ * Unhide command - remove nodes from blacklist on current view (server-side).
+ * The display SSE will push the update back, triggering graph reprocessing.
  */
 
 import { CommandDefinition } from '../types';
-import { useTodoStore } from '../../stores/todoStore';
+import { useTodoStore, deriveViewFilters } from '../../stores/todoStore';
 import { output } from '../output';
 
 export const unhideCommand: CommandDefinition = {
@@ -15,19 +16,26 @@ export const unhideCommand: CommandDefinition = {
             description: 'Node IDs to unhide (clears all if omitted)',
             required: false,
             complete: (partial) => {
-                const hideList = useTodoStore.getState().hideNodeIds;
-                if (!hideList) return [];
-                return hideList.filter(id =>
+                const { displayData, activeView } = useTodoStore.getState();
+                const { hideNodeIds } = deriveViewFilters(displayData, activeView);
+                if (!hideNodeIds) return [];
+                return hideNodeIds.filter(id =>
                     id.toLowerCase().startsWith(partial.toLowerCase())
                 );
             },
         },
     ],
     handler: (args) => {
-        const { hideNodeIds, setHide, clearHide } = useTodoStore.getState();
+        const { api, activeView, displayData } = useTodoStore.getState();
+        const { hideNodeIds } = deriveViewFilters(displayData, activeView);
 
         if (!hideNodeIds || hideNodeIds.length === 0) {
             output.error('no nodes are hidden');
+            return;
+        }
+
+        if (!api) {
+            output.error('not connected');
             return;
         }
 
@@ -35,35 +43,23 @@ export const unhideCommand: CommandDefinition = {
 
         let newHideList: string[];
         if (nodeIds.length === 0) {
-            // Clear entire hide list
-            clearHide();
             newHideList = [];
         } else {
-            // Remove specific nodes from hide list
             const toRemove = new Set(nodeIds);
             newHideList = hideNodeIds.filter(id => !toRemove.has(id));
-            if (newHideList.length === 0) {
-                clearHide();
-            } else {
-                setHide(newHideList);
-            }
         }
 
-        // Persist to server
-        const { api, activeView } = useTodoStore.getState();
-        if (api) {
-            api.displayBatch({
-                displayBatchRequest: {
-                    operations: [{
-                        op: 'update_view',
-                        view_id: activeView,
-                        blacklist: newHideList,
-                    } as any],
-                },
-            }).catch(err => {
-                console.error('Failed to persist blacklist:', err);
-            });
-        }
+        api.displayBatch({
+            displayBatchRequest: {
+                operations: [{
+                    op: 'update_view',
+                    view_id: activeView,
+                    blacklist: newHideList,
+                } as any],
+            },
+        }).catch(err => {
+            output.error(`failed to persist blacklist: ${err}`);
+        });
 
         if (nodeIds.length === 0) {
             output.success('all nodes unhidden');

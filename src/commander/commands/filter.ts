@@ -1,5 +1,6 @@
 /**
- * Filter command - client-side filter to show only specified nodes and their recursive children.
+ * Filter command - set whitelist on current view (server-side).
+ * The display SSE will push the update back, triggering graph reprocessing.
  */
 
 import { CommandDefinition } from '../types';
@@ -27,14 +28,13 @@ export const filterCommand: CommandDefinition = {
         },
     ],
     handler: (args) => {
-        const { graphData, cursor, setFilter } = useTodoStore.getState();
+        const { graphData, cursor, api, activeView } = useTodoStore.getState();
 
         if (!graphData?.tasks) {
             output.error('no graph data available');
             return;
         }
 
-        // Collect node IDs: all positional args, or cursor if none provided
         let nodeIds = args._ as string[];
 
         if (nodeIds.length === 0) {
@@ -45,7 +45,6 @@ export const filterCommand: CommandDefinition = {
             nodeIds = [cursor];
         }
 
-        // Validate all node IDs exist
         for (const id of nodeIds) {
             if (!graphData.tasks[id]) {
                 output.error(`node not found: ${id}`);
@@ -53,24 +52,23 @@ export const filterCommand: CommandDefinition = {
             }
         }
 
-        setFilter(nodeIds);
-
-        // Persist whitelist to current view (upserts view if needed)
-        const { api, activeView } = useTodoStore.getState();
-        if (api) {
-            api.displayBatch({
-                displayBatchRequest: {
-                    operations: [{
-                        op: 'update_view',
-                        view_id: activeView,
-                        whitelist: nodeIds,
-                    } as any],
-                },
-            }).catch(err => {
-                console.error('Failed to persist whitelist:', err);
-            });
+        if (!api) {
+            output.error('not connected');
+            return;
         }
 
-        output.success(`filter active: ${nodeIds.join(', ')}`);
+        api.displayBatch({
+            displayBatchRequest: {
+                operations: [{
+                    op: 'update_view',
+                    view_id: activeView,
+                    whitelist: nodeIds,
+                } as any],
+            },
+        }).catch(err => {
+            output.error(`failed to set filter: ${err}`);
+        });
+
+        output.success(`filter: ${nodeIds.join(', ')}`);
     },
 };

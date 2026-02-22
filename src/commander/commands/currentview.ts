@@ -3,7 +3,7 @@
  */
 
 import { CommandDefinition } from '../types';
-import { useTodoStore } from '../../stores/todoStore';
+import { useTodoStore, deriveViewFilters } from '../../stores/todoStore';
 import { output } from '../output';
 
 export const currentviewCommand: CommandDefinition = {
@@ -11,8 +11,9 @@ export const currentviewCommand: CommandDefinition = {
     description: 'Show the currently active display view',
     aliases: ['cv'],
     handler: () => {
-        const { activeView, displayData, filterNodeIds, hideNodeIds } = useTodoStore.getState();
+        const { activeView, displayData } = useTodoStore.getState();
         const view = displayData?.views?.[activeView];
+        const { filterNodeIds, hideNodeIds } = deriveViewFilters(displayData, activeView);
 
         output.print([
             `view: ${activeView}`,

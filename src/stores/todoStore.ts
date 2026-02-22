@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import {
     type AppState,
     type ViewListOut,
@@ -39,11 +40,7 @@ interface TodoStore {
     // Command plane state
     commandPlaneVisible: boolean;
 
-    // Client-side filter state
-    filterNodeIds: string[] | null;
-    hideNodeIds: string[] | null;
-
-    // Display layer state
+    // Display layer state (server-authoritative)
     displayData: ViewListOut | null;
     activeView: string;
     displayUnsubscribe: (() => void) | null;
@@ -58,10 +55,6 @@ interface TodoStore {
     setSimulationMode: (mode: SimulationMode) => void;
     showCommandPlane: () => void;
     hideCommandPlane: () => void;
-    setFilter: (nodeIds: string[]) => void;
-    clearFilter: () => void;
-    setHide: (nodeIds: string[]) => void;
-    clearHide: () => void;
     setActiveView: (viewId: string) => void;
     subscribeDisplay: (baseUrl: string) => () => void;
     disconnectDisplay: () => void;
@@ -69,32 +62,28 @@ interface TodoStore {
     disconnect: () => void;
 }
 
-function deriveViewFilters(displayData: ViewListOut | null, viewId: string): {
+/**
+ * Derive filter/hide arrays from displayData for a given view.
+ * Exported for use by the engine.
+ */
+export function deriveViewFilters(displayData: ViewListOut | null, viewId: string): {
     filterNodeIds: string[] | null;
     hideNodeIds: string[] | null;
 } {
     if (!displayData) {
-        return {
-            filterNodeIds: null,
-            hideNodeIds: null,
-        };
+        return { filterNodeIds: null, hideNodeIds: null };
     }
-
     const viewData = displayData.views?.[viewId];
     if (!viewData) {
-        return {
-            filterNodeIds: null,
-            hideNodeIds: null,
-        };
+        return { filterNodeIds: null, hideNodeIds: null };
     }
-
     return {
         filterNodeIds: viewData.whitelist?.length ? viewData.whitelist : null,
         hideNodeIds: viewData.blacklist?.length ? viewData.blacklist : null,
     };
 }
 
-export const useTodoStore = create<TodoStore>((set, get) => ({
+export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
     graphData: null,
     cursor: null,
     navInfoText: null,
@@ -107,8 +96,6 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     api: null,
     unsubscribe: null,
     commandPlaneVisible: false,
-    filterNodeIds: null,
-    hideNodeIds: null,
     displayData: null,
     activeView: 'default',
     displayUnsubscribe: null,
@@ -120,24 +107,13 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     setSimulationMode: (mode) => set({ simulationMode: mode }),
     showCommandPlane: () => set({ commandPlaneVisible: true }),
     hideCommandPlane: () => set({ commandPlaneVisible: false }),
-    setFilter: (nodeIds) => set({ filterNodeIds: nodeIds }),
-    clearFilter: () => set({ filterNodeIds: null }),
-    setHide: (nodeIds) => set({ hideNodeIds: nodeIds }),
-    clearHide: () => set({ hideNodeIds: null }),
     setActiveView: (viewId) => {
-        const { displayData, activeView } = get();
-        const { filterNodeIds, hideNodeIds } = deriveViewFilters(displayData, viewId);
+        const { activeView } = get();
         viewTrace('Store', 'setActiveView', {
             fromViewId: activeView,
             toViewId: viewId,
-            whitelistCount: filterNodeIds?.length ?? 0,
-            blacklistCount: hideNodeIds?.length ?? 0,
         });
-        set({
-            activeView: viewId,
-            filterNodeIds,
-            hideNodeIds,
-        });
+        set({ activeView: viewId });
     },
 
     disconnectDisplay: () => {
@@ -152,18 +128,11 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
         const unsubscribe = subscribeToDisplay(
             (data) => {
                 const { activeView } = get();
-                const { filterNodeIds, hideNodeIds } = deriveViewFilters(data, activeView);
                 viewTrace('Store', 'displaySSE:update', {
                     activeView,
                     viewCount: Object.keys(data.views || {}).length,
-                    whitelistCount: filterNodeIds?.length ?? 0,
-                    blacklistCount: hideNodeIds?.length ?? 0,
                 });
-                set({
-                    displayData: data,
-                    filterNodeIds,
-                    hideNodeIds,
-                });
+                set({ displayData: data });
             },
             {
                 baseUrl,
@@ -192,8 +161,6 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
             graphData: null,
             displayData: null,
             activeView: 'default',
-            filterNodeIds: null,
-            hideNodeIds: null,
         });
     },
 
@@ -227,12 +194,10 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
                 baseUrl,
                 onError: (err) => {
                     console.error('SSE connection error:', err);
-                    // Extract useful error message
                     let errorMessage = 'Connection failed';
                     if (err instanceof Error) {
                         errorMessage = err.message;
                     } else if (err instanceof Event) {
-                        // SSE error events don't have useful info, just indicate failure
                         errorMessage = 'Unable to connect to server';
                     }
                     set({
@@ -247,18 +212,11 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
         const displayUnsubscribe = subscribeToDisplay(
             (data) => {
                 const { activeView } = get();
-                const { filterNodeIds, hideNodeIds } = deriveViewFilters(data, activeView);
                 viewTrace('Store', 'displaySSE:update', {
                     activeView,
                     viewCount: Object.keys(data.views || {}).length,
-                    whitelistCount: filterNodeIds?.length ?? 0,
-                    blacklistCount: hideNodeIds?.length ?? 0,
                 });
-                set({
-                    displayData: data,
-                    filterNodeIds,
-                    hideNodeIds,
-                });
+                set({ displayData: data });
             },
             {
                 baseUrl,
@@ -276,4 +234,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
             set({ unsubscribe: null, displayUnsubscribe: null, connectionStatus: 'disconnected' });
         };
     },
+}), {
+    name: 'todo-store',
+    partialize: (state) => ({ activeView: state.activeView }),
 }));

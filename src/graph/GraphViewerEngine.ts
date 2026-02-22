@@ -39,7 +39,7 @@ import { SVGRenderer } from "./render/SVGRenderer";
 import { PerformanceMonitor } from "./render/PerformanceMonitor";
 import { InputHandler, InteractionController } from "./input";
 import { PositionedGraphData } from "./simulation/utils";
-import { useTodoStore, NavigationMode, SimulationMode } from "../stores/todoStore";
+import { useTodoStore, NavigationMode, SimulationMode, deriveViewFilters } from "../stores/todoStore";
 import { viewTrace } from "../utils/viewTrace";
 
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
@@ -70,6 +70,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private currentFilterNodeIds: string[] | null = null;
     private currentHideNodeIds: string[] | null = null;
     private lastActiveView: string | null = null;
+    private lastFilterKey = '';
     private initialPositionsFetched = false;
     private plansData: ProcessedPlansData = EMPTY_PLANS_DATA;
     private styledPlansData: StyledPlansData = { plans: {} };
@@ -133,7 +134,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         // Initial position fetch happens on first updateState() call,
         // when baseUrl is guaranteed to be set (SSE is already connected).
 
-        // Subscribe to mode and filter changes
+        // Subscribe to mode, view, and display changes
         this.storeUnsubscribe = useTodoStore.subscribe(
             (state) => {
                 if (state.navigationMode !== this.currentNavigationMode) {
@@ -144,32 +145,34 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
                     this.currentSimulationMode = state.simulationMode;
                     this.setSimulationEngine(this.createSimulationEngine(state.simulationMode));
                 }
+
+                // Derive filter/hide from displayData + activeView
+                const { filterNodeIds, hideNodeIds } = deriveViewFilters(state.displayData, state.activeView);
+                const filterKey = JSON.stringify(filterNodeIds) + '|' + JSON.stringify(hideNodeIds);
+
                 if (state.activeView !== this.lastActiveView) {
                     const prevViewId = this.lastActiveView!;
                     const nextViewId = state.activeView;
-                    const nextFilter = state.filterNodeIds;
-                    const nextHide = state.hideNodeIds;
                     viewTrace('Graph', 'viewChange:detected', {
                         prevViewId,
                         nextViewId,
-                        nextFilterCount: nextFilter?.length ?? 0,
-                        nextHideCount: nextHide?.length ?? 0,
+                        nextFilterCount: filterNodeIds?.length ?? 0,
+                        nextHideCount: hideNodeIds?.length ?? 0,
                     });
-                    this.onViewChange(prevViewId, nextViewId, nextFilter, nextHide);
+                    this.onViewChange(prevViewId, nextViewId, filterNodeIds, hideNodeIds);
                     this.lastActiveView = nextViewId;
-                    this.currentFilterNodeIds = nextFilter;
-                    this.currentHideNodeIds = nextHide;
+                    this.lastFilterKey = filterKey;
+                    this.currentFilterNodeIds = filterNodeIds;
+                    this.currentHideNodeIds = hideNodeIds;
                     return;
                 }
-                if (state.filterNodeIds !== this.currentFilterNodeIds) {
-                    this.onFilterChange(this.currentFilterNodeIds, state.filterNodeIds);
-                    this.currentFilterNodeIds = state.filterNodeIds;
-                }
-                if (state.hideNodeIds !== this.currentHideNodeIds) {
-                    this.currentHideNodeIds = state.hideNodeIds;
-                    if (this.lastAppState) {
-                        this.processGraphData(this.lastAppState);
-                    }
+
+                if (filterKey !== this.lastFilterKey) {
+                    this.lastFilterKey = filterKey;
+                    const prevFilter = this.currentFilterNodeIds;
+                    this.currentFilterNodeIds = filterNodeIds;
+                    this.currentHideNodeIds = hideNodeIds;
+                    this.onFilterChange(prevFilter, filterNodeIds);
                 }
             }
         );
@@ -372,7 +375,8 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     }
 
     /**
-     * Handle filter state changes: save/restore positions and reprocess graph.
+     * Handle filter/hide changes (derived from displayData).
+     * Reprocesses graph and fetches positions when filter is cleared.
      */
     private onFilterChange(prevFilter: string[] | null, newFilter: string[] | null): void {
         viewTrace('Graph', 'filterChange', {
@@ -380,19 +384,13 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             nextCount: newFilter?.length ?? 0,
             viewId: this.lastActiveView,
         });
-        if (newFilter !== null && prevFilter === null) {
-            // Filter activated: save current positions, pause persistence
-            this.positionPersistence.savePositionsNow();
-        }
         this.updatePersistencePause();
 
-        // Re-process graph data with new filter state
         if (this.lastAppState) {
-            this.currentFilterNodeIds = newFilter;
             this.processGraphData(this.lastAppState);
 
             // When clearing filter, restore saved positions from server
-            if (newFilter === null) {
+            if (newFilter === null && prevFilter !== null) {
                 const viewId = this.lastActiveView;
                 if (viewId) {
                     this.positionPersistence.fetchPositions(viewId).then((positions) => {
@@ -417,9 +415,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         const simPosCount = Object.keys(this.simulationState.positions).length;
         console.log(`[View] SWITCH '${prevViewId}' → '${nextViewId}' (simPositions=${simPosCount}, filter=${newFilter?.length ?? 'none'}, hide=${newHide?.length ?? 'none'})`);
 
-        // Persist the current graph state into the previous view before switching.
-        console.log(`[View] saving positions for prev view '${prevViewId}'...`);
-        this.positionPersistence.savePositionsNow(prevViewId);
+        // Note: no auto-save on view switch. Use 'savepos' command.
 
         this.currentFilterNodeIds = newFilter;
         this.currentHideNodeIds = newHide;
