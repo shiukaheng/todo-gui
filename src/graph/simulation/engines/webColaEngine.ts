@@ -368,10 +368,15 @@ export class WebColaEngine implements SimulationEngine {
     // TOPOLOGY CHANGE DETECTION
     // ───────────────────────────────────────────────────────────────────────
 
-    /** Create a string snapshot of node/edge IDs for cheap equality comparison. */
+    /** Create a string snapshot of node/edge structure for cheap equality comparison.
+     *  Uses fromId->toId pairs instead of dependency keys so that optimistic IDs
+     *  (e.g. "foo->bar") match server-assigned IDs for the same structural edge. */
     private computeTopologySnapshot(graph: NestedGraphData): TopologySnapshot {
         const nodeIds = Object.keys(graph.tasks).sort().join(",");
-        const edgeIds = Object.keys(graph.dependencies).sort().join(",");
+        const edgeIds = Object.values(graph.dependencies)
+            .map(dep => `${dep.data.fromId}->${dep.data.toId}`)
+            .sort()
+            .join(",");
         return { nodeIds, edgeIds };
     }
 

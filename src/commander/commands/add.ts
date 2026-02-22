@@ -71,6 +71,7 @@ export const addCommand: CommandDefinition = {
             : undefined;
 
         try {
+            useTodoStore.getState().queueCursor(taskId);
             await api.batchOperationsApiBatchPost({
                 batchRequest: {
                     operations: [{
@@ -83,7 +84,6 @@ export const addCommand: CommandDefinition = {
                     }],
                 },
             });
-            useTodoStore.getState().setCursor(taskId);
             output.success(`created task: ${taskId}`);
         } catch (err) {
             output.error(`failed to create task: ${err instanceof Error ? err.message : String(err)}`);

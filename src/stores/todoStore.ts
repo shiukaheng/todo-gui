@@ -48,8 +48,12 @@ interface TodoStore {
     // Engine callbacks (set by GraphViewerEngine)
     savePositionsCallback: (() => void) | null;
 
+    // Internal pending cursor queue
+    pendingCursors: string[];
+
     // Actions
     setCursor: (nodeId: string | null) => void;
+    queueCursor: (nodeId: string) => void;
     setNavInfoText: (text: string | null) => void;
     setNavigationMode: (mode: NavigationMode) => void;
     setSimulationMode: (mode: SimulationMode) => void;
@@ -83,6 +87,23 @@ export function deriveViewFilters(displayData: ViewListOut | null, viewId: strin
     };
 }
 
+/** Resolve pending cursors against graphData. Walk from most recent to oldest;
+ *  first node found in tasks → set cursor, clear the queue. */
+function resolvePendingCursors(
+    graphData: AppState | null,
+    get: () => TodoStore,
+    set: (partial: Partial<TodoStore>) => void,
+) {
+    const pending = get().pendingCursors;
+    if (pending.length === 0 || !graphData?.tasks) return;
+    for (let i = pending.length - 1; i >= 0; i--) {
+        if (graphData.tasks[pending[i]]) {
+            set({ cursor: pending[i], pendingCursors: [] });
+            return;
+        }
+    }
+}
+
 export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
     graphData: null,
     cursor: null,
@@ -100,8 +121,13 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
     activeView: 'default',
     displayUnsubscribe: null,
     savePositionsCallback: null,
+    pendingCursors: [],
 
     setCursor: (nodeId) => set({ cursor: nodeId }),
+    queueCursor: (nodeId) => {
+        set({ pendingCursors: [...get().pendingCursors, nodeId] });
+        resolvePendingCursors(get().graphData, get, set);
+    },
     setNavInfoText: (text) => set({ navInfoText: text }),
     setNavigationMode: (mode) => set({ navigationMode: mode }),
     setSimulationMode: (mode) => set({ simulationMode: mode }),
@@ -190,6 +216,7 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
                     lastDataReceived: Date.now(),
                     lastError: null,
                 });
+                resolvePendingCursors(data, get, set);
             },
             {
                 baseUrl,
