@@ -42,6 +42,9 @@ export interface InteractionControllerDeps {
 /** Minimum velocity before momentum stops (pixels per second) */
 const MOMENTUM_MIN_VELOCITY = 10;
 
+/** Maximum fling velocity in pixels per second */
+const MOMENTUM_MAX_VELOCITY = 3000;
+
 /** Number of recent positions to track for velocity calculation.
  *  Need at least 4 positions to compute 3 velocity samples for the
  *  iOS-style weighted average. */
@@ -416,6 +419,13 @@ export class InteractionController {
 
         const speed = Math.sqrt(vx * vx + vy * vy);
         if (speed < MOMENTUM_MIN_VELOCITY) return null;
+
+        // Clamp to max velocity, preserving direction
+        if (speed > MOMENTUM_MAX_VELOCITY) {
+            const scale = MOMENTUM_MAX_VELOCITY / speed;
+            vx *= scale;
+            vy *= scale;
+        }
 
         return { vx, vy };
     }
