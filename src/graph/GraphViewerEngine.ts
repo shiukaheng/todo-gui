@@ -72,6 +72,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private lastActiveView: string | null = null;
     private lastFilterKey = '';
     private initialPositionsFetched = false;
+    private _positionState: 'undefined' | 'ready' = 'undefined';
     private plansData: ProcessedPlansData = EMPTY_PLANS_DATA;
     private styledPlansData: StyledPlansData = { plans: {} };
     private simulationEngine: SimulationEngine;
@@ -91,6 +92,13 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private storeUnsubscribe: (() => void) | null = null;
 
     private positionPersistence: PositionPersistenceManager;
+
+    private setPositionState(next: 'undefined' | 'ready'): void {
+        if (next !== this._positionState) {
+            console.log(`[PosState] ${this._positionState} → ${next}`);
+            this._positionState = next;
+        }
+    }
 
     constructor(
         container: HTMLDivElement,
@@ -226,6 +234,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
                 } else {
                     console.log(`[View] INIT no positions for '${viewId}'`);
                 }
+                this.setPositionState('ready');
             });
         }
     }
@@ -416,6 +425,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         console.log(`[View] SWITCH '${prevViewId}' → '${nextViewId}' (simPositions=${simPosCount}, filter=${newFilter?.length ?? 'none'}, hide=${newHide?.length ?? 'none'})`);
 
         // Note: no auto-save on view switch. Use 'savepos' command.
+        this.setPositionState('undefined');
 
         this.currentFilterNodeIds = newFilter;
         this.currentHideNodeIds = newHide;
@@ -434,6 +444,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             } else {
                 console.log(`[View] no positions returned for '${nextViewId}'`);
             }
+            this.setPositionState('ready');
         });
     }
 
