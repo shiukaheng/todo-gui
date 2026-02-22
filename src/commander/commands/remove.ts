@@ -1,5 +1,5 @@
 /**
- * Remove command - delete a task node.
+ * Delete command - delete a task node.
  */
 
 import { CommandDefinition } from '../types';
@@ -7,9 +7,9 @@ import { useTodoStore } from '../../stores/todoStore';
 import { output } from '../output';
 
 export const removeCommand: CommandDefinition = {
-    name: 'remove',
+    name: 'delete',
     description: 'Delete a task node',
-    aliases: ['rm', 'del', 'delete'],
+    aliases: ['rm', 'remove'],
     positionals: [
         {
             name: 'taskId',

@@ -37,6 +37,22 @@ export const mergeCommand: CommandDefinition = {
             },
         },
     ],
+    options: [
+        {
+            name: 'children',
+            alias: 'c',
+            description: 'Only transfer children (outgoing edges)',
+            type: 'boolean',
+            default: false,
+        },
+        {
+            name: 'parents',
+            alias: 'p',
+            description: 'Only transfer parents (incoming edges)',
+            type: 'boolean',
+            default: false,
+        },
+    ],
     handler: async (args) => {
         const { api, graphData, cursor, setCursor } = useTodoStore.getState();
 
@@ -73,6 +89,12 @@ export const mergeCommand: CommandDefinition = {
 
         const deps = Object.values(graphData.dependencies || {});
 
+        // If neither flag is set, transfer both directions (default)
+        const keepChildren = !!args.children;
+        const keepParents = !!args.parents;
+        const transferChildren = !keepParents || keepChildren;  // outgoing
+        const transferParents = !keepChildren || keepParents;    // incoming
+
         // Find existing edges on toNode to avoid duplicates
         const toOutgoing = new Set(deps.filter(d => d.fromId === toId).map(d => d.toId));
         const toIncoming = new Set(deps.filter(d => d.toId === toId).map(d => d.fromId));
@@ -83,23 +105,27 @@ export const mergeCommand: CommandDefinition = {
         const newOutgoing: { fromId: string; toId: string }[] = [];
         const newIncoming: { fromId: string; toId: string }[] = [];
 
-        // Outgoing: fromNode depends on X → toNode depends on X
-        for (const dep of deps) {
-            if (dep.fromId === fromId) {
-                const target = dep.toId;
-                if (target === toId || toOutgoing.has(target)) continue;
-                newOutgoing.push({ fromId: toId, toId: target });
-                toOutgoing.add(target);
+        // Outgoing (children): fromNode depends on X → toNode depends on X
+        if (transferChildren) {
+            for (const dep of deps) {
+                if (dep.fromId === fromId) {
+                    const target = dep.toId;
+                    if (target === toId || toOutgoing.has(target)) continue;
+                    newOutgoing.push({ fromId: toId, toId: target });
+                    toOutgoing.add(target);
+                }
             }
         }
 
-        // Incoming: X depends on fromNode → X depends on toNode
-        for (const dep of deps) {
-            if (dep.toId === fromId) {
-                const source = dep.fromId;
-                if (source === toId || toIncoming.has(source)) continue;
-                newIncoming.push({ fromId: source, toId: toId });
-                toIncoming.add(source);
+        // Incoming (parents): X depends on fromNode → X depends on toNode
+        if (transferParents) {
+            for (const dep of deps) {
+                if (dep.toId === fromId) {
+                    const source = dep.fromId;
+                    if (source === toId || toIncoming.has(source)) continue;
+                    newIncoming.push({ fromId: source, toId: toId });
+                    toIncoming.add(source);
+                }
             }
         }
 

@@ -34,6 +34,8 @@ import { hideCommand } from './hide';
 import { unhideCommand } from './unhide';
 import { saveposCommand } from './savepos';
 import { mergeCommand } from './merge';
+import { renameCommand } from './rename';
+import { renameviewCommand } from './renameview';
 
 /** Register all built-in commands */
 export function registerBuiltinCommands(): void {
@@ -68,4 +70,6 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(unhideCommand);
     commandRegistry.register(saveposCommand);
     commandRegistry.register(mergeCommand);
+    commandRegistry.register(renameCommand);
+    commandRegistry.register(renameviewCommand);
 }
