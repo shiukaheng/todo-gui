@@ -97,6 +97,14 @@ export interface SimulationEngine {
     pinNodes(pins: ReadonlyMap<string, PinStatus>): void;
 
     /**
+     * Force a full layout rebuild on the next step() call.
+     * Used when positions are externally set (e.g., restored from server)
+     * so the engine rebuilds its internal state from the new positions
+     * instead of fighting them with stale forces.
+     */
+    invalidateTopology?(): void;
+
+    /**
      * Clean up any resources held by the engine (timers, workers, etc.)
      * Called when the engine is replaced or the parent is destroyed.
      */

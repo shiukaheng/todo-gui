@@ -275,6 +275,9 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             if (coverageRatio > 0.5 && validCount > 0) {
                 console.log(`[Pos] APPLY accepted — setting simulationState`);
                 this.simulationState = { positions: validPositions };
+                // Force the engine to rebuild its layout from these positions
+                // so it doesn't fight them with stale internal forces.
+                this.simulationEngine.invalidateTopology?.();
             } else {
                 console.log(`[Pos] APPLY rejected — coverage too low, keeping current simulation`);
             }

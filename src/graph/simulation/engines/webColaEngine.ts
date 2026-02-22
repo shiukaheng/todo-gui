@@ -346,6 +346,11 @@ export class WebColaEngine implements SimulationEngine {
         return this.extractState();
     }
 
+    /** Force a full reconcile+rebuild on the next step(). */
+    invalidateTopology(): void {
+        this.lastTopology = { nodeIds: "", edgeIds: "" };
+    }
+
     /** Clean up WebCola layout and reset internal state. */
     destroy(): void {
         if (this.layout) {
