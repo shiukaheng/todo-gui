@@ -358,29 +358,41 @@ export class InteractionController {
     private calculateVelocity(): { vx: number; vy: number } | null {
         if (this.velocitySamples.length < 2) return null;
 
-        // Use only the last 2 samples for instantaneous velocity at release
-        // This prevents "speeding back up" when user slows down before releasing
-        const prev = this.velocitySamples[this.velocitySamples.length - 2];
-        const last = this.velocitySamples[this.velocitySamples.length - 1];
-        const dt = (last.time - prev.time) / 1000; // Convert to seconds
-
         // If too much time has passed since last sample, user has stopped moving
+        const last = this.velocitySamples[this.velocitySamples.length - 1];
         const timeSinceLastSample = (performance.now() - last.time) / 1000;
         if (timeSinceLastSample > 0.1) {
-            // More than 100ms since last movement - no momentum
             return null;
         }
 
-        if (dt < 0.001) return null;
+        // Use peak velocity across recent samples for snappy flings.
+        // Native apps (e.g. Apple Maps) feel fast because they capture the
+        // fastest part of the gesture, not the tail end where the finger
+        // may have slowed down right before lifting.
+        let bestVx = 0;
+        let bestVy = 0;
+        let bestSpeed = 0;
 
-        const vx = (last.position.x - prev.position.x) / dt;
-        const vy = (last.position.y - prev.position.y) / dt;
+        for (let i = 1; i < this.velocitySamples.length; i++) {
+            const prev = this.velocitySamples[i - 1];
+            const curr = this.velocitySamples[i];
+            const dt = (curr.time - prev.time) / 1000;
+            if (dt < 0.001) continue;
 
-        // Only return if above minimum threshold
-        const speed = Math.sqrt(vx * vx + vy * vy);
-        if (speed < MOMENTUM_MIN_VELOCITY) return null;
+            const vx = (curr.position.x - prev.position.x) / dt;
+            const vy = (curr.position.y - prev.position.y) / dt;
+            const speed = Math.sqrt(vx * vx + vy * vy);
 
-        return { vx, vy };
+            if (speed > bestSpeed) {
+                bestSpeed = speed;
+                bestVx = vx;
+                bestVy = vy;
+            }
+        }
+
+        if (bestSpeed < MOMENTUM_MIN_VELOCITY) return null;
+
+        return { vx: bestVx, vy: bestVy };
     }
 
     // ═══════════════════════════════════════════════════════════════════════
