@@ -65,6 +65,17 @@ interface TodoStore {
     disconnect: () => void;
 }
 
+function deriveViewFilters(displayData: ViewListOut | null, viewId: string): {
+    filterNodeIds: string[] | null;
+    blacklistNodeIds: string[] | null;
+} {
+    const viewData = displayData?.views?.[viewId];
+    return {
+        filterNodeIds: viewData?.whitelist?.length ? viewData.whitelist : null,
+        blacklistNodeIds: viewData?.blacklist?.length ? viewData.blacklist : null,
+    };
+}
+
 export const useTodoStore = create<TodoStore>((set, get) => ({
     graphData: null,
     cursor: null,
@@ -96,13 +107,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     clearBlacklist: () => set({ blacklistNodeIds: null }),
     switchView: (viewId) => {
         const { displayData } = get();
-        const viewData = displayData?.views?.[viewId];
-        const filterNodeIds = viewData?.whitelist?.length
-            ? viewData.whitelist
-            : null;
-        const blacklistNodeIds = viewData?.blacklist?.length
-            ? viewData.blacklist
-            : null;
+        const { filterNodeIds, blacklistNodeIds } = deriveViewFilters(displayData, viewId);
         set({ currentViewId: viewId, filterNodeIds, blacklistNodeIds });
     },
 
@@ -116,7 +121,9 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
 
         const unsubscribe = subscribeToDisplay(
             (data) => {
-                set({ displayData: data });
+                const currentViewId = get().currentViewId;
+                const { filterNodeIds, blacklistNodeIds } = deriveViewFilters(data, currentViewId);
+                set({ displayData: data, filterNodeIds, blacklistNodeIds });
             },
             {
                 baseUrl,
@@ -194,7 +201,9 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
         // Also subscribe to display layer
         const displayUnsubscribe = subscribeToDisplay(
             (data) => {
-                set({ displayData: data });
+                const currentViewId = get().currentViewId;
+                const { filterNodeIds, blacklistNodeIds } = deriveViewFilters(data, currentViewId);
+                set({ displayData: data, filterNodeIds, blacklistNodeIds });
             },
             {
                 baseUrl,
