@@ -9,6 +9,90 @@ import type {
 } from 'todo-client';
 import { NodeType } from 'todo-client';
 
+// ── Helpers ────────────────────────────────────────────────────────
+
+function gateLogic(nodeType: NodeType, depValues: boolean[]): boolean {
+    switch (nodeType) {
+        case NodeType.Task:
+        case NodeType.And:
+            return !depValues.length || depValues.every(v => v);
+        case NodeType.Or:
+            return depValues.length > 0 && depValues.some(v => v);
+        case NodeType.Not:
+            return !depValues.some(v => v);
+        case NodeType.ExactlyOne:
+            return depValues.filter(v => v).length === 1;
+        default:
+            return true;
+    }
+}
+
+function propagateCalculatedFields(s: AppState): void {
+    if (s.hasCycles) return;
+
+    // Build indexes
+    // deps_fwd[fromId] = [toId, ...] (children = things I depend on)
+    // deps_rev[toId] = [fromId, ...]  (parents = things that depend on me)
+    const depsFwd: Record<string, string[]> = {};
+    const depsRev: Record<string, string[]> = {};
+    const parentsMap: Record<string, string[]> = {};   // nodeId -> dep IDs where node is toId
+    const childrenMap: Record<string, string[]> = {};  // nodeId -> dep IDs where node is fromId
+
+    for (const [depId, dep] of Object.entries(s.dependencies)) {
+        if (!s.tasks[dep.fromId] || !s.tasks[dep.toId]) continue;
+        (depsFwd[dep.fromId] ??= []).push(dep.toId);
+        (depsRev[dep.toId] ??= []).push(dep.fromId);
+        (parentsMap[dep.toId] ??= []).push(depId);
+        (childrenMap[dep.fromId] ??= []).push(depId);
+    }
+
+    // Memoized calculatedValue (recursive down deps_fwd)
+    const valueCache: Record<string, boolean> = {};
+    function calcValue(nodeId: string): boolean {
+        if (nodeId in valueCache) return valueCache[nodeId];
+        const node = s.tasks[nodeId];
+        const deps = (depsFwd[nodeId] ?? []).map(id => calcValue(id));
+        const depsClear = gateLogic(node.nodeType, deps);
+        const result = node.nodeType === NodeType.Task
+            ? (node.completed != null) && depsClear
+            : depsClear;
+        valueCache[nodeId] = result;
+        return result;
+    }
+
+    // Memoized calculatedDue (recursive up deps_rev)
+    const dueCache: Record<string, number | null> = {};
+    function calcDue(nodeId: string): number | null {
+        if (nodeId in dueCache) return dueCache[nodeId];
+        const node = s.tasks[nodeId];
+        const dues: number[] = [];
+        if (node.due) dues.push(node.due);
+        for (const parentId of (depsRev[nodeId] ?? [])) {
+            const parentDue = calcDue(parentId);
+            if (parentDue != null) dues.push(parentDue);
+        }
+        const result = dues.length ? Math.min(...dues) : null;
+        dueCache[nodeId] = result;
+        return result;
+    }
+
+    // Compute all fields for each node
+    for (const nodeId of Object.keys(s.tasks)) {
+        const node = s.tasks[nodeId];
+        const deps = (depsFwd[nodeId] ?? []).map(id => calcValue(id));
+        const depsClear = gateLogic(node.nodeType, deps);
+        s.tasks[nodeId] = {
+            ...node,
+            calculatedValue: calcValue(nodeId),
+            calculatedDue: calcDue(nodeId),
+            depsClear,
+            isActionable: node.nodeType === NodeType.Task && node.completed == null && depsClear,
+            parents: parentsMap[nodeId] ?? [],
+            children: childrenMap[nodeId] ?? [],
+        };
+    }
+}
+
 // ── State batch ops ────────────────────────────────────────────────
 
 export function applyBatchOps(state: AppState, ops: BatchOperation[]): AppState {
@@ -55,6 +139,7 @@ export function applyBatchOps(state: AppState, ops: BatchOperation[]): AppState 
         }
     }
 
+    propagateCalculatedFields(s);
     return s;
 }
 
@@ -99,7 +184,7 @@ function applyUpdateNode(
 ): void {
     const existing = s.tasks[op.id];
     if (!existing) return;
-    const updated = {
+    s.tasks[op.id] = {
         ...existing,
         ...(op.text !== undefined && { text: op.text ?? existing.text }),
         ...(op.completed !== undefined && { completed: op.completed }),
@@ -107,11 +192,6 @@ function applyUpdateNode(
         ...(op.due !== undefined && { due: op.due }),
         updatedAt: Math.floor(Date.now() / 1000),
     };
-    // Optimistic approximation: for Task nodes, calculatedValue tracks completed
-    if (op.completed !== undefined && (updated.nodeType === NodeType.Task || !updated.nodeType)) {
-        updated.calculatedValue = op.completed != null;
-    }
-    s.tasks[op.id] = updated;
 }
 
 function applyDeleteNode(
