@@ -99,7 +99,7 @@ function applyUpdateNode(
 ): void {
     const existing = s.tasks[op.id];
     if (!existing) return;
-    s.tasks[op.id] = {
+    const updated = {
         ...existing,
         ...(op.text !== undefined && { text: op.text ?? existing.text }),
         ...(op.completed !== undefined && { completed: op.completed }),
@@ -107,6 +107,11 @@ function applyUpdateNode(
         ...(op.due !== undefined && { due: op.due }),
         updatedAt: Math.floor(Date.now() / 1000),
     };
+    // Optimistic approximation: for Task nodes, calculatedValue tracks completed
+    if (op.completed !== undefined && (updated.nodeType === NodeType.Task || !updated.nodeType)) {
+        updated.calculatedValue = op.completed != null;
+    }
+    s.tasks[op.id] = updated;
 }
 
 function applyDeleteNode(
