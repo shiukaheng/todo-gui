@@ -14,6 +14,8 @@ const SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 export function GraphViewer() {
     const navInfoText = useTodoStore((s) => s.navInfoText);
     const navigationMode = useTodoStore((s) => s.navigationMode);
+    const cursor = useTodoStore((s) => s.cursor);
+    const setNavigationMode = useTodoStore((s) => s.setNavigationMode);
     const viewportContainerRef = useRef<HTMLDivElement>(null);
     const handles = useGraphViewerEngine(viewportContainerRef);
     const commandPlane = useCommandPlane();
@@ -67,9 +69,18 @@ export function GraphViewer() {
                     }
                     return;
                 }
-                // Escape in fly mode - no special handling needed
-                if (navigationMode === 'fly' && e.key === 'Escape') {
-                    return;
+                // Escape key handling for fly/auto modes
+                if (e.key === 'Escape') {
+                    // In auto-nav with no cursor selected: switch to fit mode
+                    if (navigationMode === 'auto' && !cursor) {
+                        e.preventDefault();
+                        setNavigationMode('fit');
+                        return;
+                    }
+                    // In fly mode: no special handling needed
+                    if (navigationMode === 'fly') {
+                        return;
+                    }
                 }
             }
 
@@ -136,7 +147,7 @@ export function GraphViewer() {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [handles, commandPlane, navigationMode]);
+    }, [handles, commandPlane, navigationMode, cursor, setNavigationMode]);
 
     return (
         <div className="absolute w-full h-full bg-black">
