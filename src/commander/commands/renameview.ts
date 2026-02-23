@@ -66,10 +66,10 @@ export const renameviewCommand: CommandDefinition = {
             const ops: any[] = [
                 {
                     op: 'update_view',
-                    view_id: newId,
-                    include_recursive: viewAny.includeRecursive ?? [],
-                    exclude_recursive: viewAny.excludeRecursive ?? [],
-                    hide_completed_for: viewAny.hideCompletedFor ?? null,
+                    viewId: newId,
+                    includeRecursive: viewAny.includeRecursive ?? [],
+                    excludeRecursive: viewAny.excludeRecursive ?? [],
+                    hideCompletedFor: viewAny.hideCompletedFor ?? null,
                 },
                 { op: 'delete_view', id: oldId },
             ];

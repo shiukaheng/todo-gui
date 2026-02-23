@@ -40,17 +40,17 @@ export const saveviewCommand: CommandDefinition = {
             return;
         }
 
-        // Persist current positions first
+        // Persist current positions to the named view
         if (savePositionsCallback) {
-            savePositionsCallback();
+            savePositionsCallback(name);
         }
 
         const op: any = {
             op: 'update_view',
-            view_id: name,
-            include_recursive: filter.includeRecursive ?? [],
-            exclude_recursive: filter.excludeRecursive ?? [],
-            hide_completed_for: filter.hideCompletedFor,
+            viewId: name,
+            includeRecursive: filter.includeRecursive ?? [],
+            excludeRecursive: filter.excludeRecursive ?? [],
+            hideCompletedFor: filter.hideCompletedFor,
         };
 
         try {

@@ -213,11 +213,25 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
                     state.showCommandPlane();
                 }
             },
+            onInteractionEnd: () => {
+                this.positionPersistence.scheduleLocalSave();
+            },
         });
         this.inputHandler.setCallback((event) => this.interactionController.handleEvent(event));
 
-        this.positionPersistence.start(() => this.simulationState);
-        useTodoStore.setState({ savePositionsCallback: () => this.positionPersistence.savePositionsNow() });
+        this.positionPersistence.setStateGetter(() => this.simulationState);
+        useTodoStore.setState({
+            savePositionsCallback: (viewId: string) => this.positionPersistence.savePositionsNow(viewId),
+            loadPositionsCallback: (viewId: string) => {
+                this.positionPersistence.fetchPositions(viewId).then(positions => {
+                    if (positions) {
+                        this.applyFetchedPositions(positions);
+                        useTodoStore.getState().setLocalPositions(positions);
+                    }
+                });
+            },
+            saveLocalPositionsCallback: () => this.positionPersistence.saveLocalPositions(),
+        });
 
         this.lastFrameTime = performance.now();
         this.startLoop();
@@ -239,21 +253,18 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             });
         }
 
-        // Fetch initial positions on first update (baseUrl is now guaranteed set)
+        // Apply local positions synchronously on first update (no server fetch)
         if (!this.initialPositionsFetched) {
             this.initialPositionsFetched = true;
-            const viewId = 'default';
-            console.log(`[View] INIT fetching positions for '${viewId}'`);
-            this.positionPersistence.fetchPositions(viewId).then((positions) => {
-                this.unpauseCoreGraphUpdates();
-                if (positions) {
-                    console.log(`[View] INIT got ${Object.keys(positions).length} positions, applying...`);
-                    this.applyFetchedPositions(positions);
-                } else {
-                    console.log(`[View] INIT no positions for '${viewId}'`);
-                }
-                this.setPositionState('ready');
-            });
+            const { localPositions } = useTodoStore.getState();
+            this.unpauseCoreGraphUpdates();
+            if (localPositions && Object.keys(localPositions).length > 0) {
+                console.log(`[View] INIT applying ${Object.keys(localPositions).length} local positions`);
+                this.applyFetchedPositions(localPositions);
+            } else {
+                console.log(`[View] INIT no local positions`);
+            }
+            this.setPositionState('ready');
         }
     }
 
@@ -560,15 +571,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
         if (this.lastAppState) {
             this.processGraphData(this.lastAppState);
-
-            // When includeRecursive removed (e.g. resetview), restore saved positions from server
-            if (newFilter.includeRecursive === null && prevFilter.includeRecursive !== null) {
-                this.positionPersistence.fetchPositions('default').then((positions) => {
-                    if (positions) {
-                        this.applyFetchedPositions(positions);
-                    }
-                });
-            }
         }
     }
 
@@ -810,7 +812,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             this.hideCompletedIntervalId = null;
         }
         this.positionPersistence.stop();
-        useTodoStore.setState({ savePositionsCallback: null });
+        useTodoStore.setState({ savePositionsCallback: null, loadPositionsCallback: null, saveLocalPositionsCallback: null });
         this.storeUnsubscribe?.();
         this.storeUnsubscribe = null;
         this.inputHandler.destroy();

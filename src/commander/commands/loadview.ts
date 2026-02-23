@@ -33,7 +33,7 @@ export const loadviewCommand: CommandDefinition = {
             return;
         }
 
-        const { viewsData, setFilter } = useTodoStore.getState();
+        const { viewsData, setFilter, loadPositionsCallback } = useTodoStore.getState();
 
         if (!viewsData?.views?.[name]) {
             output.error(`view not found: ${name}`);
@@ -42,6 +42,7 @@ export const loadviewCommand: CommandDefinition = {
 
         const filter = deriveFilterFromView(viewsData, name);
         setFilter(filter);
+        if (loadPositionsCallback) loadPositionsCallback(name);
 
         const parts: string[] = [];
         if (filter.includeRecursive) {

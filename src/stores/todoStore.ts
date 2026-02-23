@@ -32,6 +32,7 @@ interface TodoStore {
     // ── Local persisted state (survives refresh via localStorage) ─────
     // See `partialize` at the bottom for what gets persisted.
     filter: Filter;
+    localPositions: Record<string, { x: number; y: number }> | null;
 
     // ── Transient UI state (lost on refresh) ─────────────────────────
     cursor: string | null;
@@ -40,7 +41,9 @@ interface TodoStore {
     navigationMode: NavigationMode;
     simulationMode: SimulationMode;
     commandPlaneVisible: boolean;
-    savePositionsCallback: (() => void) | null;
+    savePositionsCallback: ((viewId: string) => void) | null;
+    loadPositionsCallback: ((viewId: string) => void) | null;
+    saveLocalPositionsCallback: (() => void) | null;
 
     // ── Connection / runtime (lost on refresh) ───────────────────────
     connectionStatus: ConnectionStatus;
@@ -60,6 +63,7 @@ interface TodoStore {
     showCommandPlane: () => void;
     hideCommandPlane: () => void;
     setFilter: (filter: Filter) => void;
+    setLocalPositions: (positions: Record<string, { x: number; y: number }>) => void;
     subscribeDisplay: (baseUrl: string) => () => void;
     disconnectDisplay: () => void;
     subscribe: (baseUrl: string) => () => void;
@@ -71,6 +75,7 @@ interface TodoStore {
  * Used by loadview to extract filter fields from a server-stored view.
  */
 export function deriveFilterFromView(viewsData: ViewListOut | null, viewId: string): Filter {
+    console.log(viewsData, viewId)
     if (!viewsData) return EMPTY_FILTER;
     const viewData = viewsData.views?.[viewId];
     if (!viewData) return EMPTY_FILTER;
@@ -105,6 +110,7 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
 
     // ── Local persisted ──────────────────────────────────────────────
     filter: EMPTY_FILTER,
+    localPositions: null,
 
     // ── Transient UI ─────────────────────────────────────────────────
     cursor: null,
@@ -114,6 +120,8 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
     simulationMode: 'cola' as SimulationMode,
     commandPlaneVisible: false,
     savePositionsCallback: null,
+    loadPositionsCallback: null,
+    saveLocalPositionsCallback: null,
 
     // ── Connection / runtime ─────────────────────────────────────────
     connectionStatus: 'disconnected' as ConnectionStatus,
@@ -135,6 +143,9 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
     showCommandPlane: () => set({ commandPlaneVisible: true }),
     hideCommandPlane: () => set({ commandPlaneVisible: false }),
     setFilter: (filter) => set({ filter }),
+    setLocalPositions: (positions) => set((state) => ({
+        localPositions: { ...state.localPositions, ...positions },
+    })),
 
     disconnectDisplay: () => {
         get().displayUnsubscribe?.();
@@ -194,6 +205,7 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
 
         const rawApi = new DefaultApi(new Configuration({ basePath: baseUrl }));
         const client = new OptimisticTodoClient(rawApi);
+        // const client = rawApi; // TODO toggle optimistic client
 
         const unsubscribe = client.subscribeToState(
             (data) => {
@@ -253,5 +265,5 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
     },
 }), {
     name: 'todo-store',
-    partialize: (state) => ({ filter: state.filter }),
+    partialize: (state) => ({ filter: state.filter, localPositions: state.localPositions }),
 }));

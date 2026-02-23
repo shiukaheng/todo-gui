@@ -310,18 +310,18 @@ function addDependency(s: AppState, fromId: string, toId: string): void {
 // ── Display batch ops ──────────────────────────────────────────────
 
 /**
- * Runtime shape for the `update_view` op used by commands via `as any`.
+ * Runtime shape for the `update_view` op (camelCase, matching generated client).
  */
 interface UpdateViewRuntimeOp {
     op: 'update_view';
-    view_id: string;
-    include_recursive?: string[];
-    exclude_recursive?: string[];
-    hide_completed_for?: number | null;
+    viewId: string;
+    includeRecursive?: string[];
+    excludeRecursive?: string[];
+    hideCompletedFor?: number | null;
 }
 
 function isUpdateViewOp(op: any): op is UpdateViewRuntimeOp {
-    return op && op.op === 'update_view' && typeof op.view_id === 'string';
+    return op && op.op === 'update_view' && typeof op.viewId === 'string';
 }
 
 function emptyView(id: string): ViewOut {
@@ -353,18 +353,18 @@ export function applyDisplayOps(state: ViewListOut, ops: DisplayBatchOperation[]
     }
 
     for (const raw of ops) {
-        // Handle runtime update_view ops (used via `as any` in commands).
+        // Handle runtime update_view ops (camelCase, matching generated client).
         const rawAny = raw as any;
         if (isUpdateViewOp(rawAny)) {
-            const viewId = rawAny.view_id;
+            const viewId = rawAny.viewId;
             if (!s.views[viewId]) {
                 s.views[viewId] = emptyView(viewId);
                 cloned.add(viewId);
             }
             const view = ensureCloned(viewId)! as any;
-            if (rawAny.include_recursive !== undefined) view.includeRecursive = rawAny.include_recursive;
-            if (rawAny.exclude_recursive !== undefined) view.excludeRecursive = rawAny.exclude_recursive;
-            if (rawAny.hide_completed_for !== undefined) view.hideCompletedFor = rawAny.hide_completed_for;
+            if (rawAny.includeRecursive !== undefined) view.includeRecursive = rawAny.includeRecursive;
+            if (rawAny.excludeRecursive !== undefined) view.excludeRecursive = rawAny.excludeRecursive;
+            if (rawAny.hideCompletedFor !== undefined) view.hideCompletedFor = rawAny.hideCompletedFor;
             view.updatedAt = Math.floor(Date.now() / 1000);
             continue;
         }

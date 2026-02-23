@@ -1,13 +1,14 @@
 /**
  * ===================================================================
- * Position Persistence Manager - REST-backed
+ * Position Persistence Manager
  * ===================================================================
  *
- * Persists node positions to the backend via dedicated REST endpoints
- * (GET/PUT /api/views/{viewId}/positions).
+ * Persists node positions locally (zustand/localStorage) and to the
+ * backend via REST endpoints (GET/PUT /api/views/{viewId}/positions)
+ * for named views.
  *
- * Monitors simulation positions and saves them when the graph settles.
- * Positions are fetched async on view switch via fetchPositions().
+ * Local: saveLocalPositions() / scheduleLocalSave()
+ * Server: savePositionsNow(viewId) / fetchPositions(viewId)
  *
  * ===================================================================
  */
@@ -20,34 +21,22 @@ import { viewTrace } from "../../utils/viewTrace";
  * Configuration for the position persistence manager.
  */
 export interface PositionPersistenceConfig {
-    /** How often to check positions (ms). Default: 1000 (1 second) */
-    pollInterval?: number;
-
-    /** Maximum movement threshold to consider "settled" (world space units). Default: 0.5 */
-    settlementThreshold?: number;
-
     /** Debounce duration for saving to storage (ms). Default: 2000 (2 seconds) */
     saveDebounce?: number;
 }
 
 const DEFAULT_CONFIG: Required<PositionPersistenceConfig> = {
-    pollInterval: 1000,
-    settlementThreshold: 0.5,
     saveDebounce: 2000,
 };
 
 /**
- * Manages automatic persistence of node positions.
- * Saves to server via PUT /api/views/{viewId}/positions.
- * Loads via GET /api/views/{viewId}/positions.
+ * Manages persistence of node positions.
+ * Local: merges simulation positions into zustand store (localStorage).
+ * Server: PUT/GET /api/views/{viewId}/positions for named views.
  */
 export class PositionPersistenceManager {
     private config: Required<PositionPersistenceConfig>;
-    private pollIntervalId: ReturnType<typeof setInterval> | null = null;
     private saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    private lastPositions: Record<string, Position> | null = null;
-    private isCurrentlySettled = false;
     private paused = false;
 
     /**
@@ -61,48 +50,25 @@ export class PositionPersistenceManager {
     }
 
     /**
-     * Start monitoring positions for persistence.
-     *
-     * @param getSimulationState - Function to get current positions
+     * Store the simulation state getter callback.
+     * Called once during setup instead of start().
      */
-    start(getSimulationState: () => SimulationState): void {
-        if (this.pollIntervalId !== null) {
-            console.warn("[PositionPersistence] Already started, ignoring start()");
-            return;
-        }
-
+    setStateGetter(getSimulationState: () => SimulationState): void {
         this.getSimulationState = getSimulationState;
-        this.lastPositions = null;
-        this.isCurrentlySettled = false;
-
-        // Start polling
-        this.pollIntervalId = window.setInterval(
-            () => this.checkPositions(),
-            this.config.pollInterval
-        );
-
-        console.log("[PositionPersistence] Started monitoring");
     }
 
     /**
-     * Stop monitoring and clean up.
+     * Stop and clean up.
      */
     stop(): void {
-        if (this.pollIntervalId !== null) {
-            window.clearInterval(this.pollIntervalId);
-            this.pollIntervalId = null;
-        }
-
         if (this.saveTimeoutId !== null) {
             window.clearTimeout(this.saveTimeoutId);
             this.saveTimeoutId = null;
         }
 
         this.getSimulationState = null;
-        this.lastPositions = null;
-        this.isCurrentlySettled = false;
 
-        console.log("[PositionPersistence] Stopped monitoring");
+        console.log("[PositionPersistence] Stopped");
     }
 
     /**
@@ -146,12 +112,11 @@ export class PositionPersistenceManager {
     }
 
     /**
-     * Manually save current positions to server via PUT.
-     * Normally called automatically when graph settles.
+     * Save current positions to server via PUT.
      */
-    savePositionsNow(viewIdOverride?: string): void {
+    savePositionsNow(viewId: string): void {
         if (!this.getSimulationState) {
-            console.log(`[Pos] SAVE skip — not started`);
+            console.log(`[Pos] SAVE skip — no state getter`);
             return;
         }
 
@@ -165,7 +130,6 @@ export class PositionPersistenceManager {
         }
 
         const { baseUrl } = useTodoStore.getState();
-        const targetViewId = viewIdOverride ?? 'default';
         if (!baseUrl) {
             console.log(`[Pos] SAVE skip — no baseUrl`);
             return;
@@ -175,21 +139,65 @@ export class PositionPersistenceManager {
         for (const [nodeId, pos] of Object.entries(positions)) {
             serverPositions[nodeId] = [pos.x, pos.y];
         }
-        console.log(`[Pos] SAVE view='${targetViewId}' count=${count} (override=${viewIdOverride ?? 'none'})`);
-        fetch(`${baseUrl}/api/views/${encodeURIComponent(targetViewId)}/positions`, {
+        console.log(`[Pos] SAVE view='${viewId}' count=${count}`);
+        fetch(`${baseUrl}/api/views/${encodeURIComponent(viewId)}/positions`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ positions: serverPositions }),
         }).then(() => {
-            console.log(`[Pos] SAVE ok view='${targetViewId}'`);
+            console.log(`[Pos] SAVE ok view='${viewId}'`);
         }).catch(err => {
-            console.error(`[Pos] SAVE FAIL view='${targetViewId}'`, err);
+            console.error(`[Pos] SAVE FAIL view='${viewId}'`, err);
         });
     }
 
     /**
+     * Save current simulation positions to the local zustand store.
+     * Merges with existing localPositions to preserve positions of
+     * nodes not in the current simulation (e.g. hidden by filter).
+     */
+    saveLocalPositions(): void {
+        if (!this.getSimulationState) {
+            console.log(`[Pos] LOCAL SAVE skip — no state getter`);
+            return;
+        }
+
+        const state = this.getSimulationState();
+        const positions = state.positions;
+        const count = Object.keys(positions).length;
+
+        if (count === 0) {
+            console.log(`[Pos] LOCAL SAVE skip — 0 positions in simulation`);
+            return;
+        }
+
+        console.log(`[Pos] LOCAL SAVE count=${count}`);
+        useTodoStore.getState().setLocalPositions(positions);
+    }
+
+    /**
+     * Schedule a debounced local save.
+     * Respects the paused flag — does nothing while paused.
+     */
+    scheduleLocalSave(): void {
+        if (this.paused) return;
+
+        if (this.saveTimeoutId !== null) {
+            window.clearTimeout(this.saveTimeoutId);
+        }
+
+        this.saveTimeoutId = window.setTimeout(
+            () => {
+                this.saveLocalPositions();
+                this.saveTimeoutId = null;
+            },
+            this.config.saveDebounce
+        );
+    }
+
+    /**
      * Pause or resume position saving.
-     * When paused, settlement detection and saving are skipped.
+     * When paused, scheduleLocalSave is skipped.
      */
     setPaused(paused: boolean): void {
         viewTrace('Position', 'setPaused', { paused });
@@ -201,95 +209,5 @@ export class PositionPersistenceManager {
                 this.saveTimeoutId = null;
             }
         }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PRIVATE METHODS
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /**
-     * Poll current positions and check for settlement.
-     * Called by interval timer.
-     */
-    private checkPositions(): void {
-        if (!this.getSimulationState || this.paused) return;
-
-        const state = this.getSimulationState();
-        const currentPositions = state.positions;
-
-        // Skip if no positions yet
-        if (Object.keys(currentPositions).length === 0) {
-            return;
-        }
-
-        // First poll - store baseline
-        if (this.lastPositions === null) {
-            this.lastPositions = { ...currentPositions };
-            return;
-        }
-
-        // Check if settled
-        const settled = this.isGraphSettled(this.lastPositions, currentPositions);
-
-        // Detect transition: unsettled → settled (auto-save disabled, use savepos command)
-        if (!this.isCurrentlySettled && settled) {
-            console.log(`[Pos] SETTLED (auto-save disabled — use 'savepos' command)`);
-        }
-
-        // Update state
-        this.isCurrentlySettled = settled;
-        this.lastPositions = { ...currentPositions };
-    }
-
-    /**
-     * Determine if graph has settled (all nodes below movement threshold).
-     */
-    private isGraphSettled(
-        prev: Record<string, Position>,
-        current: Record<string, Position>
-    ): boolean {
-        const threshold = this.config.settlementThreshold;
-
-        for (const nodeId in current) {
-            if (!(nodeId in prev)) {
-                return false;
-            }
-
-            const prevPos = prev[nodeId];
-            const currPos = current[nodeId];
-
-            const dx = currPos.x - prevPos.x;
-            const dy = currPos.y - prevPos.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-
-            if (distance > threshold) {
-                return false;
-            }
-        }
-
-        for (const nodeId in prev) {
-            if (!(nodeId in current)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * Schedule a debounced save to storage.
-     */
-    private scheduleSave(): void {
-        if (this.saveTimeoutId !== null) {
-            window.clearTimeout(this.saveTimeoutId);
-        }
-
-        this.saveTimeoutId = window.setTimeout(
-            () => {
-                this.savePositionsNow();
-                this.saveTimeoutId = null;
-            },
-            this.config.saveDebounce
-        );
     }
 }

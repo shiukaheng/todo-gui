@@ -31,11 +31,6 @@ export const deleteviewCommand: CommandDefinition = {
             return;
         }
 
-        if (viewId === 'default') {
-            output.error('cannot delete the default view');
-            return;
-        }
-
         const { api } = useTodoStore.getState();
         if (!api) {
             output.error('not connected to server');

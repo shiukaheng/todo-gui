@@ -33,6 +33,7 @@ export interface InteractionControllerDeps {
     getSimulationState: () => SimulationState;
     onNodeClick?: (nodeId: string) => void;
     onCanvasTap?: () => void;
+    onInteractionEnd?: () => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -208,6 +209,7 @@ export class InteractionController {
             this.endNodeDrag();
         } else if (this.isDraggingCanvas) {
             this.endCanvasDrag();
+            this.deps.onInteractionEnd?.();
         }
     }
 
@@ -297,6 +299,8 @@ export class InteractionController {
         this.draggingNodeId = null;
         this.dragOffset = null;
         this.currentDragScreenPos = null;
+
+        this.deps.onInteractionEnd?.();
     }
 
     // ─── Canvas dragging ───
@@ -566,6 +570,7 @@ export class InteractionController {
                         nav.setVelocity(velocity.vx, velocity.vy);
                     }
                 }
+                this.deps.onInteractionEnd?.();
             }
 
             this.lastDragScreenPos = null;
