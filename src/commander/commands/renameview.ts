@@ -74,7 +74,7 @@ export const renameviewCommand: CommandDefinition = {
                 { op: 'delete_view', id: oldId },
             ];
 
-            await api.displayBatchOperationsApiDisplayBatchPost({
+            await api.displayBatch({
                 displayBatchRequest: { operations: ops },
             });
 

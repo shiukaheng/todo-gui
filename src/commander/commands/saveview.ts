@@ -54,7 +54,7 @@ export const saveviewCommand: CommandDefinition = {
         };
 
         try {
-            await api.displayBatchOperationsApiDisplayBatchPost({
+            await api.displayBatch({
                 displayBatchRequest: {
                     operations: [op],
                 },

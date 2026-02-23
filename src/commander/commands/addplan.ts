@@ -74,7 +74,7 @@ export const addplanCommand: CommandDefinition = {
         }));
 
         try {
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: {
                     operations: [{
                         op: 'create_plan',

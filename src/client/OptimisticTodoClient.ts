@@ -3,8 +3,8 @@ import type {
     ViewListOut,
     BatchResponse,
     DefaultApi,
-    BatchOperationsApiBatchPostRequest,
-    DisplayBatchOperationsRequest,
+    BatchOperationRequest,
+    DisplayBatchOperationRequest,
 } from 'todo-client';
 import { subscribeToState, subscribeToDisplay } from 'todo-client';
 import { applyBatchOps, applyDisplayOps } from './applyOptimistic';
@@ -14,12 +14,12 @@ import { applyBatchOps, applyDisplayOps } from './applyOptimistic';
  * DefaultApi satisfies this structurally, as does OptimisticTodoClient.
  */
 export interface TodoApi {
-    batchOperationsApiBatchPost(
-        requestParameters: BatchOperationsApiBatchPostRequest,
+    batch(
+        requestParameters: BatchOperationRequest,
         initOverrides?: RequestInit,
     ): Promise<BatchResponse>;
-    displayBatchOperationsApiDisplayBatchPost(
-        requestParameters: DisplayBatchOperationsRequest,
+    displayBatch(
+        requestParameters: DisplayBatchOperationRequest,
         initOverrides?: RequestInit,
     ): Promise<BatchResponse>;
 }
@@ -28,7 +28,7 @@ export interface TodoApi {
  * Wraps DefaultApi + SSE subscriptions to provide optimistic updates.
  *
  * Data flow:
- *   Command calls batchOperationsApiBatchPost(...)
+ *   Command calls batch(...)
  *     1. Clone stateSnapshot, apply ops → optimistic AppState
  *     2. Push to stateCallback → store re-renders instantly
  *     3. Forward to real DefaultApi → server processes
@@ -76,10 +76,10 @@ export class OptimisticTodoClient implements TodoApi {
     }
 
     /**
-     * Wraps api.batchOperationsApiBatchPost with optimistic update.
+     * Wraps api.batch with optimistic update.
      */
-    async batchOperationsApiBatchPost(
-        requestParameters: BatchOperationsApiBatchPostRequest,
+    async batch(
+        requestParameters: BatchOperationRequest,
         initOverrides?: RequestInit,
     ): Promise<BatchResponse> {
         // 1. Apply optimistic update if we have a snapshot
@@ -90,14 +90,14 @@ export class OptimisticTodoClient implements TodoApi {
         }
 
         // 2. Forward to real API — server SSE will override with truth
-        return this.api.batchOperationsApiBatchPost(requestParameters, initOverrides);
+        return this.api.batch(requestParameters, initOverrides);
     }
 
     /**
-     * Wraps api.displayBatchOperationsApiDisplayBatchPost with optimistic update.
+     * Wraps api.displayBatch with optimistic update.
      */
-    async displayBatchOperationsApiDisplayBatchPost(
-        requestParameters: DisplayBatchOperationsRequest,
+    async displayBatch(
+        requestParameters: DisplayBatchOperationRequest,
         initOverrides?: RequestInit,
     ): Promise<BatchResponse> {
         // 1. Apply optimistic update if we have a snapshot
@@ -108,6 +108,6 @@ export class OptimisticTodoClient implements TodoApi {
         }
 
         // 2. Forward to real API — server SSE will override with truth
-        return this.api.displayBatchOperationsApiDisplayBatchPost(requestParameters, initOverrides);
+        return this.api.displayBatch(requestParameters, initOverrides);
     }
 }

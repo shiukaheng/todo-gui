@@ -72,7 +72,7 @@ export const addCommand: CommandDefinition = {
 
         try {
             useTodoStore.getState().queueCursor(taskId);
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: {
                     operations: [{
                         op: 'create_node',

@@ -43,7 +43,7 @@ export const deleteviewCommand: CommandDefinition = {
         }
 
         try {
-            await api.displayBatchOperationsApiDisplayBatchPost({
+            await api.displayBatch({
                 displayBatchRequest: {
                     operations: [{ op: 'delete_view', id: viewId }],
                 },

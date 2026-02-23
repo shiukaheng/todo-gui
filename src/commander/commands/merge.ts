@@ -149,7 +149,7 @@ export const mergeCommand: CommandDefinition = {
         operations.push({ op: 'delete_node', id: fromId });
 
         try {
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: { operations },
             });
 

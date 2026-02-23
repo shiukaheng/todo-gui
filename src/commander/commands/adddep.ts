@@ -59,7 +59,7 @@ export const adddepCommand: CommandDefinition = {
         try {
             // Create a new task that blocks the cursor (cursor depends on new task)
             useTodoStore.getState().queueCursor(taskId);
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: {
                     operations: [{
                         op: 'create_node',

@@ -113,7 +113,7 @@ export const reattachCommand: CommandDefinition = {
             // Attach to new parent
             operations.push({ op: 'link', fromId: newParentId, toId: nodeId });
 
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: { operations },
             });
 

@@ -96,7 +96,7 @@ export const pushtoplanCommand: CommandDefinition = {
                 ];
 
                 // Update plan
-                await api.batchOperationsApiBatchPost({
+                await api.batch({
                     batchRequest: {
                         operations: [{
                             op: 'update_plan',
@@ -114,7 +114,7 @@ export const pushtoplanCommand: CommandDefinition = {
                     order: (index + 1) * 1.0,
                 }));
 
-                await api.batchOperationsApiBatchPost({
+                await api.batch({
                     batchRequest: {
                         operations: [{
                             op: 'create_plan',

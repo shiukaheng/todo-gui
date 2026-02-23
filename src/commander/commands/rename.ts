@@ -78,7 +78,7 @@ export const renameCommand: CommandDefinition = {
         }
 
         try {
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: {
                     operations: [{ op: 'rename_node', id: oldId, newId }],
                 },

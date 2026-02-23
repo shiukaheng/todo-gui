@@ -61,7 +61,7 @@ export const popfromplanCommand: CommandDefinition = {
         const stepsToKeep = sortedSteps.slice(0, -1);
 
         try {
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: {
                     operations: [{
                         op: 'update_plan',

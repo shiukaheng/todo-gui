@@ -64,7 +64,7 @@ export function NodeDetailOverlay() {
 
         try {
             if (edit.field === 'id') {
-                await api.batchOperationsApiBatchPost({
+                await api.batch({
                     batchRequest: {
                         operations: [{ op: 'rename_node', id: task.id, newId: edit.value }],
                     },
@@ -82,7 +82,7 @@ export function NodeDetailOverlay() {
                         op.due = null;
                     }
                 }
-                await api.batchOperationsApiBatchPost({
+                await api.batch({
                     batchRequest: { operations: [op as any] },
                 });
             }
@@ -123,7 +123,7 @@ export function NodeDetailOverlay() {
             } else {
                 update.due = null;
             }
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: { operations: [{ op: 'update_node', id: task.id, ...update } as any] },
             });
             setEdit({ field: null, value: '' });
@@ -173,7 +173,7 @@ export function NodeDetailOverlay() {
             ? { value: false, modified: now }
             : { value: true, modified: now };
         try {
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: {
                     operations: [{ op: 'update_node', id: task.id, completed } as any],
                 },
@@ -189,7 +189,7 @@ export function NodeDetailOverlay() {
         const currentIndex = types.indexOf(task.nodeType || 'Task');
         const nextType = types[(currentIndex + 1) % types.length];
         try {
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: {
                     operations: [{ op: 'update_node', id: task.id, nodeType: nextType as any }],
                 },
@@ -297,7 +297,7 @@ export function NodeDetailOverlay() {
     const clearDue = async () => {
         if (!api || !task) return;
         try {
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: {
                     operations: [{ op: 'update_node', id: task.id, due: null }],
                 },

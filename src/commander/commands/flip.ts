@@ -91,7 +91,7 @@ export const flipCommand: CommandDefinition = {
         try {
             if (aDependsOnB) {
                 // A depends on B, flip to B depends on A
-                await api.batchOperationsApiBatchPost({
+                await api.batch({
                     batchRequest: {
                         operations: [
                             { op: 'unlink', fromId: taskA, toId: taskB },
@@ -102,7 +102,7 @@ export const flipCommand: CommandDefinition = {
                 output.success(`flipped: ${taskB} now depends on ${taskA}`);
             } else {
                 // B depends on A, flip to A depends on B
-                await api.batchOperationsApiBatchPost({
+                await api.batch({
                     batchRequest: {
                         operations: [
                             { op: 'unlink', fromId: taskB, toId: taskA },

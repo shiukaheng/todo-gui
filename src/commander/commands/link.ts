@@ -73,7 +73,7 @@ export const linkCommand: CommandDefinition = {
 
         try {
             // API: from_id depends on to_id (from=dependent, to=blocker)
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: {
                     operations: [{
                         op: 'link',

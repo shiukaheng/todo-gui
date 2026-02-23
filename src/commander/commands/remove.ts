@@ -116,7 +116,7 @@ export const removeCommand: CommandDefinition = {
 
         try {
             const operations = deleteIds.map(id => ({ op: 'delete_node' as const, id }));
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: { operations },
             });
             if (recursive && deleteIds.length > 1) {

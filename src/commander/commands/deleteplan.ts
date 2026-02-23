@@ -47,7 +47,7 @@ export const deleteplanCommand: CommandDefinition = {
         }
 
         try {
-            await api.batchOperationsApiBatchPost({
+            await api.batch({
                 batchRequest: {
                     operations: [{ op: 'delete_plan', id: planId }],
                 },
