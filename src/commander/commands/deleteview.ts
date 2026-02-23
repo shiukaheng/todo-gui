@@ -16,9 +16,9 @@ export const deleteviewCommand: CommandDefinition = {
             description: 'ID of the view to delete',
             required: true,
             complete: (partial) => {
-                const displayData = useTodoStore.getState().displayData;
-                if (!displayData?.views) return [];
-                return Object.keys(displayData.views).filter(id =>
+                const { viewsData } = useTodoStore.getState();
+                if (!viewsData?.views) return [];
+                return Object.keys(viewsData.views).filter(id =>
                     id.toLowerCase().startsWith(partial.toLowerCase())
                 );
             },
@@ -36,19 +36,14 @@ export const deleteviewCommand: CommandDefinition = {
             return;
         }
 
-        const { api, activeView, setActiveView } = useTodoStore.getState();
+        const { api } = useTodoStore.getState();
         if (!api) {
             output.error('not connected to server');
             return;
         }
 
         try {
-            // If deleting the current view, switch to default first
-            if (activeView === viewId) {
-                setActiveView('default');
-            }
-
-            await api.displayBatch({
+            await api.displayBatchOperationsApiDisplayBatchPost({
                 displayBatchRequest: {
                     operations: [{ op: 'delete_view', id: viewId }],
                 },

@@ -164,8 +164,8 @@ export class PositionPersistenceManager {
             return;
         }
 
-        const { baseUrl, activeView } = useTodoStore.getState();
-        const targetViewId = viewIdOverride ?? activeView;
+        const { baseUrl } = useTodoStore.getState();
+        const targetViewId = viewIdOverride ?? 'default';
         if (!baseUrl) {
             console.log(`[Pos] SAVE skip — no baseUrl`);
             return;
@@ -175,7 +175,7 @@ export class PositionPersistenceManager {
         for (const [nodeId, pos] of Object.entries(positions)) {
             serverPositions[nodeId] = [pos.x, pos.y];
         }
-        console.log(`[Pos] SAVE view='${targetViewId}' count=${count} (activeView='${activeView}', override=${viewIdOverride ?? 'none'})`);
+        console.log(`[Pos] SAVE view='${targetViewId}' count=${count} (override=${viewIdOverride ?? 'none'})`);
         fetch(`${baseUrl}/api/views/${encodeURIComponent(targetViewId)}/positions`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },

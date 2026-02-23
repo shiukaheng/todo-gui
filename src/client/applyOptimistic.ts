@@ -6,6 +6,7 @@ import type {
     DependencyOut,
     BatchOperation,
     DisplayBatchOperation,
+    CompletedInfo,
 } from 'todo-client';
 import { NodeType } from 'todo-client';
 
@@ -31,12 +32,10 @@ function propagateCalculatedFields(s: AppState): void {
     if (s.hasCycles) return;
 
     // Build indexes
-    // deps_fwd[fromId] = [toId, ...] (children = things I depend on)
-    // deps_rev[toId] = [fromId, ...]  (parents = things that depend on me)
     const depsFwd: Record<string, string[]> = {};
     const depsRev: Record<string, string[]> = {};
-    const parentsMap: Record<string, string[]> = {};   // nodeId -> dep IDs where node is toId
-    const childrenMap: Record<string, string[]> = {};  // nodeId -> dep IDs where node is fromId
+    const parentsMap: Record<string, string[]> = {};
+    const childrenMap: Record<string, string[]> = {};
 
     for (const [depId, dep] of Object.entries(s.dependencies)) {
         if (!s.tasks[dep.fromId] || !s.tasks[dep.toId]) continue;
@@ -53,8 +52,9 @@ function propagateCalculatedFields(s: AppState): void {
         const node = s.tasks[nodeId];
         const deps = (depsFwd[nodeId] ?? []).map(id => calcValue(id));
         const depsClear = gateLogic(node.nodeType, deps);
+        const completed = node.completed;
         const result = node.nodeType === NodeType.Task
-            ? (node.completed != null) && depsClear
+            ? (completed?.value === true) && depsClear
             : depsClear;
         valueCache[nodeId] = result;
         return result;
@@ -81,12 +81,13 @@ function propagateCalculatedFields(s: AppState): void {
         const node = s.tasks[nodeId];
         const deps = (depsFwd[nodeId] ?? []).map(id => calcValue(id));
         const depsClear = gateLogic(node.nodeType, deps);
+        const completed = node.completed;
         s.tasks[nodeId] = {
             ...node,
             calculatedValue: calcValue(nodeId),
             calculatedDue: calcDue(nodeId),
             depsClear,
-            isActionable: node.nodeType === NodeType.Task && node.completed == null && depsClear,
+            isActionable: node.nodeType === NodeType.Task && (completed?.value !== true) && depsClear,
             parents: parentsMap[nodeId] ?? [],
             children: childrenMap[nodeId] ?? [],
         };
@@ -310,13 +311,13 @@ function addDependency(s: AppState, fromId: string, toId: string): void {
 
 /**
  * Runtime shape for the `update_view` op used by commands via `as any`.
- * Not part of the generated DisplayBatchOperation union.
  */
 interface UpdateViewRuntimeOp {
     op: 'update_view';
     view_id: string;
-    whitelist?: string[];
-    blacklist?: string[];
+    include_recursive?: string[];
+    exclude_recursive?: string[];
+    hide_completed_for?: number | null;
 }
 
 function isUpdateViewOp(op: any): op is UpdateViewRuntimeOp {
@@ -327,11 +328,12 @@ function emptyView(id: string): ViewOut {
     return {
         id,
         positions: {},
-        whitelist: [],
-        blacklist: [],
+        includeRecursive: [],
+        excludeRecursive: [],
+        hideCompletedFor: null,
         createdAt: Math.floor(Date.now() / 1000),
         updatedAt: Math.floor(Date.now() / 1000),
-    };
+    } as any;
 }
 
 export function applyDisplayOps(state: ViewListOut, ops: DisplayBatchOperation[]): ViewListOut {
@@ -352,7 +354,6 @@ export function applyDisplayOps(state: ViewListOut, ops: DisplayBatchOperation[]
 
     for (const raw of ops) {
         // Handle runtime update_view ops (used via `as any` in commands).
-        // These are not part of the typed DisplayBatchOperation union.
         const rawAny = raw as any;
         if (isUpdateViewOp(rawAny)) {
             const viewId = rawAny.view_id;
@@ -360,61 +361,19 @@ export function applyDisplayOps(state: ViewListOut, ops: DisplayBatchOperation[]
                 s.views[viewId] = emptyView(viewId);
                 cloned.add(viewId);
             }
-            const view = ensureCloned(viewId)!;
-            if (rawAny.whitelist !== undefined) view.whitelist = rawAny.whitelist;
-            if (rawAny.blacklist !== undefined) view.blacklist = rawAny.blacklist;
+            const view = ensureCloned(viewId)! as any;
+            if (rawAny.include_recursive !== undefined) view.includeRecursive = rawAny.include_recursive;
+            if (rawAny.exclude_recursive !== undefined) view.excludeRecursive = rawAny.exclude_recursive;
+            if (rawAny.hide_completed_for !== undefined) view.hideCompletedFor = rawAny.hide_completed_for;
             view.updatedAt = Math.floor(Date.now() / 1000);
             continue;
         }
 
         switch (raw.op) {
-            case 'create_view':
-                s.views[raw.id] = emptyView(raw.id);
-                cloned.add(raw.id);
-                break;
-
             case 'delete_view':
                 delete s.views[raw.id];
                 cloned.delete(raw.id);
                 break;
-
-            case 'set_whitelist': {
-                const view = ensureCloned(raw.viewId);
-                if (view) {
-                    view.whitelist = [...raw.nodeIds];
-                    view.updatedAt = Math.floor(Date.now() / 1000);
-                }
-                break;
-            }
-
-            case 'set_blacklist': {
-                const view = ensureCloned(raw.viewId);
-                if (view) {
-                    view.blacklist = [...raw.nodeIds];
-                    view.updatedAt = Math.floor(Date.now() / 1000);
-                }
-                break;
-            }
-
-            case 'update_positions': {
-                const view = ensureCloned(raw.viewId);
-                if (view) {
-                    Object.assign(view.positions, raw.positions);
-                    view.updatedAt = Math.floor(Date.now() / 1000);
-                }
-                break;
-            }
-
-            case 'remove_positions': {
-                const view = ensureCloned(raw.viewId);
-                if (view) {
-                    for (const nodeId of raw.nodeIds) {
-                        delete view.positions[nodeId];
-                    }
-                    view.updatedAt = Math.floor(Date.now() / 1000);
-                }
-                break;
-            }
         }
     }
 

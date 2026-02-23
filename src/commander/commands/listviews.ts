@@ -9,19 +9,17 @@ import { output } from '../output';
 export const listviewsCommand: CommandDefinition = {
     name: 'listviews',
     description: 'List available display views',
-    aliases: ['lv'],
     handler: () => {
-        const { displayData, activeView } = useTodoStore.getState();
+        const { viewsData } = useTodoStore.getState();
 
-        if (!displayData?.views || Object.keys(displayData.views).length === 0) {
+        if (!viewsData?.views || Object.keys(viewsData.views).length === 0) {
             output.print('no views available');
             return;
         }
 
         const lines: string[] = [];
-        for (const [id] of Object.entries(displayData.views)) {
-            const marker = id === activeView ? ' *' : '';
-            lines.push(`${id}${marker}`);
+        for (const [id] of Object.entries(viewsData.views)) {
+            lines.push(id);
         }
         output.print(lines.join('\n'));
     },

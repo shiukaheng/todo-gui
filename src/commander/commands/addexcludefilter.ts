@@ -1,20 +1,20 @@
 /**
- * Filter command - set whitelist on current view (server-side).
- * The display SSE will push the update back, triggering graph reprocessing.
+ * Addexcludefilter command - append IDs to the exclude-recursive filter.
+ * Modifies the local filter via setFilter(); no server calls.
  */
 
 import { CommandDefinition } from '../types';
 import { useTodoStore } from '../../stores/todoStore';
 import { output } from '../output';
 
-export const filterCommand: CommandDefinition = {
-    name: 'filter',
-    description: 'Filter graph to show only specified nodes and their children',
-    aliases: ['f'],
+export const addexcludefilterCommand: CommandDefinition = {
+    name: 'addexcludefilter',
+    description: 'Add node IDs to the exclude-recursive filter',
+    aliases: ['aef'],
     positionals: [
         {
             name: 'nodeIds',
-            description: 'Node IDs to filter on (uses cursor if omitted)',
+            description: 'Node IDs to add (uses cursor if omitted)',
             required: false,
             complete: (partial) => {
                 const graphData = useTodoStore.getState().graphData;
@@ -28,7 +28,7 @@ export const filterCommand: CommandDefinition = {
         },
     ],
     handler: (args) => {
-        const { graphData, cursor, api, activeView } = useTodoStore.getState();
+        const { graphData, cursor, filter, setFilter } = useTodoStore.getState();
 
         if (!graphData?.tasks) {
             output.error('no graph data available');
@@ -52,23 +52,10 @@ export const filterCommand: CommandDefinition = {
             }
         }
 
-        if (!api) {
-            output.error('not connected');
-            return;
-        }
+        const existing = filter.excludeRecursive ?? [];
+        const merged = [...new Set([...existing, ...nodeIds])];
 
-        api.displayBatch({
-            displayBatchRequest: {
-                operations: [{
-                    op: 'update_view',
-                    view_id: activeView,
-                    whitelist: nodeIds,
-                } as any],
-            },
-        }).catch(err => {
-            output.error(`failed to set filter: ${err}`);
-        });
-
-        output.success(`filter: ${nodeIds.join(', ')}`);
+        setFilter({ ...filter, excludeRecursive: merged });
+        output.success(`excludeRecursive added: ${nodeIds.join(', ')} (total: ${merged.length})`);
     },
 };

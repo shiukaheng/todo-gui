@@ -11,12 +11,12 @@ export const saveposCommand: CommandDefinition = {
     description: 'Save current node positions to the server',
     aliases: ['sp'],
     handler: () => {
-        const { savePositionsCallback, activeView } = useTodoStore.getState();
+        const { savePositionsCallback } = useTodoStore.getState();
         if (!savePositionsCallback) {
             output.print('No graph engine active');
             return;
         }
         savePositionsCallback();
-        output.print(`Saving positions for view '${activeView}'`);
+        output.print('Saving positions');
     },
 };

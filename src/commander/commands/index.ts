@@ -23,19 +23,23 @@ import { deleteplanCommand } from './deleteplan';
 import { pushtoplanCommand } from './pushtoplan';
 import { popfromplanCommand } from './popfromplan';
 import { renameplanCommand } from './renameplan';
-import { filterCommand } from './filter';
 import { resetviewCommand } from './resetview';
 import { reattachCommand } from './reattach';
 import { deleteviewCommand } from './deleteview';
-import { setviewCommand } from './setview';
 import { listviewsCommand } from './listviews';
-import { currentviewCommand } from './currentview';
-import { hideCommand } from './hide';
-import { unhideCommand } from './unhide';
 import { saveposCommand } from './savepos';
 import { mergeCommand } from './merge';
 import { renameCommand } from './rename';
 import { renameviewCommand } from './renameview';
+import { setincludefilterCommand } from './setincludefilter';
+import { addincludefilterCommand } from './addincludefilter';
+import { deleteincludefilterCommand } from './deleteincludefilter';
+import { setexcludefilterCommand } from './setexcludefilter';
+import { addexcludefilterCommand } from './addexcludefilter';
+import { deleteexcludefilterCommand } from './deleteexcludefilter';
+import { setcompletedcullfilterCommand } from './setcompletedcullfilter';
+import { saveviewCommand } from './saveview';
+import { loadviewCommand } from './loadview';
 
 /** Register all built-in commands */
 export function registerBuiltinCommands(): void {
@@ -59,17 +63,21 @@ export function registerBuiltinCommands(): void {
     commandRegistry.register(pushtoplanCommand);
     commandRegistry.register(popfromplanCommand);
     commandRegistry.register(renameplanCommand);
-    commandRegistry.register(filterCommand);
     commandRegistry.register(resetviewCommand);
     commandRegistry.register(reattachCommand);
-    commandRegistry.register(setviewCommand);
     commandRegistry.register(deleteviewCommand);
     commandRegistry.register(listviewsCommand);
-    commandRegistry.register(currentviewCommand);
-    commandRegistry.register(hideCommand);
-    commandRegistry.register(unhideCommand);
     commandRegistry.register(saveposCommand);
     commandRegistry.register(mergeCommand);
     commandRegistry.register(renameCommand);
     commandRegistry.register(renameviewCommand);
+    commandRegistry.register(setincludefilterCommand);
+    commandRegistry.register(addincludefilterCommand);
+    commandRegistry.register(deleteincludefilterCommand);
+    commandRegistry.register(setexcludefilterCommand);
+    commandRegistry.register(addexcludefilterCommand);
+    commandRegistry.register(deleteexcludefilterCommand);
+    commandRegistry.register(setcompletedcullfilterCommand);
+    commandRegistry.register(saveviewCommand);
+    commandRegistry.register(loadviewCommand);
 }

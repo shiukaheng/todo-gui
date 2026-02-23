@@ -4,20 +4,7 @@ import { formatDistanceToNow } from "date-fns";
 import { getUrgencyColorCSSFromTimestamp } from "../utils/urgencyColor";
 import { parseDate } from "chrono-node";
 import { useCommandPlane } from "../commander";
-
-interface Task {
-    id: string;
-    text: string;
-    nodeType?: string;
-    depsClear?: boolean;
-    calculatedValue?: boolean;
-    isActionable?: boolean;
-    calculatedDue?: number | null;
-    due?: number | null;
-    completed?: number | null;
-    children?: string[];
-    parents?: string[];
-}
+import type { CompletedInfo, NodeOut } from "todo-client";
 
 interface EditState {
     field: 'id' | 'text' | 'due' | null;
@@ -33,7 +20,7 @@ export function NodeDetailOverlay() {
     const api = useTodoStore((s) => s.api);
     const commandPlane = useCommandPlane();
 
-    const task: Task | null = cursor && graphData?.tasks[cursor] ? graphData.tasks[cursor] : null;
+    const task: NodeOut | null = cursor && graphData?.tasks[cursor] ? graphData.tasks[cursor] : null;
 
     // Backend provides depsClear - no need to calculate manually
     const isBlocked = task ? (task.depsClear === false) : false;
@@ -181,10 +168,14 @@ export function NodeDetailOverlay() {
 
     const toggleCompletion = useCallback(async () => {
         if (!task || !api || task.nodeType !== "Task" || isBlocked) return;
+        const now = Math.floor(Date.now() / 1000);
+        const completed: CompletedInfo = task.completed?.value
+            ? { value: false, modified: now }
+            : { value: true, modified: now };
         try {
             await api.batchOperationsApiBatchPost({
                 batchRequest: {
-                    operations: [{ op: 'update_node', id: task.id, completed: task.completed != null ? null : Math.floor(Date.now() / 1000) }],
+                    operations: [{ op: 'update_node', id: task.id, completed } as any],
                 },
             });
         } catch (err) {

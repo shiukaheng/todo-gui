@@ -1,43 +1,29 @@
 /**
- * Resetview command - clear all filters and hides on the current view (server-side).
- * The display SSE will push the update back, triggering graph reprocessing.
+ * Resetview command - clear local filter buffer.
  */
 
 import { CommandDefinition } from '../types';
-import { useTodoStore, deriveViewFilters } from '../../stores/todoStore';
+import { useTodoStore } from '../../stores/todoStore';
+import { EMPTY_FILTER } from '../../stores/filterTypes';
 import { output } from '../output';
 
 export const resetviewCommand: CommandDefinition = {
     name: 'resetview',
-    description: 'Reset current view (clear filter and hidden nodes)',
     aliases: ['rv'],
+    description: 'Reset local filter (clear include, exclude, and completed cull)',
     handler: () => {
-        const { displayData, activeView, api } = useTodoStore.getState();
-        const { filterNodeIds, hideNodeIds } = deriveViewFilters(displayData, activeView);
+        const { filter, setFilter } = useTodoStore.getState();
 
-        if (filterNodeIds === null && (hideNodeIds === null || hideNodeIds.length === 0)) {
-            output.error('view already has no filter or hidden nodes');
+        if (
+            filter.includeRecursive === null &&
+            filter.excludeRecursive === null &&
+            filter.hideCompletedFor === null
+        ) {
+            output.error('filter already empty');
             return;
         }
 
-        if (!api) {
-            output.error('not connected');
-            return;
-        }
-
-        api.displayBatch({
-            displayBatchRequest: {
-                operations: [{
-                    op: 'update_view',
-                    view_id: activeView,
-                    whitelist: [],
-                    blacklist: [],
-                } as any],
-            },
-        }).catch(err => {
-            output.error(`failed to reset view: ${err}`);
-        });
-
-        output.success('view reset');
+        setFilter(EMPTY_FILTER);
+        output.success('filter reset');
     },
 };

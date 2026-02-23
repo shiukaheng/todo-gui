@@ -39,7 +39,9 @@ import { SVGRenderer } from "./render/SVGRenderer";
 import { PerformanceMonitor } from "./render/PerformanceMonitor";
 import { InputHandler, InteractionController } from "./input";
 import { PositionedGraphData } from "./simulation/utils";
-import { useTodoStore, NavigationMode, SimulationMode, deriveViewFilters } from "../stores/todoStore";
+import { useTodoStore, NavigationMode, SimulationMode } from "../stores/todoStore";
+import { type Filter, EMPTY_FILTER } from "../stores/filterTypes";
+import type { CompletedInfo } from "todo-client";
 import { viewTrace } from "../utils/viewTrace";
 
 const DEFAULT_SELECTORS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
@@ -67,9 +69,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
     private graphData: ProcessedGraphData | null = null;
     private lastAppState: AppState | null = null;
-    private currentFilterNodeIds: string[] | null = null;
-    private currentHideNodeIds: string[] | null = null;
-    private lastActiveView: string | null = null;
+    private currentFilter: Filter = EMPTY_FILTER;
     private lastFilterKey = '';
     private initialPositionsFetched = false;
     private _positionState: 'undefined' | 'ready' = 'undefined';
@@ -93,6 +93,9 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     private storeUnsubscribe: (() => void) | null = null;
 
     private positionPersistence: PositionPersistenceManager;
+
+    /** Interval for periodic re-evaluation when hideCompletedFor is active */
+    private hideCompletedIntervalId: ReturnType<typeof setInterval> | null = null;
 
     private setPositionState(next: 'undefined' | 'ready'): void {
         if (next !== this._positionState) {
@@ -120,7 +123,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         if (this._coreGraphPaused) {
             this._coreGraphPaused = false;
             if (this.lastAppState) {
-                console.log(`[CoreGraph] unpaused, flushing (${Object.keys(this.lastAppState.tasks).length} tasks, filter=${this.currentFilterNodeIds?.length ?? 'none'})`);
+                console.log(`[CoreGraph] unpaused, flushing (${Object.keys(this.lastAppState.tasks).length} tasks, filter=${this.currentFilter.includeRecursive?.length ?? 'none'})`);
                 this.processGraphData(this.lastAppState);
             } else {
                 console.log('[CoreGraph] unpaused, nothing to flush');
@@ -157,7 +160,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
         // Initialize from store
         const initialStoreState = useTodoStore.getState();
-        this.lastActiveView = initialStoreState.activeView;
+        this.currentFilter = initialStoreState.filter;
 
         // Initialize simulation engine based on store mode
         this.currentSimulationMode = useTodoStore.getState().simulationMode;
@@ -167,10 +170,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         this.currentNavigationMode = useTodoStore.getState().navigationMode;
         this.navigationEngine = this.createNavigationEngine(this.currentNavigationMode);
 
-        // Initial position fetch happens on first updateState() call,
-        // when baseUrl is guaranteed to be set (SSE is already connected).
-
-        // Subscribe to mode, view, and display changes
+        // Subscribe to mode and filter changes
         this.storeUnsubscribe = useTodoStore.subscribe(
             (state) => {
                 if (state.navigationMode !== this.currentNavigationMode) {
@@ -182,33 +182,15 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
                     this.setSimulationEngine(this.createSimulationEngine(state.simulationMode));
                 }
 
-                // Derive filter/hide from displayData + activeView
-                const { filterNodeIds, hideNodeIds } = deriveViewFilters(state.displayData, state.activeView);
-                const filterKey = JSON.stringify(filterNodeIds) + '|' + JSON.stringify(hideNodeIds);
-
-                if (state.activeView !== this.lastActiveView) {
-                    const prevViewId = this.lastActiveView!;
-                    const nextViewId = state.activeView;
-                    viewTrace('Graph', 'viewChange:detected', {
-                        prevViewId,
-                        nextViewId,
-                        nextFilterCount: filterNodeIds?.length ?? 0,
-                        nextHideCount: hideNodeIds?.length ?? 0,
-                    });
-                    this.onViewChange(prevViewId, nextViewId, filterNodeIds, hideNodeIds);
-                    this.lastActiveView = nextViewId;
-                    this.lastFilterKey = filterKey;
-                    this.currentFilterNodeIds = filterNodeIds;
-                    this.currentHideNodeIds = hideNodeIds;
-                    return;
-                }
+                // Read filter directly from store
+                const filter = state.filter;
+                const filterKey = JSON.stringify(filter);
 
                 if (filterKey !== this.lastFilterKey) {
+                    const prevFilter = this.currentFilter;
                     this.lastFilterKey = filterKey;
-                    const prevFilter = this.currentFilterNodeIds;
-                    this.currentFilterNodeIds = filterNodeIds;
-                    this.currentHideNodeIds = hideNodeIds;
-                    this.onFilterChange(prevFilter, filterNodeIds);
+                    this.currentFilter = filter;
+                    this.onFilterChange(prevFilter, filter);
                 }
             }
         );
@@ -246,7 +228,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
         if (!this._coreGraphPaused) {
             viewTrace('Graph', 'updateState:process', {
-                viewId: this.lastActiveView,
                 taskCount: Object.keys(appState.tasks).length,
                 depCount: Object.keys(appState.dependencies).length,
             });
@@ -254,7 +235,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         } else {
             console.log(`[CoreGraph] updateState buffered (${Object.keys(appState.tasks).length} tasks held)`);
             viewTrace('Graph', 'updateState:buffered', {
-                viewId: this.lastActiveView,
                 taskCount: Object.keys(appState.tasks).length,
             });
         }
@@ -262,7 +242,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         // Fetch initial positions on first update (baseUrl is now guaranteed set)
         if (!this.initialPositionsFetched) {
             this.initialPositionsFetched = true;
-            const viewId = this.lastActiveView ?? 'default';
+            const viewId = 'default';
             console.log(`[View] INIT fetching positions for '${viewId}'`);
             this.positionPersistence.fetchPositions(viewId).then((positions) => {
                 this.unpauseCoreGraphUpdates();
@@ -282,11 +262,11 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
      */
     private processGraphData(appState: AppState): void {
         viewTrace('Graph', 'processGraphData:start', {
-            viewId: this.lastActiveView,
             inputTasks: Object.keys(appState.tasks).length,
             inputDeps: Object.keys(appState.dependencies).length,
-            filterCount: this.currentFilterNodeIds?.length ?? 0,
-            hideCount: this.currentHideNodeIds?.length ?? 0,
+            filterInclude: this.currentFilter.includeRecursive?.length ?? 0,
+            filterExclude: this.currentFilter.excludeRecursive?.length ?? 0,
+            hideCompletedFor: this.currentFilter.hideCompletedFor,
         });
         // Apply client-side filter if active
         const taskList = this.applyFilter({
@@ -335,7 +315,6 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
                 console.log(`[Pos] APPLY accepted — setting simulationState`);
                 this.simulationState = { positions: validPositions };
                 // Force the engine to rebuild its layout from these positions
-                // so it doesn't fight them with stale internal forces.
                 this.simulationEngine.invalidateTopology?.();
             } else {
                 console.log(`[Pos] APPLY rejected — coverage too low, keeping current simulation`);
@@ -350,26 +329,24 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     }
 
     /**
-     * Apply client-side filter (whitelist) and blacklist.
-     * Whitelist: keep only filter root nodes and their recursive children.
-     * Blacklist: remove specific nodes.
-     * Returns the input unchanged if neither is active.
+     * Apply client-side filter (includeRecursive), excludeRecursive, and hideCompletedFor.
+     * Returns the input unchanged if no filters are active.
      */
     private applyFilter(taskList: NodeListOut): NodeListOut {
-        const filterNodeIds = this.currentFilterNodeIds;
-        const hideNodeIds = this.currentHideNodeIds;
-        const hasWhitelist = filterNodeIds && filterNodeIds.length > 0;
-        const hasBlacklist = hideNodeIds && hideNodeIds.length > 0;
+        const { includeRecursive, excludeRecursive, hideCompletedFor } = this.currentFilter;
+        const hasInclude = includeRecursive && includeRecursive.length > 0;
+        const hasExclude = excludeRecursive && excludeRecursive.length > 0;
+        const hasHideCompleted = hideCompletedFor != null && hideCompletedFor > 0;
 
-        if (!hasWhitelist && !hasBlacklist) {
+        if (!hasInclude && !hasExclude && !hasHideCompleted) {
             return taskList;
         }
 
         // Start with all nodes visible
         let visible = new Set<string>(Object.keys(taskList.tasks));
 
-        // Apply whitelist: restrict to filter roots + recursive children
-        if (hasWhitelist) {
+        // Apply includeRecursive: restrict to filter roots + recursive children
+        if (hasInclude) {
             // Build parent → children adjacency from dependencies
             const childrenMap = new Map<string, string[]>();
             for (const dep of Object.values(taskList.dependencies)) {
@@ -379,7 +356,7 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
 
             // BFS from filter roots
             visible = new Set<string>();
-            const queue = [...filterNodeIds];
+            const queue = [...includeRecursive!];
             while (queue.length > 0) {
                 const nodeId = queue.shift()!;
                 if (visible.has(nodeId)) continue;
@@ -391,10 +368,155 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
             }
         }
 
-        // Apply blacklist: remove hidden nodes
-        if (hasBlacklist) {
-            for (const nodeId of hideNodeIds) {
+        // Apply excludeRecursive: remove hidden nodes
+        if (hasExclude) {
+            for (const nodeId of excludeRecursive!) {
                 visible.delete(nodeId);
+            }
+        }
+
+        // Apply hideCompletedFor: hide nodes whose calculatedValue became true
+        // more than hideCompletedFor seconds ago
+        if (hasHideCompleted) {
+            const nowSec = Math.floor(Date.now() / 1000);
+            const cutoff = nowSec - hideCompletedFor!;
+
+            // Build dependency indexes for calculatedCompletedAt propagation
+            const depsFwd: Record<string, string[]> = {};
+            for (const dep of Object.values(taskList.dependencies)) {
+                if (!taskList.tasks[dep.fromId] || !taskList.tasks[dep.toId]) continue;
+                (depsFwd[dep.fromId] ??= []).push(dep.toId);
+            }
+
+            // Memoized calcTrueAt / calcFalseAt
+            const trueAtCache: Record<string, number | null> = {};
+            const falseAtCache: Record<string, number | null> = {};
+
+            function calcTrueAt(nodeId: string): number | null {
+                if (nodeId in trueAtCache) return trueAtCache[nodeId];
+                const node = taskList.tasks[nodeId];
+                if (!node) { trueAtCache[nodeId] = null; return null; }
+
+                const completed = node.completed;
+                const children = depsFwd[nodeId] ?? [];
+                const nodeType = node.nodeType ?? 'Task';
+                let result: number | null = null;
+
+                if (nodeType === 'Task') {
+                    // Task: trueAt = completed.modified if value===true, factoring deps
+                    const ownTrueAt = (completed?.value === true) ? completed!.modified : null;
+                    if (ownTrueAt != null) {
+                        // Also need all deps to be true: trueAt = max(own, max children trueAt)
+                        let maxChildTrue: number | null = null;
+                        for (const cid of children) {
+                            const ct = calcTrueAt(cid);
+                            if (ct == null) { maxChildTrue = null; break; }
+                            maxChildTrue = maxChildTrue == null ? ct : Math.max(maxChildTrue, ct);
+                        }
+                        if (children.length === 0 || maxChildTrue != null) {
+                            result = maxChildTrue != null ? Math.max(ownTrueAt, maxChildTrue) : ownTrueAt;
+                        }
+                    }
+                } else if (nodeType === 'And') {
+                    // AND: true when all children true → max of children's trueAt
+                    if (children.length === 0) { result = null; }
+                    else {
+                        let maxT: number | null = null;
+                        for (const cid of children) {
+                            const ct = calcTrueAt(cid);
+                            if (ct == null) { maxT = null; break; }
+                            maxT = maxT == null ? ct : Math.max(maxT, ct);
+                        }
+                        result = maxT;
+                    }
+                } else if (nodeType === 'Or') {
+                    // OR: true when any child true → min of true-children's trueAt
+                    let minT: number | null = null;
+                    for (const cid of children) {
+                        const ct = calcTrueAt(cid);
+                        if (ct != null) {
+                            minT = minT == null ? ct : Math.min(minT, ct);
+                        }
+                    }
+                    result = minT;
+                } else if (nodeType === 'Not') {
+                    // NOT: true when child false → child's falseAt
+                    result = children.length > 0 ? calcFalseAt(children[0]) : null;
+                } else if (nodeType === 'ExactlyOne') {
+                    // ExactlyOne: true when exactly one child true
+                    const trueChildren = children.filter(cid => calcTrueAt(cid) != null);
+                    if (trueChildren.length === 1) {
+                        result = calcTrueAt(trueChildren[0]);
+                    }
+                }
+
+                trueAtCache[nodeId] = result;
+                return result;
+            }
+
+            function calcFalseAt(nodeId: string): number | null {
+                if (nodeId in falseAtCache) return falseAtCache[nodeId];
+                const node = taskList.tasks[nodeId];
+                if (!node) { falseAtCache[nodeId] = null; return null; }
+
+                const completed = node.completed;
+                const children = depsFwd[nodeId] ?? [];
+                const nodeType = node.nodeType ?? 'Task';
+                let result: number | null = null;
+
+                if (nodeType === 'Task') {
+                    result = (completed?.value === false) ? completed!.modified : null;
+                } else if (nodeType === 'And') {
+                    // AND false when any child false → max of false-children's falseAt
+                    let maxF: number | null = null;
+                    for (const cid of children) {
+                        const cf = calcFalseAt(cid);
+                        if (cf != null) {
+                            maxF = maxF == null ? cf : Math.max(maxF, cf);
+                        }
+                    }
+                    result = maxF;
+                } else if (nodeType === 'Or') {
+                    // OR false when all children false → max of children's falseAt
+                    if (children.length === 0) { result = null; }
+                    else {
+                        let maxF: number | null = null;
+                        for (const cid of children) {
+                            const cf = calcFalseAt(cid);
+                            if (cf == null) { maxF = null; break; }
+                            maxF = maxF == null ? cf : Math.max(maxF, cf);
+                        }
+                        result = maxF;
+                    }
+                } else if (nodeType === 'Not') {
+                    // NOT false when child true → child's trueAt
+                    result = children.length > 0 ? calcTrueAt(children[0]) : null;
+                } else if (nodeType === 'ExactlyOne') {
+                    // Simplified: false when 0 or >1 children true
+                    const trueChildren = children.filter(cid => calcTrueAt(cid) != null);
+                    if (trueChildren.length !== 1) {
+                        // max of all children's falseAt
+                        let maxF: number | null = null;
+                        for (const cid of children) {
+                            const cf = calcFalseAt(cid);
+                            if (cf != null) {
+                                maxF = maxF == null ? cf : Math.max(maxF, cf);
+                            }
+                        }
+                        result = maxF;
+                    }
+                }
+
+                falseAtCache[nodeId] = result;
+                return result;
+            }
+
+            // Hide nodes where trueAt < cutoff
+            for (const nodeId of [...visible]) {
+                const trueAt = calcTrueAt(nodeId);
+                if (trueAt != null && trueAt < cutoff) {
+                    visible.delete(nodeId);
+                }
             }
         }
 
@@ -422,84 +544,59 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
     }
 
     /**
-     * Handle filter/hide changes (derived from displayData).
-     * Reprocesses graph and fetches positions when view is reset.
+     * Handle filter changes (from store).
+     * Reprocesses graph and manages hideCompletedFor interval.
      */
-    private onFilterChange(prevFilter: string[] | null, newFilter: string[] | null): void {
+    private onFilterChange(prevFilter: Filter, newFilter: Filter): void {
         viewTrace('Graph', 'filterChange', {
-            prevCount: prevFilter?.length ?? 0,
-            nextCount: newFilter?.length ?? 0,
-            viewId: this.lastActiveView,
+            prevInclude: prevFilter.includeRecursive?.length ?? 0,
+            nextInclude: newFilter.includeRecursive?.length ?? 0,
+            prevExclude: prevFilter.excludeRecursive?.length ?? 0,
+            nextExclude: newFilter.excludeRecursive?.length ?? 0,
+            hideCompletedFor: newFilter.hideCompletedFor,
         });
         this.updatePersistencePause();
+        this.updateHideCompletedInterval();
 
         if (this.lastAppState) {
             this.processGraphData(this.lastAppState);
 
-            // When filter removed (e.g. resetview), restore saved positions from server
-            if (newFilter === null && prevFilter !== null) {
-                const viewId = this.lastActiveView;
-                if (viewId) {
-                    this.positionPersistence.fetchPositions(viewId).then((positions) => {
-                        if (positions) {
-                            this.applyFetchedPositions(positions);
-                        }
-                    });
-                }
+            // When includeRecursive removed (e.g. resetview), restore saved positions from server
+            if (newFilter.includeRecursive === null && prevFilter.includeRecursive !== null) {
+                this.positionPersistence.fetchPositions('default').then((positions) => {
+                    if (positions) {
+                        this.applyFetchedPositions(positions);
+                    }
+                });
             }
         }
     }
 
     /**
-     * Handle view switch: save current positions, then fetch new view positions async.
+     * Manage the setInterval for hideCompletedFor re-evaluation.
      */
-    private onViewChange(
-        prevViewId: string,
-        nextViewId: string,
-        newFilter: string[] | null,
-        newHide: string[] | null,
-    ): void {
-        const simPosCount = Object.keys(this.simulationState.positions).length;
-        console.log(`[View] SWITCH '${prevViewId}' → '${nextViewId}' (simPositions=${simPosCount}, filter=${newFilter?.length ?? 'none'}, hide=${newHide?.length ?? 'none'})`);
-
-        // Note: no auto-save on view switch. Use 'savepos' command.
-        this.setPositionState('undefined');
-
-        // Pause core graph updates — the render loop keeps showing the old view
-        // while we fetch positions for the new one.
-        this.pauseCoreGraphUpdates();
-
-        this.currentFilterNodeIds = newFilter;
-        this.currentHideNodeIds = newHide;
-        this.updatePersistencePause();
-
-        // Fetch positions for the new view async
-        console.log(`[View] fetching positions for next view '${nextViewId}'...`);
-        this.positionPersistence.fetchPositions(nextViewId).then((positions) => {
-            // Unpause first: flushes buffered state → processGraphData runs
-            // with new view's filters, producing correct graphData.
-            this.unpauseCoreGraphUpdates();
-
-            // Now apply fetched positions on top of the new graphData.
-            if (positions) {
-                console.log(`[View] got ${Object.keys(positions).length} positions for '${nextViewId}', applying...`);
-                this.applyFetchedPositions(positions);
-            } else {
-                console.log(`[View] no positions returned for '${nextViewId}'`);
+    private updateHideCompletedInterval(): void {
+        if (this.currentFilter.hideCompletedFor != null && this.currentFilter.hideCompletedFor > 0) {
+            if (!this.hideCompletedIntervalId) {
+                this.hideCompletedIntervalId = setInterval(() => {
+                    if (this.lastAppState && !this._coreGraphPaused) {
+                        this.processGraphData(this.lastAppState);
+                    }
+                }, 15000); // Re-evaluate every 15 seconds
             }
-            this.setPositionState('ready');
-        }).catch((err) => {
-            console.error('[View] position fetch failed:', err);
-            this.unpauseCoreGraphUpdates();
-            this.setPositionState('ready');
-        });
+        } else {
+            if (this.hideCompletedIntervalId) {
+                clearInterval(this.hideCompletedIntervalId);
+                this.hideCompletedIntervalId = null;
+            }
+        }
     }
 
     private updatePersistencePause(): void {
-        const shouldPause = this.currentFilterNodeIds !== null;
+        const shouldPause = this.currentFilter.includeRecursive !== null;
         viewTrace('Graph', 'persistencePause', {
             shouldPause,
-            filterCount: this.currentFilterNodeIds?.length ?? 0,
+            filterCount: this.currentFilter.includeRecursive?.length ?? 0,
         });
         this.positionPersistence.setPaused(shouldPause);
     }
@@ -707,6 +804,10 @@ export class GraphViewerEngine extends AbstractGraphViewerEngine {
         if (this.animationFrameId !== null) {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
+        }
+        if (this.hideCompletedIntervalId) {
+            clearInterval(this.hideCompletedIntervalId);
+            this.hideCompletedIntervalId = null;
         }
         this.positionPersistence.stop();
         useTodoStore.setState({ savePositionsCallback: null });

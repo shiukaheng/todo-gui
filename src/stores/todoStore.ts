@@ -9,6 +9,7 @@ import {
 } from 'todo-client';
 import { OptimisticTodoClient, type TodoApi } from '../client/OptimisticTodoClient';
 import { viewTrace } from '../utils/viewTrace';
+import { type Filter, EMPTY_FILTER } from './filterTypes';
 
 /** Navigation mode for the graph viewer */
 export type NavigationMode = 'auto' | 'manual' | 'follow' | 'fly';
@@ -26,11 +27,11 @@ interface TodoStore {
 
     // ── Server-authoritative state (display / views) ─────────────────
     // Pushed via display SSE; never persisted locally.
-    displayData: ViewListOut | null;
+    viewsData: ViewListOut | null;
 
     // ── Local persisted state (survives refresh via localStorage) ─────
     // See `partialize` at the bottom for what gets persisted.
-    activeView: string;
+    filter: Filter;
 
     // ── Transient UI state (lost on refresh) ─────────────────────────
     cursor: string | null;
@@ -58,7 +59,7 @@ interface TodoStore {
     setSimulationMode: (mode: SimulationMode) => void;
     showCommandPlane: () => void;
     hideCommandPlane: () => void;
-    setActiveView: (viewId: string) => void;
+    setFilter: (filter: Filter) => void;
     subscribeDisplay: (baseUrl: string) => () => void;
     disconnectDisplay: () => void;
     subscribe: (baseUrl: string) => () => void;
@@ -66,23 +67,17 @@ interface TodoStore {
 }
 
 /**
- * Derive filter/hide arrays from displayData for a given view.
- * Exported for use by the engine.
+ * Derive a Filter from a ViewOut.
+ * Used by loadview to extract filter fields from a server-stored view.
  */
-export function deriveViewFilters(displayData: ViewListOut | null, viewId: string): {
-    filterNodeIds: string[] | null;
-    hideNodeIds: string[] | null;
-} {
-    if (!displayData) {
-        return { filterNodeIds: null, hideNodeIds: null };
-    }
-    const viewData = displayData.views?.[viewId];
-    if (!viewData) {
-        return { filterNodeIds: null, hideNodeIds: null };
-    }
+export function deriveFilterFromView(viewsData: ViewListOut | null, viewId: string): Filter {
+    if (!viewsData) return EMPTY_FILTER;
+    const viewData = viewsData.views?.[viewId];
+    if (!viewData) return EMPTY_FILTER;
     return {
-        filterNodeIds: viewData.whitelist?.length ? viewData.whitelist : null,
-        hideNodeIds: viewData.blacklist?.length ? viewData.blacklist : null,
+        includeRecursive: viewData.includeRecursive?.length ? viewData.includeRecursive : null,
+        excludeRecursive: viewData.excludeRecursive?.length ? viewData.excludeRecursive : null,
+        hideCompletedFor: viewData.hideCompletedFor ?? null,
     };
 }
 
@@ -106,10 +101,10 @@ function resolvePendingCursors(
 export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
     // ── Server-authoritative ─────────────────────────────────────────
     graphData: null,
-    displayData: null,
+    viewsData: null,
 
     // ── Local persisted ──────────────────────────────────────────────
-    activeView: 'default',
+    filter: EMPTY_FILTER,
 
     // ── Transient UI ─────────────────────────────────────────────────
     cursor: null,
@@ -139,18 +134,11 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
     setSimulationMode: (mode) => set({ simulationMode: mode }),
     showCommandPlane: () => set({ commandPlaneVisible: true }),
     hideCommandPlane: () => set({ commandPlaneVisible: false }),
-    setActiveView: (viewId) => {
-        const { activeView } = get();
-        viewTrace('Store', 'setActiveView', {
-            fromViewId: activeView,
-            toViewId: viewId,
-        });
-        set({ activeView: viewId });
-    },
+    setFilter: (filter) => set({ filter }),
 
     disconnectDisplay: () => {
         get().displayUnsubscribe?.();
-        set({ displayUnsubscribe: null, displayData: null });
+        set({ displayUnsubscribe: null, viewsData: null });
     },
 
     subscribeDisplay: (baseUrl: string) => {
@@ -159,12 +147,10 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
 
         const unsubscribe = subscribeToDisplay(
             (data) => {
-                const { activeView } = get();
                 viewTrace('Store', 'displaySSE:update', {
-                    activeView,
                     viewCount: Object.keys(data.views || {}).length,
                 });
-                set({ displayData: data });
+                set({ viewsData: data });
             },
             {
                 baseUrl,
@@ -191,8 +177,7 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
             api: null,
             connectionStatus: 'disconnected',
             graphData: null,
-            displayData: null,
-            activeView: 'default',
+            viewsData: null,
         });
     },
 
@@ -245,12 +230,10 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
         // Also subscribe to display layer
         const displayUnsubscribe = client.subscribeToDisplay(
             (data) => {
-                const { activeView } = get();
                 viewTrace('Store', 'displaySSE:update', {
-                    activeView,
                     viewCount: Object.keys(data.views || {}).length,
                 });
-                set({ displayData: data });
+                set({ viewsData: data });
             },
             {
                 baseUrl,
@@ -270,5 +253,5 @@ export const useTodoStore = create<TodoStore>()(persist((set, get) => ({
     },
 }), {
     name: 'todo-store',
-    partialize: (state) => ({ activeView: state.activeView }),
+    partialize: (state) => ({ filter: state.filter }),
 }));

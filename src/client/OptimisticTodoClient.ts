@@ -18,7 +18,7 @@ export interface TodoApi {
         requestParameters: BatchOperationsApiBatchPostRequest,
         initOverrides?: RequestInit,
     ): Promise<BatchResponse>;
-    displayBatch(
+    displayBatchOperationsApiDisplayBatchPost(
         requestParameters: DisplayBatchOperationsRequest,
         initOverrides?: RequestInit,
     ): Promise<BatchResponse>;
@@ -94,9 +94,9 @@ export class OptimisticTodoClient implements TodoApi {
     }
 
     /**
-     * Wraps api.displayBatch with optimistic update.
+     * Wraps api.displayBatchOperationsApiDisplayBatchPost with optimistic update.
      */
-    async displayBatch(
+    async displayBatchOperationsApiDisplayBatchPost(
         requestParameters: DisplayBatchOperationsRequest,
         initOverrides?: RequestInit,
     ): Promise<BatchResponse> {
@@ -108,6 +108,6 @@ export class OptimisticTodoClient implements TodoApi {
         }
 
         // 2. Forward to real API — server SSE will override with truth
-        return this.api.displayBatch(requestParameters, initOverrides);
+        return this.api.displayBatchOperationsApiDisplayBatchPost(requestParameters, initOverrides);
     }
 }
